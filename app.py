@@ -1,7 +1,9 @@
 # From https://gitlab.com/Athamaxy/telegram-bot-tutorial/-/blob/main/TutorialBot.py
 
 import logging
+import os
 
+from dotenv import load_dotenv
 from telegram import Update, ForceReply, InlineKeyboardMarkup, InlineKeyboardButton, ParseMode
 from telegram.ext import Updater, CommandHandler, MessageHandler, Filters, CallbackContext, CallbackQueryHandler
 
@@ -108,7 +110,11 @@ def button_tap(update: Update, context: CallbackContext) -> None:
 
 
 def main() -> None:
-    updater = Updater("<YOUR_BOT_TOKEN_HERE>")
+    # updater = Updater("<YOUR_BOT_TOKEN_HERE>")
+    load_dotenv()
+    BOT_TOKEN = os.environ.get("BOT_TOKEN")
+    # print(BOT_TOKEN)
+    updater = Updater(BOT_TOKEN)
 
     # Get the dispatcher to register handlers
     # Then, we register each handler and the conditions the update must meet to trigger it
