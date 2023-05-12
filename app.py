@@ -2,6 +2,7 @@
 
 import logging
 import os
+import time
 
 from dotenv import load_dotenv
 from telegram import Update, ForceReply, InlineKeyboardMarkup, InlineKeyboardButton, ParseMode
@@ -37,16 +38,21 @@ def echo(update: Update, context: CallbackContext) -> None:
     """
 
     # Print to console
-    print(f'{update.message.from_user.first_name} wrote {update.message.text}')
+    user_id = update.message.from_user.id
+    username = update.message.from_user.first_name
+    text = update.message.text
+    print(f'{username} wrote {text}')
+    logger.info(f'{time.asctime()}\t{user_id} ({username}): {text}')
 
     if screaming and update.message.text:
         context.bot.send_message(
             update.message.chat_id,
-            update.message.text.upper(),
+            text.upper(),
             # To preserve the markdown, we attach entities (bold, italic...)
             entities=update.message.entities
         )
     else:
+        # print("This is else")
         # This is equivalent to forwarding, without the sender's name
         update.message.copy(update.message.chat_id)
 
@@ -108,12 +114,70 @@ def button_tap(update: Update, context: CallbackContext) -> None:
         reply_markup=markup
     )
 
+def help(update: Update, context: CallbackContext) -> None:
+    """
+    This function handles /help command
+    """
+    bot_msg = "Should print description to user"
+    context.bot.send_message(
+            update.message.chat_id,
+            bot_msg,
+            # To preserve the markdown, we attach entities (bold, italic...)
+            entities=update.message.entities
+        )
+
+def status(update: Update, context: CallbackContext) -> None:
+    """
+    This function handles /status command
+    """
+    bot_msg = "Should print status to user"
+    context.bot.send_message(
+            update.message.chat_id,
+            bot_msg,
+            # To preserve the markdown, we attach entities (bold, italic...)
+            entities=update.message.entities
+        ) 
+
+    n = 10
+    for i in range(n):
+        time.sleep(2)
+        bot_msg = f'Current task is: {i}'
+        context.bot.send_message(
+            update.message.chat_id, 
+            bot_msg,
+            entities=update.message.entities
+        )
+
+
+def freshstart(update: Update, context: CallbackContext) -> None:
+    """
+    This function handles /freshstart command
+    """
+
+    bot_msg = "Here will be routine to start a new project"
+    context.bot.send_message(
+            update.message.chat_id,
+            bot_msg,
+            # To preserve the markdown, we attach entities (bold, italic...)
+            entities=update.message.entities
+        )   
+
+def settings(update: Update, context: CallbackContext) -> None:
+    """
+    This function handles /settings command
+    """
+    bot_msg = "Here PM should be able to change some of project settings. If no project started yet, then redirect to freshstart"
+    context.bot.send_message(
+            update.message.chat_id,
+            bot_msg,
+            # To preserve the markdown, we attach entities (bold, italic...)
+            entities=update.message.entities
+        ) 
 
 def main() -> None:
     # updater = Updater("<YOUR_BOT_TOKEN_HERE>")
     load_dotenv()
     BOT_TOKEN = os.environ.get("BOT_TOKEN")
-    # print(BOT_TOKEN)
     updater = Updater(BOT_TOKEN)
 
     # Get the dispatcher to register handlers
@@ -124,6 +188,20 @@ def main() -> None:
     dispatcher.add_handler(CommandHandler("scream", scream))
     dispatcher.add_handler(CommandHandler("whisper", whisper))
     dispatcher.add_handler(CommandHandler("menu", menu))
+    #TODO: Add more commands
+    # dispatcher.add_handler(CommandHandler("start", start)) 
+    # dispatcher.add_handler(CommandHandler("stop", stop)) # in case smth went wrong 
+    dispatcher.add_handler(CommandHandler("help", help)) # make it show description
+    # PM should have the abibility to change bot behaviour, such as reminder interval and so on
+    dispatcher.add_handler(CommandHandler("settings", settings))
+    # Command to trigger project status check.
+    dispatcher.add_handler(CommandHandler("status", status))
+    # Initialize start of the project: project name, db initialization and so on, previous project should be archived
+    dispatcher.add_handler(CommandHandler("freshstart", freshstart))  
+    # It will be useful if schedule changed outside the bot
+    # dispatcher.add_handler(CommandHandler("upload", upload))  
+    # And if changes were made inside the bot, PM could download updated schedule
+    # dispatcher.add_handler(CommandHandler("download", download))
 
     # Register handler for inline buttons
     dispatcher.add_handler(CallbackQueryHandler(button_tap))
