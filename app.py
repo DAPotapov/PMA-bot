@@ -10,6 +10,7 @@ import tempfile
 
 
 from dotenv import load_dotenv
+from datetime import date
 # from io import BufferedIOBase
 from telegram import Update, ForceReply, InlineKeyboardMarkup, InlineKeyboardButton
 from telegram.constants import ParseMode
@@ -182,9 +183,18 @@ async def status(update: Update, context: CallbackContext) -> None:
                     for task in project['tasks']:
                         # Check if task not completed
                         if task['complete'] < 100:
-                            # if task['startdate'] == 
+                            # TODO: What to do with milestones?
+                            # If delta_start >0 task not started, otherwise already started
+                            delta_start = date.today() - date.fromisoformat(task['startdate'])
+                            # If delta_end >0 task overdue, if <0 task in progress
+                            delta_end = date.today() - date.fromisoformat(task['enddate'])
+                            if delta_start.days == 0:
+                                print(f"task '{task['name']} starts today")
+                            elif :
+                                
+
                             # TODO fix end_date to enddate here and in connectors. Must be uniformal
-                            bot_msg = f"Task '{task['name']}' should be finished due: {task['end_date']}"
+                            bot_msg = f"Task '{task['name']}' should be finished due: {task['enddate']}"
                             # Send reply to PM in group chat if allowed
                             if ALLOW_POST_STATUS_TO_GROUP == True:
                                 await update.message.reply_text(bot_msg)

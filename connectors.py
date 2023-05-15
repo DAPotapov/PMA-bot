@@ -4,11 +4,11 @@ import json
 
 from numpy import busday_offset, datetime64
 
-
+# TODO maybe don't need this
 def main():
     '''
     Module recieve PosixPath of downloaded file.
-    Returns JSON of project schedule and assignments
+    Returns dictionary of lists of dictionaries of project schedule and assignments
     If error occured should return at least string of error message, but maybe there is better way of error handling
 
     '''
@@ -17,11 +17,10 @@ def main():
 
 def load_gan(fp):
     '''
-        This is a connector from GanttProject format (.gan) to inner JSON format.
-        На входе получаем имя файла (.gan )
-        Выполняем парсинг
-        Затем преобразовываем к внутреннему формату: берем только нужные элементы
-        Имеем json на выходе
+        This is a connector from GanttProject format (.gan) to inner format.
+        Get file pointer on input
+        Validates and converts data to inner dict-list-dict.. format
+        Dictionary on output        
     '''
     
     # Using untangle on GAN - WORKING. This syntax cleaner and have some useful methods like 'children'
@@ -148,7 +147,7 @@ def compose_tasks_list(list, task, allocations):
                 'id': int(task['id']),
                 'name': task['name'],
                 'startdate': task['start'],
-                'end_date': enddate, 
+                'enddate': enddate, 
                 'duration': int(task['duration']),
                 'successors': successors,
                 'milestone': milestone,
