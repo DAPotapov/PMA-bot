@@ -65,7 +65,7 @@ async def echo(update: Update, context: CallbackContext) -> None:
         await update.message.reply_text(text)
 
 
-def scream(update: Update, context: CallbackContext) -> None:
+async def scream(update: Update, context: CallbackContext) -> None:
     """
     This function handles the /scream command
     """
@@ -74,7 +74,7 @@ def scream(update: Update, context: CallbackContext) -> None:
     screaming = True
 
 
-def whisper(update: Update, context: CallbackContext) -> None:
+async def whisper(update: Update, context: CallbackContext) -> None:
     """
     This function handles /whisper command
     """
@@ -83,17 +83,17 @@ def whisper(update: Update, context: CallbackContext) -> None:
     screaming = False
 
 
-def menu(update: Update, context: CallbackContext) -> None:
+async def menu(update: Update, context: CallbackContext) -> None:
     """
     This handler sends a menu with the inline buttons we pre-assigned above
     """
-
-    context.bot.send_message(
-        update.message.from_user.id,
-        FIRST_MENU,
-        parse_mode=ParseMode.HTML,
-        reply_markup=FIRST_MENU_MARKUP
-    )
+    # From v.13.  On this step of development not needed
+    # context.bot.send_message(
+    #     update.message.from_user.id,
+    #     FIRST_MENU,
+    #     parse_mode=ParseMode.HTML,
+    #     reply_markup=FIRST_MENU_MARKUP
+    # )
 
 
 def button_tap(update: Update, context: CallbackContext) -> None:
@@ -122,67 +122,72 @@ def button_tap(update: Update, context: CallbackContext) -> None:
         reply_markup=markup
     )
 
-def help(update: Update, context: CallbackContext) -> None:
+async def help(update: Update, context: CallbackContext) -> None:
     """
     This function handles /help command
     """
     bot_msg = "Should print description to user"
-    context.bot.send_message(
-            update.message.chat_id,
-            bot_msg,
-            # To preserve the markdown, we attach entities (bold, italic...)
-            entities=update.message.entities
-        )
+    # From v.13
+    # context.bot.send_message(
+    #         update.message.chat_id,
+    #         bot_msg,
+    #         # To preserve the markdown, we attach entities (bold, italic...)
+    #         entities=update.message.entities
+    #     )
+    await update.message.reply_text(bot_msg)
 
-def status(update: Update, context: CallbackContext) -> None:
+async def status(update: Update, context: CallbackContext) -> None:
     """
     This function handles /status command
     """
     bot_msg = "Should print status to user"
-    context.bot.send_message(
-            update.message.chat_id,
-            bot_msg,
-            # To preserve the markdown, we attach entities (bold, italic...)
-            entities=update.message.entities
-        ) 
+    # context.bot.send_message(
+    #         update.message.chat_id,
+    #         bot_msg,
+    #         # To preserve the markdown, we attach entities (bold, italic...)
+    #         entities=update.message.entities
+    #     ) 
+    await update.message.reply_text(bot_msg)   
 
-    n = 10
-    for i in range(n):
-        time.sleep(2)
-        bot_msg = f'Current task is: {i}'
-        context.bot.send_message(
-            update.message.chat_id, 
-            bot_msg,
-            entities=update.message.entities
-        )
+    # n = 10
+    # for i in range(n):
+    #     time.sleep(2)
+    #     bot_msg = f'Current task is: {i}'
+    #     context.bot.send_message(
+    #         update.message.chat_id, 
+    #         bot_msg,
+    #         entities=update.message.entities
+    #     )
 
 
-def freshstart(update: Update, context: CallbackContext) -> None:
+async def freshstart(update: Update, context: CallbackContext) -> None:
     """
     This function handles /freshstart command
     """
 
     bot_msg = "Here will be routine to start a new project"
-    context.bot.send_message(
-            update.message.chat_id,
-            bot_msg,
-            # To preserve the markdown, we attach entities (bold, italic...)
-            entities=update.message.entities
-        )   
+    # context.bot.send_message(
+    #         update.message.chat_id,
+    #         bot_msg,
+    #         # To preserve the markdown, we attach entities (bold, italic...)
+    #         entities=update.message.entities
+    #     )   
+    await update.message.reply_text(bot_msg)
 
-def settings(update: Update, context: CallbackContext) -> None:
+async def settings(update: Update, context: CallbackContext) -> None:
     """
     This function handles /settings command
     """
     bot_msg = "Here PM should be able to change some of project settings. If no project started yet, then redirect to freshstart"
-    context.bot.send_message(
-            update.message.chat_id,
-            bot_msg,
-            # To preserve the markdown, we attach entities (bold, italic...)
-            entities=update.message.entities
-        ) 
+    # context.bot.send_message(
+    #         update.message.chat_id,
+    #         bot_msg,
+    #         # To preserve the markdown, we attach entities (bold, italic...)
+    #         entities=update.message.entities
+    #     ) 
+    await update.message.reply_text(bot_msg)
 
-def upload(update: Update, context: CallbackContext) -> None:
+async def upload(update: Update, context: CallbackContext) -> None:
     '''
     Function to upload new project file
     '''
@@ -206,7 +211,7 @@ def main() -> None:
     # Register commands
     application.add_handler(CommandHandler("scream", scream))
     application.add_handler(CommandHandler("whisper", whisper))
-    application.add_handler(CommandHandler("menu", menu))
+    # application.add_handler(CommandHandler("menu", menu))
     #TODO: Add more commands
     # dispatcher.add_handler(CommandHandler("start", start)) 
     # dispatcher.add_handler(CommandHandler("stop", stop)) # in case smth went wrong 
@@ -223,7 +228,7 @@ def main() -> None:
     # dispatcher.add_handler(CommandHandler("download", download))
 
     # Register handler for inline buttons
-    application.add_handler(CallbackQueryHandler(button_tap))
+    # application.add_handler(CallbackQueryHandler(button_tap))
 
     # Echo any message that is text and not a command
     application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, echo))
