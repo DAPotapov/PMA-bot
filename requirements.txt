@@ -1,2 +1,3 @@
+numpy
 python-telegram-bot==13.12
 untangle

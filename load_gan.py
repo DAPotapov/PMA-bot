@@ -2,14 +2,16 @@ import pprint
 import untangle
 import json
 
+from numpy import busday_offset, datetime64
+
 
 def main():
     '''
     This is a connector from GanttProject format (.gan) to inner JSON format.
     На входе получаем имя файла (.gan )
     Выполняем парсинг
-    Имеем json на выходе
     Затем преобразовываем к внутреннему формату: берем только нужные элементы
+    Имеем json на выходе
     '''
 
     # Using untangle on GAN - WORKING. This syntax cleaner and have some useful methods like 'children'
@@ -29,12 +31,18 @@ def main():
         for task in obj.project.tasks.task:
             # Add relevant data to list containing task information
             allocations = obj.project.allocations.allocation
-            tasks = compose_tasks_list(tasks, task, allocations)
-
-            # if task has subtask retreive data from it too
-            if 'task' in task:
-                for task in task.task:
-                    tasks = compose_tasks_list(tasks, task, allocations)                                       
+            try:
+                tasks = compose_tasks_list(tasks, task, allocations)
+            except Exception as e:
+                print("Error occured: " + str(e))
+            else:
+                # if task has subtask retreive data from it too
+                if 'task' in task:
+                    for task in task.task:
+                        try:
+                            tasks = compose_tasks_list(tasks, task, allocations)
+                        except Exception as e:
+                            print("Error occured: " + str(e))
 
         # TODO Resolving GanttProject bug of duplication of resource allocation. 
         # Better use standalone function in case they will fix this bug
@@ -60,6 +68,8 @@ def main():
 
     # DELETE. For testing purposes only
     # pprint.pprint(project['actioners'])
+    # pprint.pprint(project['tasks'])
+    
     
 
 def compose_tasks_list(list, task, allocations):
@@ -70,7 +80,7 @@ def compose_tasks_list(list, task, allocations):
     for allocation in allocations:
         if task['id'] == allocation['task-id']:
             actioners.append({
-                'actioner_id': allocation['resource-id'],
+                'actioner_id': int(allocation['resource-id']),
                 'nofeedback': False # Default. Will be changed to True if person didn't answer to bot
                 })
                              
@@ -79,9 +89,9 @@ def compose_tasks_list(list, task, allocations):
     if 'depend' in dir(task):
         for follower in task.depend:
             successors.append({
-                'id': follower['id'],
+                'id': int(follower['id']),
                 'depend_type': follower['type'],
-                'depend_offset': follower['difference']
+                'depend_offset': int(follower['difference'])
                 })
                 # depend types:
                 # 0 - none
@@ -94,24 +104,33 @@ def compose_tasks_list(list, task, allocations):
     include = []
     if 'task' in task:
         for task in task.task:
-            include.append(task['id'])
+            include.append(int(task['id']))
     
     # Construct dictionary of task and append to list of tasks   
     # TODO: construct end date from start date, duration and numpy function:
     #  https://numpy.org/doc/stable/reference/routines.datetime.html
-    enddate = ""                
+    # TODO in v.2: project apps supports alternative calendars, bot should support them as well.
+    if task['meeting'].lower() == "false":
+        milestone = False
+    elif task['meeting'].lower() == "true":
+        milestone = True
+    else:
+        raise ValueError('File may be damaged: milestone field contains invalid value ' + str(task['meeting']))
+
+    enddate = busday_offset(datetime64(task['start']), int(task['duration']), roll='forward')
+    
     list.append({
-                'id': task['id'],
+                'id': int(task['id']),
                 'name': task['name'],
-                'startdate': task['start'],
+                'startdate': datetime64(task['start']),
                 'end_date': enddate, 
-                'duration': task['duration'],
+                'duration': int(task['duration']),
                 'successors': successors,
-                'milestone': task['meeting'],
-                'complete': task['complete'],
+                'milestone': milestone,
+                'complete': int(task['complete']),
                 'curator': '', # not using for now, but it may become usefull later
-                'basicplan_startdate': task['start'], # equal to start date on a start of the project
-                'basicplan_enddate': task['end'], # equal to end date on a start of the project
+                'basicplan_startdate': datetime64(task['start']), # equal to start date on a start of the project
+                'basicplan_enddate': enddate, # equal to end date on a start of the project
                 'include': include,
                 'successors': successors,
                 'actioners': actioners
