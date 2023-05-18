@@ -8,6 +8,8 @@ from dotenv import load_dotenv
 from telegram import Update, ForceReply, InlineKeyboardMarkup, InlineKeyboardButton, ParseMode
 from telegram.ext import Updater, CommandHandler, MessageHandler, Filters, CallbackContext, CallbackQueryHandler
 
+
+logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s', level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 # Store bot screaming status
@@ -39,9 +41,10 @@ def echo(update: Update, context: CallbackContext) -> None:
 
     # Print to console
     user_id = update.message.from_user.id
-    username = update.message.from_user.first_name
+    username = update.message.from_user.username
+    firstname = update.message.from_user.first_name
     text = update.message.text
-    print(f'{username} wrote {text}')
+    print(f'{firstname} wrote {text}')
     logger.info(f'{time.asctime()}\t{user_id} ({username}): {text}')
 
     if screaming and update.message.text:
@@ -174,6 +177,13 @@ def settings(update: Update, context: CallbackContext) -> None:
             entities=update.message.entities
         ) 
 
+def upload(update: Update, context: CallbackContext) -> None:
+    '''
+    Function to upload new project file
+    '''
+
+    pass
+
 def main() -> None:
     # updater = Updater("<YOUR_BOT_TOKEN_HERE>")
     load_dotenv()
@@ -199,7 +209,7 @@ def main() -> None:
     # Initialize start of the project: project name, db initialization and so on, previous project should be archived
     dispatcher.add_handler(CommandHandler("freshstart", freshstart))  
     # It will be useful if schedule changed outside the bot
-    # dispatcher.add_handler(CommandHandler("upload", upload))  
+    dispatcher.add_handler(CommandHandler("upload", upload))  
     # And if changes were made inside the bot, PM could download updated schedule
     # dispatcher.add_handler(CommandHandler("download", download))
 
