@@ -5,8 +5,10 @@ import os
 import time
 
 from dotenv import load_dotenv
-from telegram import Update, ForceReply, InlineKeyboardMarkup, InlineKeyboardButton, ParseMode
-from telegram.ext import Updater, CommandHandler, MessageHandler, Filters, CallbackContext, CallbackQueryHandler
+from telegram import Update, ForceReply, InlineKeyboardMarkup, InlineKeyboardButton
+from telegram.constants import ParseMode
+from telegram.ext import Application, Updater, CommandHandler, MessageHandler, CallbackContext, CallbackQueryHandler, filters
+
 
 
 logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s', level=logging.INFO)
@@ -34,30 +36,33 @@ SECOND_MENU_MARKUP = InlineKeyboardMarkup([
 ])
 
 
-def echo(update: Update, context: CallbackContext) -> None:
+async def echo(update: Update, context: CallbackContext) -> None:
     """
-    This function would be added to the dispatcher as a handler for messages coming from the Bot API
+    This function would be added to the application as a handler for messages coming from the Bot API
     """
 
     # Print to console
+    # user = update.effective_user
     user_id = update.message.from_user.id
     username = update.message.from_user.username
     firstname = update.message.from_user.first_name
-    text = update.message.text
+    text = str(update.message.text) + ', ' + str(username)
     print(f'{firstname} wrote {text}')
     logger.info(f'{time.asctime()}\t{user_id} ({username}): {text}')
 
     if screaming and update.message.text:
-        context.bot.send_message(
-            update.message.chat_id,
-            text.upper(),
-            # To preserve the markdown, we attach entities (bold, italic...)
-            entities=update.message.entities
-        )
+        await update.message.reply_text(text.upper())
+        # From v.13
+        # context.bot.send_message(
+        #     update.message.chat_id,
+        #     text.upper(),
+        #     # To preserve the markdown, we attach entities (bold, italic...)
+        #     entities=update.message.entities
+        # )
     else:
         # print("This is else")
         # This is equivalent to forwarding, without the sender's name
-        update.message.copy(update.message.chat_id)
+        await update.message.reply_text(text)
 
 
 def scream(update: Update, context: CallbackContext) -> None:
@@ -188,42 +193,46 @@ def main() -> None:
     # updater = Updater("<YOUR_BOT_TOKEN_HERE>")
     load_dotenv()
     BOT_TOKEN = os.environ.get("BOT_TOKEN")
-    updater = Updater(BOT_TOKEN)
+    # updater = Updater(BOT_TOKEN) # deprecated
+    # Create a builder via Application.builder() and then specifies all required arguments via that builder.
+    #  Finally, the Application is created by calling builder.build()
+    application = Application.builder().token(BOT_TOKEN).build()
+
 
     # Get the dispatcher to register handlers
     # Then, we register each handler and the conditions the update must meet to trigger it
-    dispatcher = updater.dispatcher
+    # dispatcher = updater.dispatcher # depricated
 
     # Register commands
-    dispatcher.add_handler(CommandHandler("scream", scream))
-    dispatcher.add_handler(CommandHandler("whisper", whisper))
-    dispatcher.add_handler(CommandHandler("menu", menu))
+    application.add_handler(CommandHandler("scream", scream))
+    application.add_handler(CommandHandler("whisper", whisper))
+    application.add_handler(CommandHandler("menu", menu))
     #TODO: Add more commands
     # dispatcher.add_handler(CommandHandler("start", start)) 
     # dispatcher.add_handler(CommandHandler("stop", stop)) # in case smth went wrong 
-    dispatcher.add_handler(CommandHandler("help", help)) # make it show description
+    application.add_handler(CommandHandler("help", help)) # make it show description
     # PM should have the abibility to change bot behaviour, such as reminder interval and so on
-    dispatcher.add_handler(CommandHandler("settings", settings))
+    application.add_handler(CommandHandler("settings", settings))
     # Command to trigger project status check.
-    dispatcher.add_handler(CommandHandler("status", status))
+    application.add_handler(CommandHandler("status", status))
     # Initialize start of the project: project name, db initialization and so on, previous project should be archived
-    dispatcher.add_handler(CommandHandler("freshstart", freshstart))  
+    application.add_handler(CommandHandler("freshstart", freshstart))  
     # It will be useful if schedule changed outside the bot
-    dispatcher.add_handler(CommandHandler("upload", upload))  
+    application.add_handler(CommandHandler("upload", upload))  
     # And if changes were made inside the bot, PM could download updated schedule
     # dispatcher.add_handler(CommandHandler("download", download))
 
     # Register handler for inline buttons
-    dispatcher.add_handler(CallbackQueryHandler(button_tap))
+    application.add_handler(CallbackQueryHandler(button_tap))
 
-    # Echo any message that is not a command
-    dispatcher.add_handler(MessageHandler(~Filters.command, echo))
+    # Echo any message that is text and not a command
+    application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, echo))
 
     # Start the Bot
-    updater.start_polling()
+    application.run_polling()
 
     # Run the bot until you press Ctrl-C
-    updater.idle()
+    # application.idle()
 
 
 if __name__ == '__main__':
