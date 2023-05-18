@@ -66,11 +66,12 @@ def main():
         # Append actioners list to project dictionary
         project['actioners'] = actioners
 
-    # DELETE. For testing purposes only
-    # pprint.pprint(project['actioners'])
-    # pprint.pprint(project['tasks'])
-    
-    
+    # Save project to file TEMPORARY TODO Remove. It should be on other side
+    json_file = "data/temp.json"
+    # TODO add error handling
+    with open(json_file, 'w') as json_fh:
+        json.dump(project, json_fh)
+
 
 def compose_tasks_list(list, task, allocations):
     ''' Function to append to list of tasks information of one task or subtask'''
@@ -117,19 +118,19 @@ def compose_tasks_list(list, task, allocations):
     else:
         raise ValueError('File may be damaged: milestone field contains invalid value ' + str(task['meeting']))
 
-    enddate = busday_offset(datetime64(task['start']), int(task['duration']), roll='forward')
-    
+    enddate = str(busday_offset(datetime64(task['start']), int(task['duration']), roll='forward'))
+
     list.append({
                 'id': int(task['id']),
                 'name': task['name'],
-                'startdate': datetime64(task['start']),
+                'startdate': task['start'],
                 'end_date': enddate, 
                 'duration': int(task['duration']),
                 'successors': successors,
                 'milestone': milestone,
                 'complete': int(task['complete']),
                 'curator': '', # not using for now, but it may become usefull later
-                'basicplan_startdate': datetime64(task['start']), # equal to start date on a start of the project
+                'basicplan_startdate': task['start'], # equal to start date on a start of the project
                 'basicplan_enddate': enddate, # equal to end date on a start of the project
                 'include': include,
                 'successors': successors,
