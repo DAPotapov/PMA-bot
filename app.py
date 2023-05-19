@@ -3,9 +3,11 @@
 import logging
 import os
 import time
-import asyncio
+# import asyncio
+
 
 from dotenv import load_dotenv
+from io import BufferedIOBase
 from telegram import Update, ForceReply, InlineKeyboardMarkup, InlineKeyboardButton
 from telegram.constants import ParseMode
 from telegram.ext import Application, Updater, CommandHandler, MessageHandler, CallbackContext, CallbackQueryHandler, filters
@@ -19,7 +21,7 @@ screaming = False
 
 # Project constants, should be stored separately TODO
 # TODO: change according to starter of the bot
-PM = 'den4242'
+PM = 'hagen10'
 PROJECTTITLE = ''
 
 # Pre-assign menu text
@@ -209,14 +211,31 @@ async def upload(update: Update, context: CallbackContext) -> None:
     '''
     Function to upload new project file
     '''
+    # Message to return
+    message = ''
 
     # PPP:
+    # Check if user is PM
+    uploader = update.message.from_user.username
+    if uploader == PM:
+        # message = 'Project manager'
+        # message = update.message.document.mime_type
+        gotfile = await context.bot.get_file(update.message.document)
+        # schedule_file = BufferedIOBase
+        # await project_file.download_to_memory(schedule_file)
+        fp = await gotfile.download_to_drive()
+        message = str(type(fp.suffix))
+        
+    else:
+        message = 'Only Project Manager is allowed to upload new schedule'
     # Get file
     # Check extension
     # Case for known file types
     # if known: call such function with this file as argument
     # else inform user about supported file types
-    await update.message.reply_text('Got file!')
+
+
+    await update.message.reply_text(message)
 
 
 def main() -> None:
