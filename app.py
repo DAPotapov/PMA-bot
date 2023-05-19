@@ -185,8 +185,12 @@ async def settings(update: Update, context: CallbackContext) -> None:
     """
     bot_msg = "Here PM should be able to change some of project settings. If no project started yet, then redirect to freshstart"
 
+    # PPP: Check if asking user is PM: proceed only if it is. If not - inform user.
     # TODO: Add buttons to change project settings, such as:
     # 1. change of PM (see below)
+    # PPP: 
+    # Take new PM name, check if he's member of chat members, do nothing and inform user if otherwise
+    # 
     # message = ''
     # global PM
     # if update.effective_user == PM:
@@ -201,13 +205,18 @@ async def settings(update: Update, context: CallbackContext) -> None:
 
     await update.message.reply_text(bot_msg)
 
-def upload():
+async def upload(update: Update, context: CallbackContext) -> None:
     '''
     Function to upload new project file
     '''
 
-
-    pass
+    # PPP:
+    # Get file
+    # Check extension
+    # Case for known file types
+    # if known: call such function with this file as argument
+    # else inform user about supported file types
+    await update.message.reply_text('Got file!')
 
 
 def main() -> None:
@@ -250,7 +259,7 @@ def main() -> None:
     application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, echo))
 
     # Register handler for recieving new project file
-    application.add_handler(MessageHandler(filters.Document, upload))
+    application.add_handler(MessageHandler(filters.Document.ALL, upload))
 
     # Start the Bot
     application.run_polling()
