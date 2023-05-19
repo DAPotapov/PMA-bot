@@ -43,18 +43,12 @@ def load_gan(fp):
                 # Add relevant data to list containing task information
                 if 'allocation' in obj.project.allocations:
                     allocations = obj.project.allocations.allocation
-                    try:
-                        tasks = compose_tasks_list(tasks, task, allocations)
-                    except Exception as e:
-                        raise
-                    else:
-                        # if task has subtask retreive data from it too
-                        if 'task' in task:
-                            for task in task.task:
-                                try:
-                                    tasks = compose_tasks_list(tasks, task, allocations)
-                                except Exception as e:
-                                    print("Error occured: " + str(e))
+                    tasks = compose_tasks_list(tasks, task, allocations)
+                    # if task has subtask retreive data from it too
+                    if 'task' in task:
+                        for task in task.task:
+                            tasks = compose_tasks_list(tasks, task, allocations)
+
                 else:
                     raise ValueError('There are no assignments made. Whom are you gonna manage?')
         else:
