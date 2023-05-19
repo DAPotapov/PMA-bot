@@ -224,8 +224,15 @@ async def upload(update: Update, context: CallbackContext) -> None:
         # schedule_file = BufferedIOBase
         # await project_file.download_to_memory(schedule_file)
         fp = await gotfile.download_to_drive()
-        message = str(type(fp.suffix))
-        
+        # message = str(type(fp.suffix))
+        match fp.suffix:
+            case '.txt':
+                message = 'It is a .txt file. Just for example of recognition.'
+            case '.gan':
+                message = 'It is a GanttProject file format'
+            case _:                
+                message = 'Bot supports only these project file formats: .gan (GanttProject) and that is all for now.'
+
     else:
         message = 'Only Project Manager is allowed to upload new schedule'
     # Get file
