@@ -26,36 +26,39 @@ def load_gan(fp):
     
     # Using untangle on GAN - WORKING. This syntax cleaner and have some useful methods like 'children'
     # Declare dictionary to store data
-    project = {
-        'tasks' : [],
-        'actioners': []
-        }
+    project = {}
+        # 'tasks' : [],
+        # 'actioners': []
+        # }
     tasks = []
     filename = fp.name
     try:
         obj = untangle.parse(filename)
     except:
-        print('Oh no! Error occured!')
+        raise FileNotFoundError
     else:
-        # Loop through tasks
-        for task in obj.project.tasks.task:
-            # Add relevant data to list containing task information
-            if 'allocation' in obj.project.allocations:
-                allocations = obj.project.allocations.allocation
-                try:
-                    tasks = compose_tasks_list(tasks, task, allocations)
-                except Exception as e:
-                    print("Error occured: " + str(e))
+        if 'task' in obj.project.tasks:
+            # Loop through tasks
+            for task in obj.project.tasks.task:
+                # Add relevant data to list containing task information
+                if 'allocation' in obj.project.allocations:
+                    allocations = obj.project.allocations.allocation
+                    try:
+                        tasks = compose_tasks_list(tasks, task, allocations)
+                    except Exception as e:
+                        raise
+                    else:
+                        # if task has subtask retreive data from it too
+                        if 'task' in task:
+                            for task in task.task:
+                                try:
+                                    tasks = compose_tasks_list(tasks, task, allocations)
+                                except Exception as e:
+                                    print("Error occured: " + str(e))
                 else:
-                    # if task has subtask retreive data from it too
-                    if 'task' in task:
-                        for task in task.task:
-                            try:
-                                tasks = compose_tasks_list(tasks, task, allocations)
-                            except Exception as e:
-                                print("Error occured: " + str(e))
-            else:
-                raise ValueError('There are no assignments made. Whom are you gonna manage?')
+                    raise ValueError('There are no assignments made. Whom are you gonna manage?')
+        else:
+            raise ValueError('There are no tasks in provided file. Nothing to do.')
 
         # TODO Resolving GanttProject bug of duplication of resource allocation. 
         # Better use standalone function in case they will fix this bug
@@ -65,9 +68,13 @@ def load_gan(fp):
 
         actioners = []
         for actioner in obj.project.resources.resource:
-            # TODO Add check if special field for telegram id exist and to choose correct 
+# TODO Add check if special field for telegram id exist and to choose correct 
             # custom property if there are several of them
+            # try:
             telegram_id = actioner.custom_property['value']
+            # except AttributeError as e:
+            #     pass
+            # else:
             # Build list of actioners
             actioners.append({
                 'id' : actioner['id'],
@@ -82,10 +89,7 @@ def load_gan(fp):
     return project
 
     # Save project to file TEMPORARY TODO Remove. It should be on other side
-    # json_file = "data/temp.json"
-    # TODO add error handling
-    # with open(json_file, 'w') as json_fh:
-    #     json.dump(project, json_fh)
+
 
 
 def compose_tasks_list(list, task, allocations):
@@ -153,6 +157,13 @@ def compose_tasks_list(list, task, allocations):
             })
     return list
 
+def load_json(fp):
+    '''
+    This connector useful in case we downloaded JSON, manually made some changes, 
+    and upload it again to bot 
+    '''
+    # TODO: to implement
+    return
 
 if __name__ == '__main__':
     main()

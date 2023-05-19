@@ -26,6 +26,7 @@ screaming = False
 # TODO: change according to starter of the bot
 PM = 'hagen10'
 PROJECTTITLE = ''
+PROJECTJSON = "temp.json"
 
 # Pre-assign menu text
 FIRST_MENU = "<b>Menu 1</b>\n\nA beautiful menu with a shiny inline button."
@@ -228,32 +229,44 @@ async def upload(update: Update, context: CallbackContext) -> None:
         # await project_file.download_to_memory(schedule_file)
         fp = await gotfile.download_to_drive()
         # message = str(type(fp.suffix))
-        # if known: call such function with this file as argument
-        match fp.suffix:
-            case '.txt':
-                message = 'It is a .txt file. Just for example of recognition.'
-            case '.gan':
-                # message = 'It is a GanttProject file format'
-                # Send to connector to receive project in JSON format
-                try:
+        # if known: call appropriate function with this file as argument
+        try:
+            match fp.suffix:
+                case '.gan':
+                    # Send to connector to receive project in JSON format
                     project = connectors.load_gan(fp)
-                except ValueError as e:
-                    message = str(e)
-                else:
-                    message = str(project.keys())
-                    
-        # else inform user about supported file types
-            case _:                
-                message = 'Bot supports only these project file formats: .gan (GanttProject) and that is all for now.'
 
+                case '.json':
+                    project = connectors.load_json(fp)
+
+            # else inform user about supported file types
+                case _:                
+                    message = 'Bot supports only these project file formats: .gan (GanttProject) and that is all for now.'
+        except AttributeError as e:
+            message = f'Seems like field for telegram id for team member is absent: {e}'
+        except ValueError as e:
+            message = f'Error occurred while processing file: {e}'
+        except FileNotFoundError as e:
+            message = f'Seems like the file {e} does not exist'
+        except Exception as e:
+            message = f'Unknow error occurred while processing file: {e}'
+            logger.info(f'{time.asctime()}\t {type(e)} \t {e.with_traceback}')
+        else:
+
+            # message = str(dir(project))
+            message = str(project.keys())
+    # TODO after CASE succeed
+
+        # TODO add error handling
+            with open(PROJECTJSON, 'w') as json_fh:
+                try:
+                    json.dump(project, json_fh)
+                except:
+                    message = 'Error saving project to json file'    
+                else:
+                    message = 'Successfully saved project to json file'
     else:
         message = 'Only Project Manager is allowed to upload new schedule'
-    # Get file
-    # Check extension
-    # Case for known file types
-
-
-
 
     await update.message.reply_text(message)
 
