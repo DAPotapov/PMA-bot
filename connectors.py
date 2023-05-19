@@ -7,13 +7,23 @@ from numpy import busday_offset, datetime64
 
 def main():
     '''
-    This is a connector from GanttProject format (.gan) to inner JSON format.
-    На входе получаем имя файла (.gan )
-    Выполняем парсинг
-    Затем преобразовываем к внутреннему формату: берем только нужные элементы
-    Имеем json на выходе
-    '''
+    Module recieve PosixPath of downloaded file.
+    Returns JSON of project schedule and assignments
+    If error occured should return at least string of error message, but maybe there is better way of error handling
 
+    '''
+    
+    return
+
+def load_gan(fp):
+    '''
+        This is a connector from GanttProject format (.gan) to inner JSON format.
+        На входе получаем имя файла (.gan )
+        Выполняем парсинг
+        Затем преобразовываем к внутреннему формату: берем только нужные элементы
+        Имеем json на выходе
+    '''
+    
     # Using untangle on GAN - WORKING. This syntax cleaner and have some useful methods like 'children'
     # Declare dictionary to store data
     project = {
@@ -21,7 +31,7 @@ def main():
         'actioners': []
         }
     tasks = []
-    filename = "data/test1.gan"
+    filename = fp.name
     try:
         obj = untangle.parse(filename)
     except:
@@ -30,19 +40,22 @@ def main():
         # Loop through tasks
         for task in obj.project.tasks.task:
             # Add relevant data to list containing task information
-            allocations = obj.project.allocations.allocation
-            try:
-                tasks = compose_tasks_list(tasks, task, allocations)
-            except Exception as e:
-                print("Error occured: " + str(e))
+            if 'allocation' in obj.project.allocations:
+                allocations = obj.project.allocations.allocation
+                try:
+                    tasks = compose_tasks_list(tasks, task, allocations)
+                except Exception as e:
+                    print("Error occured: " + str(e))
+                else:
+                    # if task has subtask retreive data from it too
+                    if 'task' in task:
+                        for task in task.task:
+                            try:
+                                tasks = compose_tasks_list(tasks, task, allocations)
+                            except Exception as e:
+                                print("Error occured: " + str(e))
             else:
-                # if task has subtask retreive data from it too
-                if 'task' in task:
-                    for task in task.task:
-                        try:
-                            tasks = compose_tasks_list(tasks, task, allocations)
-                        except Exception as e:
-                            print("Error occured: " + str(e))
+                raise ValueError('There are no assignments made. Whom are you gonna manage?')
 
         # TODO Resolving GanttProject bug of duplication of resource allocation. 
         # Better use standalone function in case they will fix this bug
@@ -66,11 +79,13 @@ def main():
         # Append actioners list to project dictionary
         project['actioners'] = actioners
 
+    return project
+
     # Save project to file TEMPORARY TODO Remove. It should be on other side
-    json_file = "data/temp.json"
+    # json_file = "data/temp.json"
     # TODO add error handling
-    with open(json_file, 'w') as json_fh:
-        json.dump(project, json_fh)
+    # with open(json_file, 'w') as json_fh:
+    #     json.dump(project, json_fh)
 
 
 def compose_tasks_list(list, task, allocations):

@@ -3,6 +3,8 @@
 import logging
 import os
 import time
+import json
+import connectors
 # import asyncio
 
 
@@ -11,6 +13,7 @@ from io import BufferedIOBase
 from telegram import Update, ForceReply, InlineKeyboardMarkup, InlineKeyboardButton
 from telegram.constants import ParseMode
 from telegram.ext import Application, Updater, CommandHandler, MessageHandler, CallbackContext, CallbackQueryHandler, filters
+
 
 # Configure logging
 logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s', level=logging.INFO)
@@ -225,11 +228,21 @@ async def upload(update: Update, context: CallbackContext) -> None:
         # await project_file.download_to_memory(schedule_file)
         fp = await gotfile.download_to_drive()
         # message = str(type(fp.suffix))
+        # if known: call such function with this file as argument
         match fp.suffix:
             case '.txt':
                 message = 'It is a .txt file. Just for example of recognition.'
             case '.gan':
-                message = 'It is a GanttProject file format'
+                # message = 'It is a GanttProject file format'
+                # Send to connector to receive project in JSON format
+                try:
+                    project = connectors.load_gan(fp)
+                except ValueError as e:
+                    message = str(e)
+                else:
+                    message = str(project.keys())
+                    
+        # else inform user about supported file types
             case _:                
                 message = 'Bot supports only these project file formats: .gan (GanttProject) and that is all for now.'
 
@@ -238,8 +251,8 @@ async def upload(update: Update, context: CallbackContext) -> None:
     # Get file
     # Check extension
     # Case for known file types
-    # if known: call such function with this file as argument
-    # else inform user about supported file types
+
+
 
 
     await update.message.reply_text(message)
