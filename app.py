@@ -3,19 +3,24 @@
 import logging
 import os
 import time
+import asyncio
 
 from dotenv import load_dotenv
 from telegram import Update, ForceReply, InlineKeyboardMarkup, InlineKeyboardButton
 from telegram.constants import ParseMode
 from telegram.ext import Application, Updater, CommandHandler, MessageHandler, CallbackContext, CallbackQueryHandler, filters
 
-
-
+# Configure logging
 logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s', level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 # Store bot screaming status
 screaming = False
+
+# Project constants, should be stored separately TODO
+# TODO: change according to starter of the bot
+PM = 'den4242'
+PROJECTTITLE = ''
 
 # Pre-assign menu text
 FIRST_MENU = "<b>Menu 1</b>\n\nA beautiful menu with a shiny inline button."
@@ -179,20 +184,31 @@ async def settings(update: Update, context: CallbackContext) -> None:
     This function handles /settings command
     """
     bot_msg = "Here PM should be able to change some of project settings. If no project started yet, then redirect to freshstart"
-    # context.bot.send_message(
-    #         update.message.chat_id,
-    #         bot_msg,
-    #         # To preserve the markdown, we attach entities (bold, italic...)
-    #         entities=update.message.entities
-    #     ) 
+
+    # TODO: Add buttons to change project settings, such as:
+    # 1. change of PM (see below)
+    # message = ''
+    # global PM
+    # if update.effective_user == PM:
+    #     PM = update.effective_user.name
+    #     message = 'Project manager now is: ' + newPM
+    # else:
+    #     message = 'Only project manager is allowed to assign new one'
+    # await update.message.reply_text(message)
+
+    # 2. change of project name
+    # 3. interval of intermidiate reminders
+
     await update.message.reply_text(bot_msg)
 
-async def upload(update: Update, context: CallbackContext) -> None:
+def upload():
     '''
     Function to upload new project file
     '''
 
+
     pass
+
 
 def main() -> None:
     # updater = Updater("<YOUR_BOT_TOKEN_HERE>")
@@ -223,8 +239,8 @@ def main() -> None:
     # Initialize start of the project: project name, db initialization and so on, previous project should be archived
     application.add_handler(CommandHandler("freshstart", freshstart))  
     # It will be useful if schedule changed outside the bot
-    application.add_handler(CommandHandler("upload", upload))  
-    # And if changes were made inside the bot, PM could download updated schedule
+    # application.add_handler(CommandHandler("upload", upload))  
+    # And if changes were made inside the bot, PM could download updated schedule (original format?)
     # dispatcher.add_handler(CommandHandler("download", download))
 
     # Register handler for inline buttons
@@ -232,6 +248,9 @@ def main() -> None:
 
     # Echo any message that is text and not a command
     application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, echo))
+
+    # Register handler for recieving new project file
+    application.add_handler(MessageHandler(filters.Document, upload))
 
     # Start the Bot
     application.run_polling()
