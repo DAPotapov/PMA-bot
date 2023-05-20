@@ -57,31 +57,47 @@ def load_gan(fp):
 
     # Append tasks list to project dictionary
     project['tasks'] = tasks
-
     actioners = []
-    for actioner in obj.project.resources.resource:
-# TODO Add check if special field for telegram id exist and to choose correct 
-        # custom property if there are several of them
-        # try:
-        telegram_id = actioner.custom_property['value']
-        # except AttributeError as e:
-        #     pass
-        # else:
-        # Build list of actioners
-        actioners.append({
-            'id' : actioner['id'],
-            'name' : actioner['name'],
-            'email' : actioner['contacts'],
-            'phone' : actioner['phone'],
-            'telegram_id' : telegram_id,
-        })
+    property_id = ''
+    # Check if special field for telegram id exist and choose correct 
+    # custom property if there are several of them
+    for custom_property in obj.project.resources.custom_property_definition:
+        if custom_property['name'] == 'telegram_id':
+            property_id = custom_property['id']
+            # no need to continue looking through custom properties
+            break
+        else:
+            pass
+    # Check if custom property for telegram was found
+    if property_id:
+        # If custom property found, then proceed through resources
+        for actioner in obj.project.resources.resource:
+            # Looking in custom properties of each resource for property assosiated with telegram
+            telegram_id = ''
+            for property in actioner.custom_property:
+                if property['definition-id'] == property_id:
+                    # If such property not filled then abort and tell user to do his job and make a proper file
+                    if not property['value']:
+                        raise ValueError(f"'{actioner['name']}' have no telegram_id value")
+                    else:
+                        telegram_id = property['value']
+
+            # Build list of actioners
+            actioners.append({
+                'id' : actioner['id'],
+                'name' : actioner['name'],
+                'email' : actioner['contacts'],
+                'phone' : actioner['phone'],
+                'telegram_id' : telegram_id,
+            })
+    # If no custom property for telegram_id found then inform the user
+    else:
+        raise AttributeError("Project file has invalid structure: no 'telegram_id' field")
+    
     # Append actioners list to project dictionary
     project['actioners'] = actioners
 
     return project
-
-    # Save project to file TEMPORARY TODO Remove. It should be on other side
-
 
 
 def compose_tasks_list(list, task, allocations):
