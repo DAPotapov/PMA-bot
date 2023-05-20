@@ -252,24 +252,29 @@ async def upload(update: Update, context: CallbackContext) -> None:
             message = f'Unknow error occurred while processing file: {e}'
             logger.info(f'{time.asctime()}\t {type(e)} \t {e.with_traceback}')
         else:
-
-            # message = str(dir(project))
-            message = str(project.keys())
-    # TODO after CASE succeed
-
-        # TODO add error handling
-            with open(PROJECTJSON, 'w') as json_fh:
-                try:
-                    json.dump(project, json_fh)
-                except:
-                    message = 'Error saving project to json file'    
-                else:
-                    message = 'Successfully saved project to json file'
+            # Call function to save project in JSON format
+            message = save_json(project)
+            
+# TODO make as standalone function
+            
     else:
         message = 'Only Project Manager is allowed to upload new schedule'
 
     await update.message.reply_text(message)
 
+def save_json(project):
+    ''' 
+    Saves project in JSON format and returns message about success of operation
+    '''
+    message = ''
+    with open(PROJECTJSON, 'w') as json_fh:
+        try:
+            json.dump(project, json_fh)
+        except:
+            message = 'Error saving project to json file'    
+        else:
+            message = 'Successfully saved project to json file'
+    return message
 
 def main() -> None:
     # updater = Updater("<YOUR_BOT_TOKEN_HERE>")
