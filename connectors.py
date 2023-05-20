@@ -31,54 +31,52 @@ def load_gan(fp):
         # 'actioners': []
         # }
     tasks = []
-    filename = fp.name
-    try:
-        obj = untangle.parse(filename)
-    except:
-        raise FileNotFoundError
+    
+    # Parse the file
+    obj = untangle.parse(str(fp))
+
+    if 'task' in obj.project.tasks:
+        # Loop through tasks
+        for task in obj.project.tasks.task:
+            # Add relevant data to list containing task information
+            if 'allocation' in obj.project.allocations:
+                allocations = obj.project.allocations.allocation
+                tasks = compose_tasks_list(tasks, task, allocations)
+                # if task has subtask retreive data from it too
+                if 'task' in task:
+                    for task in task.task:
+                        tasks = compose_tasks_list(tasks, task, allocations)
+
+            else:
+                raise ValueError('There are no assignments made. Whom are you gonna manage?')
     else:
-        if 'task' in obj.project.tasks:
-            # Loop through tasks
-            for task in obj.project.tasks.task:
-                # Add relevant data to list containing task information
-                if 'allocation' in obj.project.allocations:
-                    allocations = obj.project.allocations.allocation
-                    tasks = compose_tasks_list(tasks, task, allocations)
-                    # if task has subtask retreive data from it too
-                    if 'task' in task:
-                        for task in task.task:
-                            tasks = compose_tasks_list(tasks, task, allocations)
+        raise ValueError('There are no tasks in provided file. Nothing to do.')
 
-                else:
-                    raise ValueError('There are no assignments made. Whom are you gonna manage?')
-        else:
-            raise ValueError('There are no tasks in provided file. Nothing to do.')
+    # TODO Resolving GanttProject bug of duplication of resource allocation. 
+    # Better use standalone function in case they will fix this bug
 
-        # TODO Resolving GanttProject bug of duplication of resource allocation. 
-        # Better use standalone function in case they will fix this bug
+    # Append tasks list to project dictionary
+    project['tasks'] = tasks
 
-        # Append tasks list to project dictionary
-        project['tasks'] = tasks
-
-        actioners = []
-        for actioner in obj.project.resources.resource:
+    actioners = []
+    for actioner in obj.project.resources.resource:
 # TODO Add check if special field for telegram id exist and to choose correct 
-            # custom property if there are several of them
-            # try:
-            telegram_id = actioner.custom_property['value']
-            # except AttributeError as e:
-            #     pass
-            # else:
-            # Build list of actioners
-            actioners.append({
-                'id' : actioner['id'],
-                'name' : actioner['name'],
-                'email' : actioner['contacts'],
-                'phone' : actioner['phone'],
-                'telegram_id' : telegram_id,
-            })
-        # Append actioners list to project dictionary
-        project['actioners'] = actioners
+        # custom property if there are several of them
+        # try:
+        telegram_id = actioner.custom_property['value']
+        # except AttributeError as e:
+        #     pass
+        # else:
+        # Build list of actioners
+        actioners.append({
+            'id' : actioner['id'],
+            'name' : actioner['name'],
+            'email' : actioner['contacts'],
+            'phone' : actioner['phone'],
+            'telegram_id' : telegram_id,
+        })
+    # Append actioners list to project dictionary
+    project['actioners'] = actioners
 
     return project
 
@@ -121,16 +119,15 @@ def compose_tasks_list(list, task, allocations):
             include.append(int(task['id']))
     
     # Construct dictionary of task and append to list of tasks   
-    # TODO: construct end date from start date, duration and numpy function:
-    #  https://numpy.org/doc/stable/reference/routines.datetime.html
-    # TODO in v.2: project apps supports alternative calendars, bot should support them as well.
     if task['meeting'].lower() == "false":
         milestone = False
     elif task['meeting'].lower() == "true":
         milestone = True
     else:
         raise ValueError('File may be damaged: milestone field contains invalid value ' + str(task['meeting']))
-
+    
+    # Construct end date from start date, duration and numpy function:
+    # TODO in v.2: project apps supports alternative calendars, bot should support them as well.
     enddate = str(busday_offset(datetime64(task['start']), int(task['duration']), roll='forward'))
 
     list.append({

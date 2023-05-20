@@ -5,6 +5,7 @@ import os
 import time
 import json
 import connectors
+import tempfile
 # import asyncio
 
 
@@ -215,45 +216,41 @@ async def upload(update: Update, context: CallbackContext) -> None:
     '''
     Function to upload new project file
     '''
-    # Message to return
+    # Message to return to user
     message = ''
 
-    # PPP:
     # Check if user is PM
     uploader = update.message.from_user.username
     if uploader == PM:
-        # message = 'Project manager'
-        # message = update.message.document.mime_type
-        gotfile = await context.bot.get_file(update.message.document)
-        # schedule_file = BufferedIOBase
-        # await project_file.download_to_memory(schedule_file)
-        fp = await gotfile.download_to_drive()
-        # message = str(type(fp.suffix))
-        # if known: call appropriate function with this file as argument
-        try:
-            match fp.suffix:
-                case '.gan':
-                    # Send to connector to receive project in JSON format
-                    project = connectors.load_gan(fp)
+        # Let's keep files got from user in temporary directory
+        with tempfile.TemporaryDirectory() as tdp:
+            gotfile = await context.bot.get_file(update.message.document)
+            fp = await gotfile.download_to_drive(os.path.join(tdp, update.message.document.file_name))
+            # if file is known format: call appropriate function with this file as argument
+            try:
+                match fp.suffix:
+                    case '.gan':
+                        # Send to connector to receive project in JSON format
+                        project = connectors.load_gan(fp)
 
-                case '.json':
-                    project = connectors.load_json(fp)
+                    case '.json':
+                        project = connectors.load_json(fp)
 
-            # else inform user about supported file types
-                case _:                
-                    message = 'Bot supports only these project file formats: .gan (GanttProject) and that is all for now.'
-        except AttributeError as e:
-            message = f'Seems like field for telegram id for team member is absent: {e}'
-        except ValueError as e:
-            message = f'Error occurred while processing file: {e}'
-        except FileNotFoundError as e:
-            message = f'Seems like the file {e} does not exist'
-        except Exception as e:
-            message = f'Unknow error occurred while processing file: {e}'
-            logger.info(f'{time.asctime()}\t {type(e)} \t {e.with_traceback}')
-        else:
-            # Call function to save project in JSON format
-            message = save_json(project)
+                # else inform user about supported file types
+                    case _:                
+                        message = 'Bot supports only these project file formats: .gan (GanttProject) and that is all for now.'
+            except AttributeError as e:
+                message = f'Seems like field for telegram id for team member is absent: {e}'
+            except ValueError as e:
+                message = f'Error occurred while processing file: {e}'
+            except FileNotFoundError as e:
+                message = f'Seems like the file {e} does not exist'
+            except Exception as e:
+                message = f'Unknow error occurred while processing file: {e}'
+                logger.info(f'{time.asctime()}\t {type(e)} \t {e.with_traceback}')
+            else:
+                # Call function to save project in JSON format
+                message = save_json(project)
             
 # TODO make as standalone function
             
@@ -277,19 +274,15 @@ def save_json(project):
     return message
 
 def main() -> None:
-    # updater = Updater("<YOUR_BOT_TOKEN_HERE>")
+
     load_dotenv()
     BOT_TOKEN = os.environ.get("BOT_TOKEN")
-    # updater = Updater(BOT_TOKEN) # deprecated
+
     # Create a builder via Application.builder() and then specifies all required arguments via that builder.
     #  Finally, the Application is created by calling builder.build()
     application = Application.builder().token(BOT_TOKEN).build()
 
-
-    # Get the dispatcher to register handlers
     # Then, we register each handler and the conditions the update must meet to trigger it
-    # dispatcher = updater.dispatcher # depricated
-
     # Register commands
     application.add_handler(CommandHandler("scream", scream))
     application.add_handler(CommandHandler("whisper", whisper))
@@ -318,11 +311,8 @@ def main() -> None:
     # Register handler for recieving new project file
     application.add_handler(MessageHandler(filters.Document.ALL, upload))
 
-    # Start the Bot
+    # Start the Bot and run it until Ctrl+C pressed
     application.run_polling()
-
-    # Run the bot until you press Ctrl-C
-    # application.idle()
 
 
 if __name__ == '__main__':
