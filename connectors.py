@@ -27,9 +27,7 @@ def load_gan(fp):
     # Using untangle on GAN - WORKING. This syntax cleaner and have some useful methods like 'children'
     # Declare dictionary to store data
     project = {}
-        # 'tasks' : [],
-        # 'actioners': []
-        # }
+
     tasks = []
     
     # Parse the file

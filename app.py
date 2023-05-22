@@ -139,13 +139,7 @@ async def help(update: Update, context: CallbackContext) -> None:
     This function handles /help command
     """
     bot_msg = "Should print description to user"
-    # From v.13
-    # context.bot.send_message(
-    #         update.message.chat_id,
-    #         bot_msg,
-    #         # To preserve the markdown, we attach entities (bold, italic...)
-    #         entities=update.message.entities
-    #     )
+
     await update.message.reply_text(bot_msg)
 
 async def status(update: Update, context: CallbackContext) -> None:
@@ -153,23 +147,9 @@ async def status(update: Update, context: CallbackContext) -> None:
     This function handles /status command
     """
     bot_msg = "Should print status to user"
-    # context.bot.send_message(
-    #         update.message.chat_id,
-    #         bot_msg,
-    #         # To preserve the markdown, we attach entities (bold, italic...)
-    #         entities=update.message.entities
-    #     ) 
+
     await update.message.reply_text(bot_msg)   
 
-    # n = 10
-    # for i in range(n):
-    #     time.sleep(2)
-    #     bot_msg = f'Current task is: {i}'
-    #     context.bot.send_message(
-    #         update.message.chat_id, 
-    #         bot_msg,
-    #         entities=update.message.entities
-    #     )
 
 
 async def freshstart(update: Update, context: CallbackContext) -> None:
@@ -178,12 +158,7 @@ async def freshstart(update: Update, context: CallbackContext) -> None:
     """
 
     bot_msg = "Here will be routine to start a new project"
-    # context.bot.send_message(
-    #         update.message.chat_id,
-    #         bot_msg,
-    #         # To preserve the markdown, we attach entities (bold, italic...)
-    #         entities=update.message.entities
-    #     )   
+
     await update.message.reply_text(bot_msg)
 
 async def settings(update: Update, context: CallbackContext) -> None:
