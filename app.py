@@ -227,6 +227,7 @@ async def upload(update: Update, context: CallbackContext) -> None:
             gotfile = await context.bot.get_file(update.message.document)
             fp = await gotfile.download_to_drive(os.path.join(tdp, update.message.document.file_name))
             # if file is known format: call appropriate function with this file as argument
+            project = {}
             try:
                 match fp.suffix:
                     case '.gan':
@@ -250,9 +251,8 @@ async def upload(update: Update, context: CallbackContext) -> None:
                 logger.info(f'{time.asctime()}\t {type(e)} \t {e.with_traceback}')
             else:
                 # Call function to save project in JSON format
-                message = save_json(project)
-            
-# TODO make as standalone function
+                if project:
+                    message = save_json(project)            
             
     else:
         message = 'Only Project Manager is allowed to upload new schedule'
