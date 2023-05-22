@@ -9,8 +9,13 @@ It should make free PM from sitting behind dashboard and looking who delaying wh
 
 ## Current state
 
-Just started
+Bot can inform user about purpose of each command.
+Bot can recieve file from user. And inform user of file formats supported.
+Bot currently accept .gan (GanttProject) format and translate it to json format for inner use.
 
 ## TODO
 
-[ ] Make "hello world" type bot - learn how to connect app to telegram
+[ ] implement /help command
+[ ] implement /status command
+[ ] Error handling: https://docs.python-telegram-bot.org/en/stable/telegram.ext.application.html#telegram.ext.Application.error_handlers
+[x] Make "hello world" type bot - learn how to connect app to telegram

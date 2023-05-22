@@ -1,4 +1,4 @@
-# From https://gitlab.com/Athamaxy/telegram-bot-tutorial/-/blob/main/TutorialBot.py
+# Based on https://gitlab.com/Athamaxy/telegram-bot-tutorial/-/blob/main/TutorialBot.py
 
 import logging
 import os
@@ -10,7 +10,7 @@ import tempfile
 
 
 from dotenv import load_dotenv
-from io import BufferedIOBase
+# from io import BufferedIOBase
 from telegram import Update, ForceReply, InlineKeyboardMarkup, InlineKeyboardButton
 from telegram.constants import ParseMode
 from telegram.ext import Application, Updater, CommandHandler, MessageHandler, CallbackContext, CallbackQueryHandler, filters
@@ -139,7 +139,7 @@ async def help(update: Update, context: CallbackContext) -> None:
     This function handles /help command
     """
     bot_msg = "Should print description to user"
-
+    
     await update.message.reply_text(bot_msg)
 
 async def status(update: Update, context: CallbackContext) -> None:
@@ -256,7 +256,7 @@ def main() -> None:
     # Create a builder via Application.builder() and then specifies all required arguments via that builder.
     #  Finally, the Application is created by calling builder.build()
     application = Application.builder().token(BOT_TOKEN).build()
-
+    
     # Then, we register each handler and the conditions the update must meet to trigger it
     # Register commands
     application.add_handler(CommandHandler("scream", scream))
