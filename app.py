@@ -6,14 +6,14 @@ import time
 import json
 import connectors
 import tempfile
-# import asyncio
+import asyncio
 
 
 from dotenv import load_dotenv
 # from io import BufferedIOBase
-from telegram import Update, ForceReply, InlineKeyboardMarkup, InlineKeyboardButton
+from telegram import Bot, Update, ForceReply, InlineKeyboardMarkup, InlineKeyboardButton
 from telegram.constants import ParseMode
-from telegram.ext import Application, Updater, CommandHandler, MessageHandler, CallbackContext, CallbackQueryHandler, filters
+from telegram.ext import Application, Updater, CommandHandler, MessageHandler, CallbackContext, CallbackQueryHandler, ContextTypes,  filters
 
 
 # Configure logging
@@ -134,11 +134,15 @@ def button_tap(update: Update, context: CallbackContext) -> None:
         reply_markup=markup
     )
 
-async def help(update: Update, context: CallbackContext) -> None:
+async def help(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """
     This function handles /help command
     """
     bot_msg = "Should print description to user"
+
+    # smth = dir(context.bot)
+    smth =context.bot.getMyCommands()
+    print(smth)
     
     await update.message.reply_text(bot_msg)
 
@@ -192,7 +196,7 @@ async def upload(update: Update, context: CallbackContext) -> None:
     Function to upload new project file
     '''
     # Message to return to user
-    message = ''
+    bot_msg = ''
 
     # Check if user is PM
     uploader = update.message.from_user.username
@@ -214,39 +218,39 @@ async def upload(update: Update, context: CallbackContext) -> None:
 
                 # else inform user about supported file types
                     case _:                
-                        message = 'Bot supports only these project file formats: .gan (GanttProject) and that is all for now.'
+                        bot_msg = 'Bot supports only these project file formats: .gan (GanttProject) and that is all for now.'
             except AttributeError as e:
-                message = f'Seems like field for telegram id for team member is absent: {e}'
+                bot_msg = f'Seems like field for telegram id for team member is absent: {e}'
             except ValueError as e:
-                message = f'Error occurred while processing file: {e}'
+                bot_msg = f'Error occurred while processing file: {e}'
             except FileNotFoundError as e:
-                message = f'Seems like the file {e} does not exist'
+                bot_msg = f'Seems like the file {e} does not exist'
             except Exception as e:
-                message = f'Unknow error occurred while processing file: {e}'
+                bot_msg = f'Unknow error occurred while processing file: {e}'
                 logger.info(f'{time.asctime()}\t {type(e)} \t {e.with_traceback}')
             else:
                 # Call function to save project in JSON format
                 if project:
-                    message = save_json(project)            
+                    bot_msg = save_json(project)            
             
     else:
-        message = 'Only Project Manager is allowed to upload new schedule'
+        bot_msg = 'Only Project Manager is allowed to upload new schedule'
 
-    await update.message.reply_text(message)
+    await update.message.reply_text(bot_msg)
 
 def save_json(project):
     ''' 
     Saves project in JSON format and returns message about success of operation
     '''
-    message = ''
+    bot_msg = ''
     with open(PROJECTJSON, 'w') as json_fh:
         try:
             json.dump(project, json_fh)
         except:
-            message = 'Error saving project to json file'    
+            bot_msg = 'Error saving project to json file'    
         else:
-            message = 'Successfully saved project to json file'
-    return message
+            bot_msg = 'Successfully saved project to json file'
+    return bot_msg
 
 def main() -> None:
 
@@ -255,8 +259,16 @@ def main() -> None:
 
     # Create a builder via Application.builder() and then specifies all required arguments via that builder.
     #  Finally, the Application is created by calling builder.build()
-    application = Application.builder().token(BOT_TOKEN).build()
+    # application = Application.builder().token(BOT_TOKEN).build()   
+    bot = Bot(BOT_TOKEN)
+    application = Application.builder().bot(bot).build()    
     
+    # mybot = ExtBot.initialize
+
+# НЕ работает
+    smth = application.bot.getMyName
+    print(smth)
+
     # Then, we register each handler and the conditions the update must meet to trigger it
     # Register commands
     application.add_handler(CommandHandler("scream", scream))
