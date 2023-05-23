@@ -13,7 +13,7 @@ from dotenv import load_dotenv
 # from io import BufferedIOBase
 from telegram import Bot, Update, ForceReply, InlineKeyboardMarkup, InlineKeyboardButton
 from telegram.constants import ParseMode
-from telegram.ext import Application, Updater, CommandHandler, MessageHandler, CallbackContext, CallbackQueryHandler, ContextTypes,  filters
+from telegram.ext import Application, ExtBot, Updater, CommandHandler, MessageHandler, CallbackContext, CallbackQueryHandler, ContextTypes,  filters
 
 
 # Configure logging
@@ -138,13 +138,16 @@ async def help(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """
     This function handles /help command
     """
-    bot_msg = "Should print description to user"
 
-    # smth = dir(context.bot)
-    smth =context.bot.getMyCommands()
-    print(smth)
-    
+    bot_description = await context.bot.getMyDescription()
+    bot_msg = bot_description.description
     await update.message.reply_text(bot_msg)
+
+    bot_commands = await context.bot.getMyCommands()
+    for command in bot_commands:
+        bot_msg = f"/{command.command} \t- {command.description}"
+        await update.message.reply_text(bot_msg)
+    
 
 async def status(update: Update, context: CallbackContext) -> None:
     """
@@ -153,7 +156,6 @@ async def status(update: Update, context: CallbackContext) -> None:
     bot_msg = "Should print status to user"
 
     await update.message.reply_text(bot_msg)   
-
 
 
 async def freshstart(update: Update, context: CallbackContext) -> None:
@@ -259,15 +261,7 @@ def main() -> None:
 
     # Create a builder via Application.builder() and then specifies all required arguments via that builder.
     #  Finally, the Application is created by calling builder.build()
-    # application = Application.builder().token(BOT_TOKEN).build()   
-    bot = Bot(BOT_TOKEN)
-    application = Application.builder().bot(bot).build()    
-    
-    # mybot = ExtBot.initialize
-
-# НЕ работает
-    smth = application.bot.getMyName
-    print(smth)
+    application = Application.builder().token(BOT_TOKEN).build()   
 
     # Then, we register each handler and the conditions the update must meet to trigger it
     # Register commands
