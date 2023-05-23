@@ -138,15 +138,19 @@ async def help(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """
     This function handles /help command
     """
-
+    # Get description and send to user
     bot_description = await context.bot.getMyDescription()
     bot_msg = bot_description.description
     await update.message.reply_text(bot_msg)
 
     bot_commands = await context.bot.getMyCommands()
+    # Build message about commands
+    bot_msg = ''
     for command in bot_commands:
-        bot_msg = f"/{command.command} \t- {command.description}"
-        await update.message.reply_text(bot_msg)
+        if command.command != 'help':
+            bot_msg = f"/{command.command} - {command.description}\n" + bot_msg
+
+    await update.message.reply_text(bot_msg)
     
 
 async def status(update: Update, context: CallbackContext) -> None:
