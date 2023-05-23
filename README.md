@@ -17,5 +17,6 @@ Bot currently accept .gan (GanttProject) format and translate it to json format 
 
 [ ] implement /help command
 [ ] implement /status command
+[ ] add example of json structure for project files and requirments for project files to README.
 [ ] Error handling: https://docs.python-telegram-bot.org/en/stable/telegram.ext.application.html#telegram.ext.Application.error_handlers
 [x] Make "hello world" type bot - learn how to connect app to telegram

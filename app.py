@@ -27,7 +27,7 @@ screaming = False
 # TODO: change according to starter of the bot
 PM = 'hagen10'
 PROJECTTITLE = ''
-PROJECTJSON = "temp.json"
+PROJECTJSON = "data/temp.json"
 
 # Pre-assign menu text
 FIRST_MENU = "<b>Menu 1</b>\n\nA beautiful menu with a shiny inline button."
@@ -147,7 +147,33 @@ async def status(update: Update, context: CallbackContext) -> None:
     This function handles /status command
     """
     bot_msg = "Should print status to user"
+    # Because /status command could be called anytime, we can't pass project stored in memory to it
+    # so it will be loaded from disk
+    # PPP
+    # Check for json project file to exist
+    # load project
+    # proceed through dictionary entries
+    # make messages on the way
 
+    if os.path.exists(PROJECTJSON):
+        with open(PROJECTJSON, 'r') as fp:
+            try:
+                project = connectors.load_json(fp)
+            except Exception as e:
+                bot_msg = f"ERROR ({e}): Unable to load"
+                logger.info(f'{time.asctime()}\t {type(e)} \t {e.with_traceback}')
+                
+                
+            else:
+                # Main 
+                bot_msg = f"Load successfull, wait for updates"
+                # check Who calls?
+                # if PM then proceed all tasks
+
+                # if not - then only tasks for this member
+    else:
+        bot_msg = f"Project file does not exist, try to load first"
+        
     await update.message.reply_text(bot_msg)   
 
 

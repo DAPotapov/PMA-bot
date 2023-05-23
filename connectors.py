@@ -164,11 +164,17 @@ def compose_tasks_list(list, task, allocations):
 
 def load_json(fp):
     '''
+    Loads JSON data from file into dictionary.
     This connector useful in case we downloaded JSON, manually made some changes, 
     and upload it again to bot 
     '''
-    # TODO: to implement
-    return
+    # TODO:
+    # 1. Limit size of data to load to prevent attacks
+    # 2. 
+    
+    project = json.load(fp)
+    # TODO check if it seems like project. Look for inner format structure
+    return project
 
 if __name__ == '__main__':
     main()
