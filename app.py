@@ -170,35 +170,44 @@ async def status(update: Update, context: CallbackContext) -> None:
                 
                 
             else:
-                # Main 
+                # Main thread
                 bot_msg = f"Load successfull, wait for updates"
-                # check Who calls?
-                # if PM then proceed all tasks
                 user = update.message.from_user
                 username = user.username
-                # if username in project['actioners']['telegram_id']:
-                print (project['actioners'])
+                # check Who calls?
+                # if PM then proceed all tasks
                 if username == PM:
-                    bot_msg = f"Hello Master."
+                    # bot_msg = f"Here"
                     
-                    # Send reply to PM in group chat if allowed
-                    if ALLOW_POST_STATUS_TO_GROUP == True:
-                        await update.message.reply_text(bot_msg)
-                    else:
-                        # Or in private chat
-                        await user.send_message(bot_msg)
+                    for task in project['tasks']:
+                        # Check if task not completed
+                        if task['complete'] < 100:
+                            # if task['startdate'] == 
+                            # TODO fix end_date to enddate here and in connectors. Must be uniformal
+                            bot_msg = f"Task '{task['name']}' should be finished due: {task['end_date']}"
+                            # Send reply to PM in group chat if allowed
+                            if ALLOW_POST_STATUS_TO_GROUP == True:
+                                await update.message.reply_text(bot_msg)
+                            else:
+                                # Or in private chat
+                                await user.send_message(bot_msg)
 
                 # if not - then only tasks for this member
                 else:
-                    # TODO here should check if user is part of the project team
-                    #
-                    bot_msg = f"Project status for {username} (will be here)"
-                    # Send reply to user in group chat if allowed
-                    if ALLOW_POST_STATUS_TO_GROUP == True:
-                        await update.message.reply_text(bot_msg)
+                    # Check if user is part of the project team
+                    if [True for x in project['actioners'] if x['telegram_id'] == username]:
+                        bot_msg = f"Project status for {username} (will be here)"
+                        # Send reply to user in group chat if allowed
+                        if ALLOW_POST_STATUS_TO_GROUP == True:
+                            await update.message.reply_text(bot_msg)
+                        else:
+                            # Or in private chat
+                            await user.send_message(bot_msg)
                     else:
-                        # Or in private chat
-                        await user.send_message(bot_msg)
+                        bot_msg = f"{username} is not participate in schedule provided."
+                        # TODO This case should be certanly send to PM. For time being just keep it this way
+                        await update.message.reply_text(bot_msg)
+
                     
     else:
         bot_msg = f"Project file does not exist, try to load first"
