@@ -176,8 +176,10 @@ async def status(update: Update, context: CallbackContext) -> None:
                 # if PM then proceed all tasks
                 user = update.message.from_user
                 username = user.username
+                # if username in project['actioners']['telegram_id']:
+                print (project['actioners'])
                 if username == PM:
-                    bot_msg = f'Hello Master'
+                    bot_msg = f"Hello Master."
                     
                     # Send reply to PM in group chat if allowed
                     if ALLOW_POST_STATUS_TO_GROUP == True:
