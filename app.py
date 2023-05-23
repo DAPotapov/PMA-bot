@@ -24,10 +24,15 @@ logger = logging.getLogger(__name__)
 screaming = False
 
 # Project constants, should be stored separately TODO
+
+# This setting control whether bot will send status report for PM in private chat 
+# or in group chat if /status command executed in group chat
+ALLOW_POST_STATUS_TO_GROUP = False 
 # TODO: change according to starter of the bot
 PM = 'hagen10'
 PROJECTTITLE = ''
 PROJECTJSON = "data/temp.json"
+
 
 # Pre-assign menu text
 FIRST_MENU = "<b>Menu 1</b>\n\nA beautiful menu with a shiny inline button."
@@ -169,13 +174,34 @@ async def status(update: Update, context: CallbackContext) -> None:
                 bot_msg = f"Load successfull, wait for updates"
                 # check Who calls?
                 # if PM then proceed all tasks
+                user = update.message.from_user
+                username = user.username
+                if username == PM:
+                    bot_msg = f'Hello Master'
+                    
+                    # Send reply to PM in group chat if allowed
+                    if ALLOW_POST_STATUS_TO_GROUP == True:
+                        await update.message.reply_text(bot_msg)
+                    else:
+                        # Or in private chat
+                        await user.send_message(bot_msg)
 
                 # if not - then only tasks for this member
+                else:
+                    # TODO here should check if user is part of the project team
+                    #
+                    bot_msg = f"Project status for {username} (will be here)"
+                    # Send reply to user in group chat if allowed
+                    if ALLOW_POST_STATUS_TO_GROUP == True:
+                        await update.message.reply_text(bot_msg)
+                    else:
+                        # Or in private chat
+                        await user.send_message(bot_msg)
+                    
     else:
         bot_msg = f"Project file does not exist, try to load first"
-        
-    await update.message.reply_text(bot_msg)   
-
+        # TODO consider send directly to user asked
+        await update.message.reply_text(bot_msg)  
 
 
 async def freshstart(update: Update, context: CallbackContext) -> None:
@@ -209,7 +235,8 @@ async def settings(update: Update, context: CallbackContext) -> None:
     # await update.message.reply_text(message)
 
     # 2. change of project name
-    # 3. interval of intermidiate reminders
+    # 3. Allow status update in group chat
+    # 4. interval of intermidiate reminders
 
     await update.message.reply_text(bot_msg)
 
