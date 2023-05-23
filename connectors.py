@@ -5,6 +5,34 @@ import json
 from numpy import busday_offset, datetime64
 
 
+def email_validation(email):
+    '''
+    Function to validate an email address and gently inform user if smth not right, like:
+    ' Hey, I could not send email to that address later'
+    It's for future function to inform user via email
+    '''
+    # TODO: implement
+    pass
+
+
+def phone_validation():
+    '''
+    Function to validate phone number and gently inform PM if smth is not right, like
+    'Hey, it seems we couldn't call such number later'
+    It's for future function to inform user via phone
+    '''
+    # TODO: Implement
+    pass
+
+
+def tg_validation():
+    ''' 
+    Function to validate telegram username
+    '''
+# TODO: Implement
+    pass
+
+
 def main():
     '''
     Module recieve PosixPath of downloaded file.
