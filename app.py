@@ -8,13 +8,21 @@ import connectors
 import tempfile
 import asyncio
 
-
 from dotenv import load_dotenv
 from datetime import date
 # from io import BufferedIOBase
 from telegram import Bot, Update, ForceReply, InlineKeyboardMarkup, InlineKeyboardButton
 from telegram.constants import ParseMode
-from telegram.ext import Application, ExtBot, Updater, CommandHandler, MessageHandler, CallbackContext, CallbackQueryHandler, ContextTypes,  filters
+from telegram.ext import (
+                            Application, 
+                            ExtBot, 
+                            Updater, 
+                            CommandHandler, 
+                            MessageHandler, 
+                            CallbackContext, 
+                            CallbackQueryHandler, 
+                            ContextTypes,  
+                            filters)
 
 
 # Configure logging
@@ -70,16 +78,7 @@ async def echo(update: Update, context: CallbackContext) -> None:
 
     if screaming and update.message.text:
         await update.message.reply_text(text.upper())
-        # From v.13
-        # context.bot.send_message(
-        #     update.message.chat_id,
-        #     text.upper(),
-        #     # To preserve the markdown, we attach entities (bold, italic...)
-        #     entities=update.message.entities
-        # )
     else:
-        # print("This is else")
-        # This is equivalent to forwarding, without the sender's name
         await update.message.reply_text(text)
 
 
@@ -166,11 +165,6 @@ async def status(update: Update, context: CallbackContext) -> None:
     bot_msg = "Should print status to user"
     # Because /status command could be called anytime, we can't pass project stored in memory to it
     # so it will be loaded from disk
-    # PPP
-    # Check for json project file to exist
-    # load project
-    # proceed through dictionary entries
-    # make messages on the way
 
     if os.path.exists(PROJECTJSON):
         with open(PROJECTJSON, 'r') as fp:
@@ -178,9 +172,7 @@ async def status(update: Update, context: CallbackContext) -> None:
                 project = connectors.load_json(fp)
             except Exception as e:
                 bot_msg = f"ERROR ({e}): Unable to load"
-                logger.info(f'{time.asctime()}\t {type(e)} \t {e.with_traceback}')
-                
-                
+                logger.info(f'{time.asctime()}\t {type(e)} \t {e.with_traceback}')                  
             else:
                 # Main thread
                 bot_msg = f"Load successfull, wait for updates"
@@ -189,8 +181,6 @@ async def status(update: Update, context: CallbackContext) -> None:
                 # check Who calls?
                 # if PM then proceed all tasks
                 if username == PM:
-                    # bot_msg = f"Here"
-                    
                     for task in project['tasks']:
                         # Bot will inform user only of tasks with important dates
                         bot_msg = ""
@@ -236,8 +226,7 @@ async def status(update: Update, context: CallbackContext) -> None:
                         bot_msg = f"{username} is not participate in schedule provided."
                         # TODO This case should be certanly send to PM. For time being just keep it this way
                         await update.message.reply_text(bot_msg)
-
-                    
+                  
     else:
         bot_msg = f"Project file does not exist, try to load first"
         # TODO consider send directly to user asked
