@@ -181,26 +181,34 @@ async def status(update: Update, context: CallbackContext) -> None:
                     # bot_msg = f"Here"
                     
                     for task in project['tasks']:
+                        # Bot will inform user only of tasks with important dates
+                        bot_msg = ""
                         # Check if task not completed
                         if task['complete'] < 100:
-                            # TODO: What to do with milestones?
-                            # If delta_start >0 task not started, otherwise already started
+                # TODO: What to do with milestones? Separately inform!
+                            # If delta_start <0 task not started, otherwise already started
                             delta_start = date.today() - date.fromisoformat(task['startdate'])
                             # If delta_end >0 task overdue, if <0 task in progress
                             delta_end = date.today() - date.fromisoformat(task['enddate'])
                             if delta_start.days == 0:
-                                print(f"task '{task['name']} starts today")
-                            elif :
-                                
-
-                            # TODO fix end_date to enddate here and in connectors. Must be uniformal
-                            bot_msg = f"Task '{task['name']}' should be finished due: {task['enddate']}"
-                            # Send reply to PM in group chat if allowed
-                            if ALLOW_POST_STATUS_TO_GROUP == True:
-                                await update.message.reply_text(bot_msg)
+                                bot_msg = f"task {task['id']} '{task['name']}' starts today. Assigned to {task['actioners']}"
+                            elif delta_start.days > 0  and delta_end.days < 0:
+                                bot_msg = f"task {task['id']} '{task['name']}' is intermidiate. Due date is {task['enddate']}"
+                            elif delta_end.days == 0:
+                                bot_msg = f"task {task['id']}  '{task['name']}' must be completed today! Assigned to {task['actioners']}"
+                            elif delta_start.days > 0 and delta_end.days > 0:
+                                bot_msg = f"task {task['id']} '{task['name']}' is overdue! (had to be completed on {task['enddate']}). Assigned to {task['actioners']}"
                             else:
-                                # Or in private chat
-                                await user.send_message(bot_msg)
+                                print(f"Future tasks as {task['id']} '{task['name']}' goes here")                            
+
+                            # Check if there is something to report to user
+                            if bot_msg:
+                                # Send reply to PM in group chat if allowed
+                                if ALLOW_POST_STATUS_TO_GROUP == True:
+                                    await update.message.reply_text(bot_msg)
+                                else:
+                                    # Or in private chat
+                                    await user.send_message(bot_msg)
 
                 # if not - then only tasks for this member
                 else:
