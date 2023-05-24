@@ -331,9 +331,9 @@ def save_json(project):
     Saves project in JSON format and returns message about success of operation
     '''
     bot_msg = ''
-    with open(PROJECTJSON, 'w') as json_fh:
+    with open(PROJECTJSON, 'w', encoding='utf-8') as json_fh:
         try:
-            json.dump(project, json_fh)
+            json.dump(project, json_fh, ensure_ascii=False, indent=4)
         except:
             bot_msg = 'Error saving project to json file'    
         else:

@@ -87,7 +87,7 @@ def load_gan(fp):
     # Check if special field for telegram id exist and choose correct 
     # custom property if there are several of them
     for custom_property in obj.project.resources.custom_property_definition:
-        if custom_property['name'] == 'telegram_id':
+        if custom_property['name'] == 'tg_username':
             property_id = custom_property['id']
             # no need to continue looking through custom properties
             break
@@ -98,14 +98,14 @@ def load_gan(fp):
         # If custom property found, then proceed through resources
         for actioner in obj.project.resources.resource:
             # Looking in custom properties of each resource for property assosiated with telegram
-            telegram_id = ''
+            tg_username = ''
             for property in actioner.custom_property:
                 if property['definition-id'] == property_id:
                     # If such property not filled then abort and tell user to do his job and make a proper file
                     if not property['value']:
-                        raise ValueError(f"'{actioner['name']}' have no telegram_id value")
+                        raise ValueError(f"'{actioner['name']}' have no tg_username value")
                     else:
-                        telegram_id = property['value']
+                        tg_username = property['value']
 
             # Build list of actioners
             actioners.append({
@@ -113,11 +113,11 @@ def load_gan(fp):
                 'name' : actioner['name'],
                 'email' : actioner['contacts'],
                 'phone' : actioner['phone'],
-                'telegram_id' : telegram_id,
+                'tg_username' : tg_username,
             })
-    # If no custom property for telegram_id found then inform the user
+    # If no custom property for tg_username found then inform the user
     else:
-        raise AttributeError("Project file has invalid structure: no 'telegram_id' field")
+        raise AttributeError("Project file has invalid structure: no 'tg_username' field")
     
     # Append actioners list to project dictionary
     project['actioners'] = actioners
@@ -167,8 +167,8 @@ def compose_tasks_list(list, task, allocations):
     else:
         raise ValueError('File may be damaged: milestone field contains invalid value ' + str(task['meeting']))
     
-    # Construct end date from start date, duration and numpy function:
     # TODO in v.2: project apps supports alternative calendars, bot should support them as well.
+    # Construct end date from start date, duration and numpy function:
     enddate = str(busday_offset(datetime64(task['start']), int(task['duration']), roll='forward'))
 
     list.append({
