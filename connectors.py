@@ -32,11 +32,11 @@ def tg_validation():
 # TODO: Implement
     pass
 
-
+# TODO maybe don't need this
 def main():
     '''
     Module recieve PosixPath of downloaded file.
-    Returns JSON of project schedule and assignments
+    Returns dictionary of lists of dictionaries of project schedule and assignments
     If error occured should return at least string of error message, but maybe there is better way of error handling
 
     '''
@@ -45,11 +45,10 @@ def main():
 
 def load_gan(fp):
     '''
-        This is a connector from GanttProject format (.gan) to inner JSON format.
-        На входе получаем имя файла (.gan )
-        Выполняем парсинг
-        Затем преобразовываем к внутреннему формату: берем только нужные элементы
-        Имеем json на выходе
+        This is a connector from GanttProject format (.gan) to inner format.
+        Get file pointer on input
+        Validates and converts data to inner dict-list-dict.. format
+        Dictionary on output        
     '''
     
     # Using untangle on GAN - WORKING. This syntax cleaner and have some useful methods like 'children'
@@ -176,7 +175,7 @@ def compose_tasks_list(list, task, allocations):
                 'id': int(task['id']),
                 'name': task['name'],
                 'startdate': task['start'],
-                'end_date': enddate, 
+                'enddate': enddate, 
                 'duration': int(task['duration']),
                 'successors': successors,
                 'milestone': milestone,
@@ -192,11 +191,17 @@ def compose_tasks_list(list, task, allocations):
 
 def load_json(fp):
     '''
+    Loads JSON data from file into dictionary.
     This connector useful in case we downloaded JSON, manually made some changes, 
     and upload it again to bot 
     '''
-    # TODO: to implement
-    return
+    # TODO:
+    # 1. Limit size of data to load to prevent attacks
+    # 2. 
+    
+    project = json.load(fp)
+    # TODO check if it seems like project. Look for inner format structure
+    return project
 
 if __name__ == '__main__':
     main()

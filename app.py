@@ -10,6 +10,7 @@ import asyncio
 
 
 from dotenv import load_dotenv
+from datetime import date
 # from io import BufferedIOBase
 from telegram import Bot, Update, ForceReply, InlineKeyboardMarkup, InlineKeyboardButton
 from telegram.constants import ParseMode
@@ -24,10 +25,15 @@ logger = logging.getLogger(__name__)
 screaming = False
 
 # Project constants, should be stored separately TODO
+
+# This setting control whether bot will send status report for PM in private chat 
+# or in group chat if /status command executed in group chat
+ALLOW_POST_STATUS_TO_GROUP = False 
 # TODO: change according to starter of the bot
 PM = 'hagen10'
 PROJECTTITLE = ''
-PROJECTJSON = "temp.json"
+PROJECTJSON = "data/temp.json"
+
 
 # Pre-assign menu text
 FIRST_MENU = "<b>Menu 1</b>\n\nA beautiful menu with a shiny inline button."
@@ -158,9 +164,84 @@ async def status(update: Update, context: CallbackContext) -> None:
     This function handles /status command
     """
     bot_msg = "Should print status to user"
+    # Because /status command could be called anytime, we can't pass project stored in memory to it
+    # so it will be loaded from disk
+    # PPP
+    # Check for json project file to exist
+    # load project
+    # proceed through dictionary entries
+    # make messages on the way
 
-    await update.message.reply_text(bot_msg)   
+    if os.path.exists(PROJECTJSON):
+        with open(PROJECTJSON, 'r') as fp:
+            try:
+                project = connectors.load_json(fp)
+            except Exception as e:
+                bot_msg = f"ERROR ({e}): Unable to load"
+                logger.info(f'{time.asctime()}\t {type(e)} \t {e.with_traceback}')
+                
+                
+            else:
+                # Main thread
+                bot_msg = f"Load successfull, wait for updates"
+                user = update.message.from_user
+                username = user.username
+                # check Who calls?
+                # if PM then proceed all tasks
+                if username == PM:
+                    # bot_msg = f"Here"
+                    
+                    for task in project['tasks']:
+                        # Bot will inform user only of tasks with important dates
+                        bot_msg = ""
+                        # Check if task not completed
+                        if task['complete'] < 100:
+                # TODO: What to do with milestones? Separately inform!
+                            # If delta_start <0 task not started, otherwise already started
+                            delta_start = date.today() - date.fromisoformat(task['startdate'])
+                            # If delta_end >0 task overdue, if <0 task in progress
+                            delta_end = date.today() - date.fromisoformat(task['enddate'])
+                            if delta_start.days == 0:
+                                bot_msg = f"task {task['id']} '{task['name']}' starts today. Assigned to {task['actioners']}"
+                            elif delta_start.days > 0  and delta_end.days < 0:
+                                bot_msg = f"task {task['id']} '{task['name']}' is intermidiate. Due date is {task['enddate']}"
+                            elif delta_end.days == 0:
+                                bot_msg = f"task {task['id']}  '{task['name']}' must be completed today! Assigned to {task['actioners']}"
+                            elif delta_start.days > 0 and delta_end.days > 0:
+                                bot_msg = f"task {task['id']} '{task['name']}' is overdue! (had to be completed on {task['enddate']}). Assigned to {task['actioners']}"
+                            else:
+                                print(f"Future tasks as {task['id']} '{task['name']}' goes here")                            
 
+                            # Check if there is something to report to user
+                            if bot_msg:
+                                # Send reply to PM in group chat if allowed
+                                if ALLOW_POST_STATUS_TO_GROUP == True:
+                                    await update.message.reply_text(bot_msg)
+                                else:
+                                    # Or in private chat
+                                    await user.send_message(bot_msg)
+
+                # if not - then only tasks for this member
+                else:
+                    # Check if user is part of the project team
+                    if [True for x in project['actioners'] if x['telegram_id'] == username]:
+                        bot_msg = f"Project status for {username} (will be here)"
+                        # Send reply to user in group chat if allowed
+                        if ALLOW_POST_STATUS_TO_GROUP == True:
+                            await update.message.reply_text(bot_msg)
+                        else:
+                            # Or in private chat
+                            await user.send_message(bot_msg)
+                    else:
+                        bot_msg = f"{username} is not participate in schedule provided."
+                        # TODO This case should be certanly send to PM. For time being just keep it this way
+                        await update.message.reply_text(bot_msg)
+
+                    
+    else:
+        bot_msg = f"Project file does not exist, try to load first"
+        # TODO consider send directly to user asked
+        await update.message.reply_text(bot_msg)  
 
 async def freshstart(update: Update, context: CallbackContext) -> None:
     """
@@ -193,7 +274,8 @@ async def settings(update: Update, context: CallbackContext) -> None:
     # await update.message.reply_text(message)
 
     # 2. change of project name
-    # 3. interval of intermidiate reminders
+    # 3. Allow status update in group chat
+    # 4. interval of intermidiate reminders
 
     await update.message.reply_text(bot_msg)
 
