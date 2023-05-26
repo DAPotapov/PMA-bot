@@ -3,6 +3,8 @@ import untangle
 import json
 
 from numpy import busday_offset, datetime64
+# For testing purposes
+from pprint import pprint
 
 
 def email_validation(email):
@@ -66,11 +68,16 @@ def load_gan(fp):
             # Add relevant data to list containing task information
             if 'allocation' in obj.project.allocations:
                 allocations = obj.project.allocations.allocation
+                # pprint(f' Tasks list before function call: {tasks}')
+                # pprint(f"This task will be send to function: {task['name']}")
                 tasks = compose_tasks_list(tasks, task, allocations)
+                # pprint(f" .. and after function: {tasks}")
                 # if task has subtask retreive data from it too
                 if 'task' in task:
-                    for task in task.task:
-                        tasks = compose_tasks_list(tasks, task, allocations)
+                    for subtask in task.task:
+                        # pprint(f' Tasks list before function call: {tasks}')
+                        tasks = compose_tasks_list(tasks, subtask, allocations)
+                        # pprint(f' .. and after: {tasks}')
 
             else:
                 raise ValueError('There are no assignments made. Whom are you gonna manage?')
@@ -129,6 +136,7 @@ def compose_tasks_list(list, task, allocations):
     ''' Function to append to list of tasks information of one task or subtask'''
 
     # Dictionary of id of actioners and their last reaction
+    # pprint(f"Function got these parameters:\n {list}\n{task['name']}\n{allocations}")
     actioners = [] 
     for allocation in allocations:
         if task['id'] == allocation['task-id']:
@@ -156,8 +164,8 @@ def compose_tasks_list(list, task, allocations):
     # Dictionary of subtasks' id of this one. This way helpful to almost infinitely decompose tasks. 
     include = []
     if 'task' in task:
-        for task in task.task:
-            include.append(int(task['id']))
+        for subtask in task.task:
+            include.append(int(subtask['id']))
     
     # Construct dictionary of task and append to list of tasks   
     if task['meeting'].lower() == "false":

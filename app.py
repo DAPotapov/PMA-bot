@@ -37,6 +37,8 @@ screaming = False
 # This setting control whether bot will send status report for PM in private chat 
 # or in group chat if /status command executed in group chat
 ALLOW_POST_STATUS_TO_GROUP = False 
+# Inform actioners of milestones (by default only PM) TODO
+INFORM_ACTIONERS_OF_MILESTONES = False
 # TODO: change according to starter of the bot
 PM = 'hagen10'
 PROJECTTITLE = ''
