@@ -188,21 +188,30 @@ async def status(update: Update, context: CallbackContext) -> None:
                         bot_msg = ""
                         # Check if task not completed
                         if task['complete'] < 100:
-                # TODO: What to do with milestones? Separately inform!
                             # If delta_start <0 task not started, otherwise already started
                             delta_start = date.today() - date.fromisoformat(task['startdate'])
                             # If delta_end >0 task overdue, if <0 task in progress
                             delta_end = date.today() - date.fromisoformat(task['enddate'])
-                            if delta_start.days == 0:
-                                bot_msg = f"task {task['id']} '{task['name']}' starts today. Assigned to {task['actioners']}"
-                            elif delta_start.days > 0  and delta_end.days < 0:
-                                bot_msg = f"task {task['id']} '{task['name']}' is intermidiate. Due date is {task['enddate']}"
-                            elif delta_end.days == 0:
-                                bot_msg = f"task {task['id']}  '{task['name']}' must be completed today! Assigned to {task['actioners']}"
-                            elif delta_start.days > 0 and delta_end.days > 0:
-                                bot_msg = f"task {task['id']} '{task['name']}' is overdue! (had to be completed on {task['enddate']}). Assigned to {task['actioners']}"
+                            # Deal with common task
+                            if task['include']:
+                                # For now focus only on subtasks, that can be actually done
+                                # I'll decide what to do with such tasks after gathering user experience
+                                pass
                             else:
-                                print(f"Future tasks as {task['id']} '{task['name']}' goes here")                            
+                                # Inform about milestone
+                                if task['milestone'] == True and delta_end.days < 0:
+                                    bot_msg = f"Milestone '{task['name']}' is near ({task['enddate']})!"
+                                else:
+                                    if delta_start.days == 0:
+                                        bot_msg = f"task {task['id']} '{task['name']}' starts today. Assigned to {task['actioners']}"
+                                    elif delta_start.days > 0  and delta_end.days < 0:
+                                        bot_msg = f"task {task['id']} '{task['name']}' is intermidiate. Due date is {task['enddate']}"
+                                    elif delta_end.days == 0:
+                                        bot_msg = f"task {task['id']}  '{task['name']}' must be completed today! Assigned to {task['actioners']}"
+                                    elif delta_start.days > 0 and delta_end.days > 0:
+                                        bot_msg = f"task {task['id']} '{task['name']}' is overdue! (had to be completed on {task['enddate']}). Assigned to {task['actioners']}"
+                                    else:
+                                        print(f"Future tasks as {task['id']} '{task['name']}' goes here")                            
 
                             # Check if there is something to report to user
                             if bot_msg:
