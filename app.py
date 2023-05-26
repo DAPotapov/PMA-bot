@@ -203,7 +203,14 @@ async def status(update: Update, context: CallbackContext) -> None:
                                     bot_msg = f"Milestone '{task['name']}' is near ({task['enddate']})!"
                                 else:
                                     if delta_start.days == 0:
-                                        bot_msg = f"task {task['id']} '{task['name']}' starts today. Assigned to {task['actioners']}"
+                                        people = []
+                                        for doer in task['actioners']:
+                                            for member in project['actioners']:
+                                                # print(f"Doer: {type(doer['actioner_id'])} \t {type(member['id'])}")
+                                                if doer['actioner_id'] == member['id']:                                                    
+                                                    people.append((member['name'], member['tg_username']))
+                                        # print(f"Actioner: {task['actioners'][0]['actioner_id']}, actioners: {people}")
+                                        bot_msg = f"task {task['id']} '{task['name']}' starts today. Assigned to {people}"
                                     elif delta_start.days > 0  and delta_end.days < 0:
                                         bot_msg = f"task {task['id']} '{task['name']}' is intermidiate. Due date is {task['enddate']}"
                                     elif delta_end.days == 0:

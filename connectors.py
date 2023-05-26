@@ -116,7 +116,7 @@ def load_gan(fp):
 
             # Build list of actioners
             actioners.append({
-                'id' : actioner['id'],
+                'id' : int(actioner['id']),
                 'name' : actioner['name'],
                 'email' : actioner['contacts'],
                 'phone' : actioner['phone'],
