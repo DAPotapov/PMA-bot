@@ -160,6 +160,20 @@ async def help(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     await update.message.reply_text(bot_msg)
     
 
+def get_assignees(task, actioners):
+    '''
+    Helper function for getting list of tuples of name and telegram username 
+    of person assigned to given task
+    '''
+    people = []
+    for doer in task['actioners']:
+        for member in actioners:
+            # print(f"Doer: {type(doer['actioner_id'])} \t {type(member['id'])}")
+            if doer['actioner_id'] == member['id']:                                                    
+                people.append((member['name'], member['tg_username']))
+    return people
+
+
 async def status(update: Update, context: CallbackContext) -> None:
     """
     This function handles /status command
@@ -202,15 +216,16 @@ async def status(update: Update, context: CallbackContext) -> None:
                                 if task['milestone'] == True and delta_end.days < 0:
                                     bot_msg = f"Milestone '{task['name']}' is near ({task['enddate']})!"
                                 else:
+                                    actioners = project['actioners']
                                     if delta_start.days == 0:
-                                        people = []
-                                        for doer in task['actioners']:
-                                            for member in project['actioners']:
-                                                # print(f"Doer: {type(doer['actioner_id'])} \t {type(member['id'])}")
-                                                if doer['actioner_id'] == member['id']:                                                    
-                                                    people.append((member['name'], member['tg_username']))
-                                        # print(f"Actioner: {task['actioners'][0]['actioner_id']}, actioners: {people}")
-                                        bot_msg = f"task {task['id']} '{task['name']}' starts today. Assigned to {people}"
+                                        try:
+                                            people = get_assignees(task, actioners)
+                                        except Exception as e:
+                                            bot_msg = "Error occured while processing assigned actioners to task task['id']} '{task['name']}' starting today"
+                                            logger.info(f'{time.asctime()}\t {type(e)} \t {e.with_traceback}')
+                                        else:
+                                            # print(f"Actioner: {task['actioners'][0]['actioner_id']}, actioners: {people}")
+                                            bot_msg = f"task {task['id']} '{task['name']}' starts today. Assigned to {people}"
                                     elif delta_start.days > 0  and delta_end.days < 0:
                                         bot_msg = f"task {task['id']} '{task['name']}' is intermidiate. Due date is {task['enddate']}"
                                     elif delta_end.days == 0:
