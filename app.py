@@ -324,20 +324,21 @@ async def freshstart(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None
     bot_msg = "Are you really want to start a new project?"
     await update.message.reply_text(bot_msg, reply_markup=reply_markup)
 
-async def button(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    bot_msg = "Bot answer"
-    """Parses the CallbackQuery and updates the message text."""
-    query = update.callback_query
-    """ As said in documentation CallbackQueries need to be answered """
-    await query.answer()
+# Currently not used
+# async def button(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+#     bot_msg = "Bot answer"
+#     """Parses the CallbackQuery and updates the message text."""
+#     query = update.callback_query
+#     """ As said in documentation CallbackQueries need to be answered """
+#     await query.answer()
 
-    if query.data == "1":
-        bot_msg = "As you wish. Upload new project file"
-    if query.data == "2":
-        bot_msg = "Let's continue with current project"
-    if query.data == "3":
-        bot_msg = "Starting new project will replace your current reminders with new schedule"
-    await query.edit_message_text(bot_msg)
+#     if query.data == "1":
+#         bot_msg = "As you wish. Upload new project file"
+#     if query.data == "2":
+#         bot_msg = "Let's continue with current project"
+#     if query.data == "3":
+#         bot_msg = "Starting new project will replace your current reminders with new schedule"
+#     await query.edit_message_text(bot_msg)
 
 async def settings(update: Update, context: CallbackContext) -> None:
     """
@@ -364,7 +365,55 @@ async def settings(update: Update, context: CallbackContext) -> None:
     # 3. Allow status update in group chat
     # 4. interval of intermidiate reminders
 
-    await update.message.reply_text(bot_msg)
+    # Check if it is PM who wish to change settings
+    username = update.message.from_user.username
+    if username == PM:
+        option_suffix = ""
+        option_suffix = "On" if ALLOW_POST_STATUS_TO_GROUP == True else "Off"
+        allow_status_option = "Allow status update in group chat: " + option_suffix        
+        option_suffix = "On" if INFORM_ACTIONERS_OF_MILESTONES == True else "Off"
+        milestones_anounce_option = "Users get anounces about milestones (by default only PM): " + option_suffix
+
+        done_option = "Done"
+        settings_kbd = [
+                        [InlineKeyboardButton(allow_status_option, callback_data="allow_status_option")],
+                        [InlineKeyboardButton(milestones_anounce_option, callback_data="milestones_anounce_option")],
+                        [InlineKeyboardButton(done_option, callback_data="done_option")]
+        ]
+        settings_markup = InlineKeyboardMarkup(settings_kbd)     
+        bot_msg = "You can alter this settings:"
+        await update.message.reply_text(bot_msg, reply_markup=settings_markup)
+    else:
+        bot_msg = "Only Project manager is allowed to change settings."
+        await update.message.reply_text(bot_msg)
+
+async def buttons(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """ Function to control buttons in settings """
+    bot_msg = "Bot answer"
+    """Parses the CallbackQuery and updates the message text."""
+    query = update.callback_query
+    """ As said in documentation CallbackQueries need to be answered """
+    await query.answer()
+
+    match query.data:
+        case "allow_status_option":
+            # Switch this setting
+            global ALLOW_POST_STATUS_TO_GROUP
+            ALLOW_POST_STATUS_TO_GROUP = True if ALLOW_POST_STATUS_TO_GROUP == False else False
+            bot_msg = "Setting updated. Something else? Click /settings"
+            await query.edit_message_text(bot_msg)
+        case "milestones_anounce_option":
+            global INFORM_ACTIONERS_OF_MILESTONES
+            INFORM_ACTIONERS_OF_MILESTONES = True if INFORM_ACTIONERS_OF_MILESTONES == False else False
+            bot_msg = "Setting updated. Something else? Click /settings"
+            await query.edit_message_text(bot_msg)
+        case "done_option":
+            bot_msg = "Ok. You may call some other commands"
+            await query.edit_message_text(bot_msg)  
+        case _:
+            bot_msg = "Unknown answer"
+            await query.edit_message_text(bot_msg)                        
+
 
 async def upload(update: Update, context: CallbackContext) -> None:
     '''
@@ -479,8 +528,12 @@ def main() -> None:
     # And if changes were made inside the bot, PM could download updated schedule (original format?)
     # dispatcher.add_handler(CommandHandler("download", download))
 
-    # Register handler for inline buttons
-    application.add_handler(CallbackQueryHandler(button))
+    # # Register handler for inline buttons in ...
+    # application.add_handler(CallbackQueryHandler(button))
+
+    # Handler to control buttons 
+    application.add_handler(CallbackQueryHandler(buttons))
+    
 
     # Echo any message that is text and not a command
     application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, echo))
