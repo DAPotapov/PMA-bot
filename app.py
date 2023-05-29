@@ -141,6 +141,15 @@ def button_tap(update: Update, context: CallbackContext) -> None:
         reply_markup=markup
     )
 
+async def feedback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    '''
+    This function purpose is to inform developer of user feedback    
+    '''
+    logger.warning(f'{time.asctime()}\tFEEDBACK from {update.message.from_user.username}: {update.message.text}')
+    print("Contex is here:" , context.args)
+    bot_msg = "Feedback sent to developer."
+    await update.message.reply_text(bot_msg)
+
 async def help(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """
     This function handles /help command
@@ -386,6 +395,8 @@ def main() -> None:
     application.add_handler(CommandHandler("status", status))
     # Initialize start of the project: project name, db initialization and so on, previous project should be archived
     application.add_handler(CommandHandler("freshstart", freshstart))  
+    # Bot should have the ability for user to inform developer of something: bugs, features and so on
+    application.add_handler(CommandHandler("feedback", feedback))  
     # It will be useful if schedule changed outside the bot
     # application.add_handler(CommandHandler("upload", upload))  
     # And if changes were made inside the bot, PM could download updated schedule (original format?)
