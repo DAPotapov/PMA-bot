@@ -231,8 +231,13 @@ async def status(update: Update, context: CallbackContext) -> None:
                                 pass
                             else:
                                 # Inform about milestone
-                                if task['milestone'] == True and delta_end.days < 0:
-                                    bot_msg = f"Milestone '{task['name']}' is near ({task['enddate']})!"
+                                if task['milestone'] == True:
+                                    if delta_end.days < 0:
+                                        # If milestone in future inform user
+                                        bot_msg = f"Milestone '{task['name']}' is near ({task['enddate']})!"
+                                    else:
+                                        # if milestone in past do nothing
+                                        pass
                                 else:
                                     actioners = project['actioners']
                                     if delta_start.days == 0:
@@ -245,11 +250,29 @@ async def status(update: Update, context: CallbackContext) -> None:
                                             # print(f"Actioner: {task['actioners'][0]['actioner_id']}, actioners: {people}")
                                             bot_msg = f"task {task['id']} '{task['name']}' starts today. Assigned to {people}"
                                     elif delta_start.days > 0  and delta_end.days < 0:
-                                        bot_msg = f"task {task['id']} '{task['name']}' is intermidiate. Due date is {task['enddate']}"
+                                        try:
+                                            people = get_assignees(task, actioners)
+                                        except Exception as e:
+                                            bot_msg = "Error occured while processing assigned actioners to task task['id']} '{task['name']}'"
+                                            logger.info(f'{time.asctime()}\t {type(e)} \t {e.with_traceback}')
+                                        else:
+                                            bot_msg = f"task {task['id']} '{task['name']}' is intermidiate. Due date is {task['enddate']}. Assigned to {people}"
                                     elif delta_end.days == 0:
-                                        bot_msg = f"task {task['id']}  '{task['name']}' must be completed today! Assigned to {task['actioners']}"
+                                        try:
+                                            people = get_assignees(task, actioners)
+                                        except Exception as e:
+                                            bot_msg = "Error occured while processing assigned actioners to task task['id']} '{task['name']}'"
+                                            logger.info(f'{time.asctime()}\t {type(e)} \t {e.with_traceback}')
+                                        else:                                        
+                                            bot_msg = f"task {task['id']}  '{task['name']}' must be completed today! Assigned to {people}"
                                     elif delta_start.days > 0 and delta_end.days > 0:
-                                        bot_msg = f"task {task['id']} '{task['name']}' is overdue! (had to be completed on {task['enddate']}). Assigned to {task['actioners']}"
+                                        try:
+                                            people = get_assignees(task, actioners)
+                                        except Exception as e:
+                                            bot_msg = "Error occured while processing assigned actioners to task task['id']} '{task['name']}'"
+                                            logger.info(f'{time.asctime()}\t {type(e)} \t {e.with_traceback}')
+                                        else:                                         
+                                            bot_msg = f"task {task['id']} '{task['name']}' is overdue! (had to be completed on {task['enddate']}). Assigned to {people}"
                                     else:
                                         print(f"Future tasks as {task['id']} '{task['name']}' goes here")                            
 
