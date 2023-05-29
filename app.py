@@ -47,6 +47,11 @@ PROJECTJSON = "data/temp.json"
 
 # List of commands
 help_cmd = BotCommand("help","выводит данное описание")
+status_cmd = BotCommand("status", "информация о текущем состоянии проекта")
+settings_cmd = BotCommand("settings", "настройка параметров бота")
+freshstart_cmd = BotCommand("freshstart", "начало нового проекта")
+feedback_cmd = BotCommand("feedback", "+<сообщение> отправит такое сообщение разработчику")
+
 
 # Pre-assign menu text
 FIRST_MENU = "<b>Menu 1</b>\n\nA beautiful menu with a shiny inline button."
@@ -148,6 +153,7 @@ async def feedback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     '''
     This function purpose is to inform developer of user feedback    
     '''
+    # Log when and what user sent using feedback command
     logger.warning(f'{time.asctime()}\tFEEDBACK from {update.message.from_user.username}: {update.message.text}')
     # List of args can be parsed to retrieve some information, I'm not sure yet what exactly
     # user_feedback = context.args
@@ -385,16 +391,14 @@ def save_json(project):
 #     print('Commands set')
 
 
-# Function to control list of commands in bot itself
+# Function to control list of commands in bot itself. Commands itself are global
 async def post_init(application: Application):
-    global help_cmd
     await application.bot.set_my_commands([
-                                        # BotCommand("help","выводит данное описание"),
                                         help_cmd,
-                                        BotCommand("status", "информация о текущем состоянии проекта"),
-                                        BotCommand("settings", "настройка параметров бота"),
-                                        BotCommand("freshstart", "начало нового проекта"),
-                                        BotCommand("feedback", "+<сообщение> отправит такое сообщение разработчику")
+                                        status_cmd,
+                                        settings_cmd,
+                                        freshstart_cmd,
+                                        feedback_cmd
     ])
 
 
@@ -412,18 +416,17 @@ def main() -> None:
     application.add_handler(CommandHandler("scream", scream))
     application.add_handler(CommandHandler("whisper", whisper))
     # application.add_handler(CommandHandler("menu", menu))
-    #TODO: Add more commands
     # dispatcher.add_handler(CommandHandler("start", start)) 
     # dispatcher.add_handler(CommandHandler("stop", stop)) # in case smth went wrong 
-    application.add_handler(CommandHandler("help", help)) # make it show description
+    application.add_handler(CommandHandler(help_cmd.command, help)) # make it show description
     # PM should have the abibility to change bot behaviour, such as reminder interval and so on
-    application.add_handler(CommandHandler("settings", settings))
+    application.add_handler(CommandHandler(settings_cmd.command, settings))
     # Command to trigger project status check.
-    application.add_handler(CommandHandler("status", status))
+    application.add_handler(CommandHandler(status_cmd.command, status))
     # Initialize start of the project: project name, db initialization and so on, previous project should be archived
-    application.add_handler(CommandHandler("freshstart", freshstart))  
+    application.add_handler(CommandHandler(freshstart_cmd.command, freshstart))  
     # Bot should have the ability for user to inform developer of something: bugs, features and so on
-    application.add_handler(CommandHandler("feedback", feedback))  
+    application.add_handler(CommandHandler(feedback_cmd.command, feedback))  
     # It will be useful if schedule changed outside the bot
     # application.add_handler(CommandHandler("upload", upload))  
     # And if changes were made inside the bot, PM could download updated schedule (original format?)
