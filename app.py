@@ -310,8 +310,8 @@ async def freshstart(update: Update, context: CallbackContext) -> None:
     """
     This function handles /freshstart command
     """
-
     bot_msg = "Here will be routine to start a new project"
+    
 
     await update.message.reply_text(bot_msg)
 
