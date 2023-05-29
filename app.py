@@ -11,7 +11,7 @@ import asyncio
 from dotenv import load_dotenv
 from datetime import date
 # from io import BufferedIOBase
-from telegram import Bot, Update, ForceReply, InlineKeyboardMarkup, InlineKeyboardButton
+from telegram import Bot, BotCommand, Update, ForceReply, InlineKeyboardMarkup, InlineKeyboardButton
 from telegram.constants import ParseMode
 from telegram.ext import (
                             Application, 
@@ -44,6 +44,9 @@ PM = 'hagen10'
 PROJECTTITLE = ''
 PROJECTJSON = "data/temp.json"
 
+
+# List of commands
+help_cmd = BotCommand("help","выводит данное описание")
 
 # Pre-assign menu text
 FIRST_MENU = "<b>Menu 1</b>\n\nA beautiful menu with a shiny inline button."
@@ -146,7 +149,8 @@ async def feedback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     This function purpose is to inform developer of user feedback    
     '''
     logger.warning(f'{time.asctime()}\tFEEDBACK from {update.message.from_user.username}: {update.message.text}')
-    print("Contex is here:" , context.args)
+    # List of args can be parsed to retrieve some information, I'm not sure yet what exactly
+    # user_feedback = context.args
     bot_msg = "Feedback sent to developer."
     await update.message.reply_text(bot_msg)
 
@@ -168,7 +172,6 @@ async def help(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
 
     await update.message.reply_text(bot_msg)
     
-
 def get_assignees(task, actioners):
     '''
     Helper function for getting list of tuples of name and telegram username 
@@ -371,6 +374,30 @@ def save_json(project):
             bot_msg = 'Successfully saved project to json file'
     return bot_msg
 
+# async def set_commands() -> None:
+#     await context.bot.set_my_commands([
+#                                         ("help","выводит данное описание"),
+#                                         ("status", "информация о текущем состоянии проекта"),
+#                                         ("settings", "настройка параметров бота"),
+#                                         ("freshstart", "начало нового проекта"),
+#                                         ("feedback", "+<сообщение> отправит такое сообщение разработчику")
+#                                     ])
+#     print('Commands set')
+
+
+# Function to control list of commands in bot itself
+async def post_init(application: Application):
+    global help_cmd
+    await application.bot.set_my_commands([
+                                        # BotCommand("help","выводит данное описание"),
+                                        help_cmd,
+                                        BotCommand("status", "информация о текущем состоянии проекта"),
+                                        BotCommand("settings", "настройка параметров бота"),
+                                        BotCommand("freshstart", "начало нового проекта"),
+                                        BotCommand("feedback", "+<сообщение> отправит такое сообщение разработчику")
+    ])
+
+
 def main() -> None:
 
     load_dotenv()
@@ -378,7 +405,7 @@ def main() -> None:
 
     # Create a builder via Application.builder() and then specifies all required arguments via that builder.
     #  Finally, the Application is created by calling builder.build()
-    application = Application.builder().token(BOT_TOKEN).build()   
+    application = Application.builder().token(BOT_TOKEN).post_init(post_init).build()   
 
     # Then, we register each handler and the conditions the update must meet to trigger it
     # Register commands
