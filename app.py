@@ -306,14 +306,38 @@ async def status(update: Update, context: CallbackContext) -> None:
         # TODO consider send directly to user asked
         await update.message.reply_text(bot_msg)  
 
-async def freshstart(update: Update, context: CallbackContext) -> None:
+async def freshstart(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """
     This function handles /freshstart command
     """
     bot_msg = "Here will be routine to start a new project"
-    
+    keyboard = [
+        [
+        InlineKeyboardButton("Yes", callback_data=1), # it is a string actually
+        InlineKeyboardButton("No", callback_data=2),
+        ],
+    [InlineKeyboardButton("Info, please", callback_data=3)]
+    ]
 
-    await update.message.reply_text(bot_msg)
+    reply_markup = InlineKeyboardMarkup(keyboard)
+
+    bot_msg = "Are you really want to start a new project?"
+    await update.message.reply_text(bot_msg, reply_markup=reply_markup)
+
+async def button(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    bot_msg = "Bot answer"
+    """Parses the CallbackQuery and updates the message text."""
+    query = update.callback_query
+    """ As said in documentation CallbackQueries need to be answered """
+    await query.answer()
+
+    if query.data == "1":
+        bot_msg = "As you wish. Upload new project file"
+    if query.data == "2":
+        bot_msg = "Let's continue with current project"
+    if query.data == "3":
+        bot_msg = "Starting new project will replace your current reminders with new schedule"
+    await query.edit_message_text(bot_msg)
 
 async def settings(update: Update, context: CallbackContext) -> None:
     """
@@ -456,7 +480,7 @@ def main() -> None:
     # dispatcher.add_handler(CommandHandler("download", download))
 
     # Register handler for inline buttons
-    # application.add_handler(CallbackQueryHandler(button_tap))
+    application.add_handler(CallbackQueryHandler(button))
 
     # Echo any message that is text and not a command
     application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, echo))
