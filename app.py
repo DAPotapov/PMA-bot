@@ -328,10 +328,7 @@ async def freshstart(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None
     """
     This function handles /freshstart command
     """
-    bot_msg = "Here will be routine to start a new project"
-
     freshstart_markup = InlineKeyboardMarkup(freshstart_kbd)
-
     bot_msg = "Are you really want to start a new project?"
     await update.message.reply_text(bot_msg, reply_markup=freshstart_markup)
 
@@ -430,8 +427,16 @@ async def buttons(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
             await query.edit_message_text(bot_msg)
         case "3":
             bot_msg = "Starting new project will replace your current reminders with new schedule"
-            # TODO lets try repeat menu for this option
             await query.edit_message_text(bot_msg)
+            # Just repeat keyboard - raises an error
+            freshstart_markup = InlineKeyboardMarkup(freshstart_kbd)
+            bot_msg = "So what did you decide?"
+            await context.bot.send_message(
+                update.effective_message.chat_id,
+                parse_mode=ParseMode.MARKDOWN_V2,
+                text=bot_msg,
+                reply_markup=freshstart_markup)
+
         case _:
             bot_msg = "Unknown answer"
             await query.edit_message_text(bot_msg)                        
