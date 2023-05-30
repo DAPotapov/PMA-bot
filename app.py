@@ -44,8 +44,7 @@ PM = 'hagen10'
 PROJECTTITLE = ''
 PROJECTJSON = "data/temp.json"
 
-
-# List of commands
+# Set list of commands
 help_cmd = BotCommand("help","выводит данное описание")
 status_cmd = BotCommand("status", "информация о текущем состоянии проекта")
 settings_cmd = BotCommand("settings", "настройка параметров бота")
@@ -53,6 +52,25 @@ freshstart_cmd = BotCommand("freshstart", "начало нового проек�
 feedback_cmd = BotCommand("feedback", "+<сообщение> отправит такое сообщение разработчику")
 
 
+# Configure buttons for menus
+# for settings menu:
+allow_status_option = "Allow status update in group chat: "     
+milestones_anounce_option = "Users get anounces about milestones (by default only PM): "
+settings_done_option = "Done"
+
+# Build keyboards
+#   for /freshstart
+freshstart_kbd = [
+    [
+    InlineKeyboardButton("Yes", callback_data=1), # it is a string actually
+    InlineKeyboardButton("No", callback_data=2),
+    ],
+[InlineKeyboardButton("Info, please", callback_data=3)]
+]
+#   for /settings
+settings_kbd = []
+
+# This is obsolete from telegram example. TO DELETE
 # Pre-assign menu text
 FIRST_MENU = "<b>Menu 1</b>\n\nA beautiful menu with a shiny inline button."
 SECOND_MENU = "<b>Menu 2</b>\n\nA better menu with even more shiny inline buttons."
@@ -311,18 +329,11 @@ async def freshstart(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None
     This function handles /freshstart command
     """
     bot_msg = "Here will be routine to start a new project"
-    keyboard = [
-        [
-        InlineKeyboardButton("Yes", callback_data=1), # it is a string actually
-        InlineKeyboardButton("No", callback_data=2),
-        ],
-    [InlineKeyboardButton("Info, please", callback_data=3)]
-    ]
 
-    reply_markup = InlineKeyboardMarkup(keyboard)
+    freshstart_markup = InlineKeyboardMarkup(freshstart_kbd)
 
     bot_msg = "Are you really want to start a new project?"
-    await update.message.reply_text(bot_msg, reply_markup=reply_markup)
+    await update.message.reply_text(bot_msg, reply_markup=freshstart_markup)
 
 # Currently not used
 # async def button(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -374,11 +385,10 @@ async def settings(update: Update, context: CallbackContext) -> None:
         option_suffix = "On" if INFORM_ACTIONERS_OF_MILESTONES == True else "Off"
         milestones_anounce_option = "Users get anounces about milestones (by default only PM): " + option_suffix
 
-        done_option = "Done"
         settings_kbd = [
                         [InlineKeyboardButton(allow_status_option, callback_data="allow_status_option")],
                         [InlineKeyboardButton(milestones_anounce_option, callback_data="milestones_anounce_option")],
-                        [InlineKeyboardButton(done_option, callback_data="done_option")]
+                        [InlineKeyboardButton(settings_done_option, callback_data="done_option")]
         ]
         settings_markup = InlineKeyboardMarkup(settings_kbd)     
         bot_msg = "You can alter this settings:"
@@ -396,6 +406,7 @@ async def buttons(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     await query.answer()
 
     match query.data:
+        # Handling settings buttons
         case "allow_status_option":
             # Switch this setting
             global ALLOW_POST_STATUS_TO_GROUP
@@ -409,7 +420,18 @@ async def buttons(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
             await query.edit_message_text(bot_msg)
         case "done_option":
             bot_msg = "Ok. You may call some other commands"
-            await query.edit_message_text(bot_msg)  
+            await query.edit_message_text(bot_msg)
+        # Handling freshstart buttons here
+        case "1":
+            bot_msg = "As you wish. Upload new project file"
+            await query.edit_message_text(bot_msg)
+        case "2":
+            bot_msg = "Let's continue with current project"
+            await query.edit_message_text(bot_msg)
+        case "3":
+            bot_msg = "Starting new project will replace your current reminders with new schedule"
+            # TODO lets try repeat menu for this option
+            await query.edit_message_text(bot_msg)
         case _:
             bot_msg = "Unknown answer"
             await query.edit_message_text(bot_msg)                        
