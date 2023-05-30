@@ -128,45 +128,6 @@ async def whisper(update: Update, context: CallbackContext) -> None:
     screaming = False
 
 
-async def menu(update: Update, context: CallbackContext) -> None:
-    """
-    This handler sends a menu with the inline buttons we pre-assigned above
-    """
-    # From v.13.  On this step of development not needed
-    # context.bot.send_message(
-    #     update.message.from_user.id,
-    #     FIRST_MENU,
-    #     parse_mode=ParseMode.HTML,
-    #     reply_markup=FIRST_MENU_MARKUP
-    # )
-
-
-def button_tap(update: Update, context: CallbackContext) -> None:
-    """
-    This handler processes the inline buttons on the menu
-    """
-
-    data = update.callback_query.data
-    text = ''
-    markup = None
-
-    if data == NEXT_BUTTON:
-        text = SECOND_MENU
-        markup = SECOND_MENU_MARKUP
-    elif data == BACK_BUTTON:
-        text = FIRST_MENU
-        markup = FIRST_MENU_MARKUP
-
-    # Close the query to end the client-side loading animation
-    update.callback_query.answer()
-
-    # Update message content with corresponding menu section
-    update.callback_query.message.edit_text(
-        text,
-        ParseMode.HTML,
-        reply_markup=markup
-    )
-
 async def feedback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     '''
     This function purpose is to inform developer of user feedback    
@@ -332,21 +293,6 @@ async def freshstart(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None
     bot_msg = "Are you really want to start a new project?"
     await update.message.reply_text(bot_msg, reply_markup=freshstart_markup)
 
-# Currently not used
-# async def button(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-#     bot_msg = "Bot answer"
-#     """Parses the CallbackQuery and updates the message text."""
-#     query = update.callback_query
-#     """ As said in documentation CallbackQueries need to be answered """
-#     await query.answer()
-
-#     if query.data == "1":
-#         bot_msg = "As you wish. Upload new project file"
-#     if query.data == "2":
-#         bot_msg = "Let's continue with current project"
-#     if query.data == "3":
-#         bot_msg = "Starting new project will replace your current reminders with new schedule"
-#     await query.edit_message_text(bot_msg)
 
 async def settings(update: Update, context: CallbackContext) -> None:
     """
@@ -370,8 +316,9 @@ async def settings(update: Update, context: CallbackContext) -> None:
     # await update.message.reply_text(message)
 
     # 2. change of project name
-    # 3. Allow status update in group chat
+    # + Allow status update in group chat
     # 4. interval of intermidiate reminders
+    # For this purpose I will need ConversationHandler
 
     # Check if it is PM who wish to change settings
     username = update.message.from_user.username
@@ -401,20 +348,40 @@ async def buttons(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     query = update.callback_query
     """ As said in documentation CallbackQueries need to be answered """
     await query.answer()
-
+    # Should use global variables
+    global ALLOW_POST_STATUS_TO_GROUP
+    global INFORM_ACTIONERS_OF_MILESTONES
     match query.data:
-        # Handling settings buttons
+        # Handling buttons
         case "allow_status_option":
-            # Switch this setting
-            global ALLOW_POST_STATUS_TO_GROUP
+            # Switch this setting and reconfigure keyboard and markup
             ALLOW_POST_STATUS_TO_GROUP = True if ALLOW_POST_STATUS_TO_GROUP == False else False
-            bot_msg = "Setting updated. Something else? Click /settings"
-            await query.edit_message_text(bot_msg)
+            option_suffix = "On" if ALLOW_POST_STATUS_TO_GROUP == True else "Off"
+            allow_status_option = "Allow status update in group chat: " + option_suffix   
+            option_suffix = "On" if INFORM_ACTIONERS_OF_MILESTONES == True else "Off"
+            milestones_anounce_option = "Users get anounces about milestones (by default only PM): " + option_suffix                 
+            settings_kbd = [
+                            [InlineKeyboardButton(allow_status_option, callback_data="allow_status_option")],
+                            [InlineKeyboardButton(milestones_anounce_option, callback_data="milestones_anounce_option")],
+                            [InlineKeyboardButton(settings_done_option, callback_data="done_option")]
+            ]
+            settings_markup = InlineKeyboardMarkup(settings_kbd) 
+            bot_msg = "Setting updated. Something else?"
+            await query.edit_message_text(bot_msg, reply_markup=settings_markup)
         case "milestones_anounce_option":
-            global INFORM_ACTIONERS_OF_MILESTONES
             INFORM_ACTIONERS_OF_MILESTONES = True if INFORM_ACTIONERS_OF_MILESTONES == False else False
-            bot_msg = "Setting updated. Something else? Click /settings"
-            await query.edit_message_text(bot_msg)
+            option_suffix = "On" if ALLOW_POST_STATUS_TO_GROUP == True else "Off"
+            allow_status_option = "Allow status update in group chat: " + option_suffix   
+            option_suffix = "On" if INFORM_ACTIONERS_OF_MILESTONES == True else "Off"
+            milestones_anounce_option = "Users get anounces about milestones (by default only PM): " + option_suffix                 
+            settings_kbd = [
+                            [InlineKeyboardButton(allow_status_option, callback_data="allow_status_option")],
+                            [InlineKeyboardButton(milestones_anounce_option, callback_data="milestones_anounce_option")],
+                            [InlineKeyboardButton(settings_done_option, callback_data="done_option")]
+            ]
+            settings_markup = InlineKeyboardMarkup(settings_kbd)             
+            bot_msg = "Setting updated. Something else?"
+            await query.edit_message_text(bot_msg, reply_markup=settings_markup)
         case "done_option":
             bot_msg = "Ok. You may call some other commands"
             await query.edit_message_text(bot_msg)
@@ -428,7 +395,7 @@ async def buttons(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         case "3":
             bot_msg = "Starting new project will replace your current reminders with new schedule"
             await query.edit_message_text(bot_msg)
-            # Just repeat keyboard - raises an error
+            # Telegram API can't edit markup at this time, so this is workaround: send new message with buttons
             freshstart_markup = InlineKeyboardMarkup(freshstart_kbd)
             bot_msg = "So what did you decide?"
             await context.bot.send_message(
@@ -436,7 +403,7 @@ async def buttons(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
                 parse_mode=ParseMode.MARKDOWN_V2,
                 text=bot_msg,
                 reply_markup=freshstart_markup)
-
+        # Here we could add new buttons behaviour if we decide to create new menus
         case _:
             bot_msg = "Unknown answer"
             await query.edit_message_text(bot_msg)                        
@@ -503,16 +470,6 @@ def save_json(project):
             bot_msg = 'Successfully saved project to json file'
     return bot_msg
 
-# async def set_commands() -> None:
-#     await context.bot.set_my_commands([
-#                                         ("help","выводит данное описание"),
-#                                         ("status", "информация о текущем состоянии проекта"),
-#                                         ("settings", "настройка параметров бота"),
-#                                         ("freshstart", "начало нового проекта"),
-#                                         ("feedback", "+<сообщение> отправит такое сообщение разработчику")
-#                                     ])
-#     print('Commands set')
-
 
 # Function to control list of commands in bot itself. Commands itself are global
 async def post_init(application: Application):
@@ -559,8 +516,7 @@ def main() -> None:
     # application.add_handler(CallbackQueryHandler(button))
 
     # Handler to control buttons 
-    application.add_handler(CallbackQueryHandler(buttons))
-    
+    application.add_handler(CallbackQueryHandler(buttons))    
 
     # Echo any message that is text and not a command
     application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, echo))
