@@ -29,8 +29,6 @@ from telegram.ext import (
 logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s', level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-# Store bot screaming status
-screaming = False
 
 # Project constants, should be stored separately TODO
 
@@ -70,25 +68,6 @@ freshstart_kbd = [
 #   for /settings
 settings_kbd = []
 
-# This is obsolete from telegram example. TO DELETE
-# Pre-assign menu text
-FIRST_MENU = "<b>Menu 1</b>\n\nA beautiful menu with a shiny inline button."
-SECOND_MENU = "<b>Menu 2</b>\n\nA better menu with even more shiny inline buttons."
-
-# Pre-assign button text
-NEXT_BUTTON = "Next"
-BACK_BUTTON = "Back"
-TUTORIAL_BUTTON = "Tutorial"
-
-# Build keyboards
-FIRST_MENU_MARKUP = InlineKeyboardMarkup([[
-    InlineKeyboardButton(NEXT_BUTTON, callback_data=NEXT_BUTTON)
-]])
-SECOND_MENU_MARKUP = InlineKeyboardMarkup([
-    [InlineKeyboardButton(BACK_BUTTON, callback_data=BACK_BUTTON)],
-    [InlineKeyboardButton(TUTORIAL_BUTTON, url="https://core.telegram.org/bots/api")]
-])
-
 
 async def echo(update: Update, context: CallbackContext) -> None:
     """
@@ -104,28 +83,7 @@ async def echo(update: Update, context: CallbackContext) -> None:
     print(f'{firstname} wrote {text}')
     logger.info(f'{time.asctime()}\t{user_id} ({username}): {text}')
 
-    if screaming and update.message.text:
-        await update.message.reply_text(text.upper())
-    else:
-        await update.message.reply_text(text)
-
-
-async def scream(update: Update, context: CallbackContext) -> None:
-    """
-    This function handles the /scream command
-    """
-
-    global screaming
-    screaming = True
-
-
-async def whisper(update: Update, context: CallbackContext) -> None:
-    """
-    This function handles /whisper command
-    """
-
-    global screaming
-    screaming = False
+    await update.message.reply_text(text)
 
 
 async def feedback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -493,9 +451,6 @@ def main() -> None:
 
     # Then, we register each handler and the conditions the update must meet to trigger it
     # Register commands
-    application.add_handler(CommandHandler("scream", scream))
-    application.add_handler(CommandHandler("whisper", whisper))
-    # application.add_handler(CommandHandler("menu", menu))
     # dispatcher.add_handler(CommandHandler("start", start)) 
     # dispatcher.add_handler(CommandHandler("stop", stop)) # in case smth went wrong 
     application.add_handler(CommandHandler(help_cmd.command, help)) # make it show description
@@ -511,9 +466,6 @@ def main() -> None:
     # application.add_handler(CommandHandler("upload", upload))  
     # And if changes were made inside the bot, PM could download updated schedule (original format?)
     # dispatcher.add_handler(CommandHandler("download", download))
-
-    # # Register handler for inline buttons in ...
-    # application.add_handler(CallbackQueryHandler(button))
 
     # Handler to control buttons 
     application.add_handler(CallbackQueryHandler(buttons))    
