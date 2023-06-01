@@ -397,6 +397,9 @@ async def upload(update: Update, context: CallbackContext) -> None:
                     case '.json':
                         project = connectors.load_json(fp)
 
+                    case '.xml':
+                        project = connectors.load_xml(fp)
+
                 # else inform user about supported file types
                     case _:                
                         bot_msg = 'Bot supports only these project file formats: .gan (GanttProject) and that is all for now.'

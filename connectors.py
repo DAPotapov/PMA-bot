@@ -197,6 +197,7 @@ def compose_tasks_list(list, task, allocations):
             })
     return list
 
+
 def load_json(fp):
     '''
     Loads JSON data from file into dictionary.
@@ -210,6 +211,22 @@ def load_json(fp):
     project = json.load(fp)
     # TODO check if it seems like project. Look for inner format structure
     return project
+
+
+def load_xml(fp):
+    """ 
+    Function to import from MS Project XML file 
+    Get file pointer on input
+    Validates and converts data to inner dict-list-dict.. format
+    Dictionary on output    
+    """
+
+    project = {}
+    
+
+    return project
+
+
 
 if __name__ == '__main__':
     main()
