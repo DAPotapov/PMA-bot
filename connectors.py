@@ -192,7 +192,6 @@ def compose_tasks_list(list, task, allocations):
                 'basicplan_startdate': task['start'], # equal to start date on a start of the project
                 'basicplan_enddate': enddate, # equal to end date on a start of the project
                 'include': include,
-                'successors': successors,
                 'actioners': actioners
             })
     return list
@@ -222,7 +221,81 @@ def load_xml(fp):
     """
 
     project = {}
-    
+    actioners = []
+    tasks = []
+    # Store XML inner ID for field where telegram username located
+    property_id = ''
+
+    obj = untangle.parse(str(fp))
+
+    # Check for telegram username field in XML provided
+    if 'ExtendedAttribute' in obj.Project.ExtendedAttributes:
+        for attr in obj.Project.ExtendedAttributes.ExtendedAttribute:
+            if attr.Alias.cdata == 'tg_username':
+                property_id = attr.FieldID.cdata
+        # If telegram username field is not found then inform user
+        if not property_id:
+            raise AttributeError("Project file has invalid structure: no 'tg_username' field")
+    else:
+        raise AttributeError("Project file has invalid structure: no 'tg_username' field")
+
+    # Add resources from XML to list of actioners
+    if 'Resource' in obj.Project.Resources:
+        for actioner in obj.Project.Resources.Resource:
+            # Get telegram username from XML for this actioner
+            tg_username = ''
+            for attr in actioner.ExtendedAttribute:
+                if attr.FieldID.cdata == property_id:
+                    tg_username = attr.Value.cdata
+            if not tg_username:
+                raise ValueError(f"'{actioner.Name.cdata}' have no tg_username value") 
+            actioners.append({
+                'id' : int(actioner.UID.cdata),
+                'name' : actioner.Name.cdata,
+                'email' : actioner.EmailAddress.cdata,
+                # Seems like MS Project does not know about phones :) 
+                # Maybe I'll use ExtendedAttribute for this purpose later
+                'phone' : '',
+                'tg_username' : tg_username               
+            })
+    else:
+        raise ValueError('There are no actioners (resources) in provided file. Who gonna work?')
+
+    # Add collected actioners to project dictionary
+    project['actioners'] = actioners
+
+    if 'Task' in obj.Project.Tasks:
+
+
+
+        # Add tasks from XML to list of tasks
+        # Because 1st element in MS Project XML format represents project itself so skip it
+        for i, task in enumerate(obj.Project.Tasks.Task):
+            if i == 0:
+                continue            
+            # print(task.Name.cdata)
+            tasks.append({
+                'id': int(task.ID.cdata),
+                'name': task.Name.cdata,
+                'startdate': task.Start.cdata, # date need to be converted
+                'enddate': task.Finish.cdata, # date need to be converted
+                # 'duration': int(task['duration']), # need to be calculated
+                # 'successors': successors, # # need to be calculated from PredecessorLink
+                'milestone': task.Milestone.cdata, # need to be converted to boolean
+                'complete': int(task.PercentComplete.cdata),
+                'curator': '', # not using for now, but it may become usefull later
+                'basicplan_startdate': task.Start.cdata, # equal to start date on a start of the project
+                'basicplan_enddate': task.Finish.cdata, # date need to be converted # equal to end date on a start of the project
+                # 'include': include,  # need to be calculated from WBS and OutlineLevel
+                # 'actioners': actioners # will be calculated separately
+            })
+            # pprint(tasks[i-1])
+
+    else:        
+        raise ValueError('There are no tasks in provided file. Nothing to do.')
+
+    # Add collected tasks to project dictionary
+    project['tasks'] = tasks
 
     return project
 
