@@ -117,15 +117,20 @@ async def help(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     
 def get_assignees(task, actioners):
     '''
-    Helper function for getting list of tuples of name and telegram username 
-    of person assigned to given task
+    Helper function for getting name and telegram username 
+    of person assigned to given task to insert in a bot message
     '''
-    people = []
+    # people = []
+    people = ""
     for doer in task['actioners']:
         for member in actioners:
             # print(f"Doer: {type(doer['actioner_id'])} \t {type(member['id'])}")
             if doer['actioner_id'] == member['id']:                                                    
-                people.append((member['name'], member['tg_username']))
+                # people.append((member['name'], member['tg_username']))                
+                if len(people) > 0:
+                    people = people + "and @" + member['tg_username'] + " (" + member['name'] + ")"
+                else:
+                    people = f"{people}@{member['tg_username']} ({member['name']})"
     return people
 
 
@@ -185,7 +190,7 @@ async def status(update: Update, context: CallbackContext) -> None:
                                             logger.info(f'{time.asctime()}\t {type(e)} \t {e.with_traceback}')
                                         else:
                                             # print(f"Actioner: {task['actioners'][0]['actioner_id']}, actioners: {people}")
-                                            bot_msg = f"task {task['id']} '{task['name']}' starts today. Assigned to {people}"
+                                            bot_msg = f"task {task['id']} '{task['name']}' starts today. Assigned to: {people}"
                                     elif delta_start.days > 0  and delta_end.days < 0:
                                         try:
                                             people = get_assignees(task, actioners)
@@ -193,7 +198,7 @@ async def status(update: Update, context: CallbackContext) -> None:
                                             bot_msg = "Error occured while processing assigned actioners to task task['id']} '{task['name']}'"
                                             logger.info(f'{time.asctime()}\t {type(e)} \t {e.with_traceback}')
                                         else:
-                                            bot_msg = f"task {task['id']} '{task['name']}' is intermidiate. Due date is {task['enddate']}. Assigned to {people}"
+                                            bot_msg = f"task {task['id']} '{task['name']}' is intermidiate. Due date is {task['enddate']}. Assigned to: {people}"
                                     elif delta_end.days == 0:
                                         try:
                                             people = get_assignees(task, actioners)
@@ -201,7 +206,7 @@ async def status(update: Update, context: CallbackContext) -> None:
                                             bot_msg = "Error occured while processing assigned actioners to task task['id']} '{task['name']}'"
                                             logger.info(f'{time.asctime()}\t {type(e)} \t {e.with_traceback}')
                                         else:                                        
-                                            bot_msg = f"task {task['id']}  '{task['name']}' must be completed today! Assigned to {people}"
+                                            bot_msg = f"task {task['id']}  '{task['name']}' must be completed today! Assigned to: {people}"
                                     elif delta_start.days > 0 and delta_end.days > 0:
                                         try:
                                             people = get_assignees(task, actioners)
@@ -209,7 +214,7 @@ async def status(update: Update, context: CallbackContext) -> None:
                                             bot_msg = "Error occured while processing assigned actioners to task task['id']} '{task['name']}'"
                                             logger.info(f'{time.asctime()}\t {type(e)} \t {e.with_traceback}')
                                         else:                                         
-                                            bot_msg = f"task {task['id']} '{task['name']}' is overdue! (had to be completed on {task['enddate']}). Assigned to {people}"
+                                            bot_msg = f"task {task['id']} '{task['name']}' is overdue! (had to be completed on {task['enddate']}). Assigned to: {people}"
                                     else:
                                         print(f"Future tasks as {task['id']} '{task['name']}' goes here")                            
 
