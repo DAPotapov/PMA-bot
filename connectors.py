@@ -323,7 +323,11 @@ def load_xml(fp):
             predecessors = []
             if 'PredecessorLink' in task:
                 for predecessor in task.PredecessorLink:
-                    predecessors.append(int(predecessor.PredecessorUID.cdata))
+                    predecessors.append({
+                        'id': int(predecessor.PredecessorUID.cdata),
+                        'depend_type': int(predecessor.Type.cdata),
+                        'depend_offset': 0 if predecessor.LinkLag.cdata == '0' else int(floor(int(predecessor.LinkLag.cdata) / 4800)),
+                        })
 
             tasks.append({
                 'id': int(task.UID.cdata),
@@ -344,41 +348,40 @@ def load_xml(fp):
             })
             # pprint(tasks[i-1])
 
-        # Type of link (depend_type): Values are 0=FF, 1=FS, 2=SF and 3=SS (docs at https://learn.microsoft.com/en-us/office-project/xml-data-interchange/xml-schema-for-the-tasks-element?view=project-client-2016)
-        # Consider using this one instead of Gantt (and change in that function)
-        # Start loop again to 
-        for task in obj.Project.Tasks.Task:
-            # find predecessors and fill them
-            if 'PredecessorLink' in task:
-                for record in tasks:
-                    successors = []
-                    for predecessor in task.PredecessorLink:
+        # Go through collection of tasks and find it is a someone predecessor
+        for record in tasks:
+            successors = []
+            for task in obj.Project.Tasks.Task:
+                if 'PredecessorLink' in task:
+                    for predecessor in task.PredecessorLink:            
                         # pprint(predecessor)
-                        # Recalculate offset from LinkLag, which expressed in tenth of minutes (sic!), so 4800 is 8 hours
-                        if int(predecessor.LinkLag.cdata) == 0:
-                            offset = 0
-                        else:
-                            # For project management purposes it's better to be aware of smth earlier than later
-                            offset = int(floor(int(predecessor.LinkLag.cdata) / 4800))
-                            # print(f"Type of offset: {type(offset)}")
                         if record['id'] == int(predecessor.PredecessorUID.cdata):
+                            # Recalculate offset from LinkLag, which expressed in tenth of minutes (sic!), so 4800 is 8 hours
+                            if int(predecessor.LinkLag.cdata) == 0:
+                                offset = 0
+                            else:
+                                # For project management purposes it's better to be aware of smth earlier than later
+                                offset = int(floor(int(predecessor.LinkLag.cdata) / 4800))
+                            # print(f"Type of offset: {type(offset)}")
                             successors.append({
                                 'id': int(task.UID.cdata),
+                                # Type of link (depend_type): Values are 0=FF, 1=FS, 2=SF and 3=SS 
+                                # (docs at https://learn.microsoft.com/en-us/office-project/xml-data-interchange/xml-schema-for-the-tasks-element?view=project-client-2016)
                                 'depend_type': int(predecessor.Type.cdata),
                                 'depend_offset': offset
                             })
-                    record['successors'] = successors
-            
-            # And to find included tasks
-            # Look at outline level to comprehend level of WBS to look for - more than one
-            if int(task.OutlineLevel.cdata) > 1:
-            # Take part of WBS of task before last dot - this is WBS of Parent task
-                parentWBS = task.WBS.cdata[:task.WBS.cdata.rindex('.')]
-                # Find in gathered tasks list task with such WBS and add UID of task to 'include' sublist
-                for record in tasks:
+
+                # Also find included tasks
+                # Look at outline level to comprehend level of WBS to look for - more than one
+                if int(task.OutlineLevel.cdata) > 1:
+                # Take part of WBS of task before last dot - this is WBS of Parent task
+                    parentWBS = task.WBS.cdata[:task.WBS.cdata.rindex('.')]
+                    # Find in gathered tasks list task with such WBS and add UID of task to 'include' sublist
                     if record['WBS'] == parentWBS:
                         record['include'].append(int(task.UID.cdata))
 
+            record['successors'] = successors
+     
     else:        
         raise ValueError('There are no tasks in provided file. Nothing to do.')
 
