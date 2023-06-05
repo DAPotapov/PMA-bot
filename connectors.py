@@ -3,7 +3,7 @@ import re
 import untangle
 import json
 
-from numpy import busday_offset, busday_count, datetime64
+from numpy import busday_offset, busday_count, floor, datetime64
 # For testing purposes
 from pprint import pprint
 
@@ -142,7 +142,8 @@ def compose_tasks_list(list, task, allocations):
     for allocation in allocations:
         if task['id'] == allocation['task-id']:
             actioners.append({
-                'actioner_id': int(allocation['resource-id']),
+                # Memo: GanntProject starts numeration of resources from 0, MS Project - from 1
+                'actioner_id': int(allocation['resource-id']), 
                 'nofeedback': False # Default. Will be changed to True if person didn't answer to bot
                 })
                              
@@ -231,7 +232,7 @@ def load_xml(fp):
 
     obj = untangle.parse(str(fp))
 
-    #TODO consider adding version check if difficulties ocurred 
+    #TODO consider adding version check if difficulties ocurr
 
     # Check for telegram username field in XML provided
     if 'ExtendedAttribute' in obj.Project.ExtendedAttributes:
@@ -287,10 +288,14 @@ def load_xml(fp):
                 duration = busday_count(xml_date_conversion(task.Start.cdata), xml_date_conversion(task.Finish.cdata)) + 1
             # print(f"Start: {task.Start.cdata}, End: {task.Finish.cdata}, duration: {duration}")
 
-            # Offset should be recalculated from LinkLag, which expressed in tenth of minutes (sic!), so 4800 is 8 hours
-            # Type of link: Values are 0=FF, 1=FS, 2=SF and 3=SS (docs at https://learn.microsoft.com/en-us/office-project/xml-data-interchange/xml-schema-for-the-tasks-element?view=project-client-2016)
-            # Consider using this one instead of Gantt (and change in that function)
-            include = []
+            actioners = []
+            for assignment in obj.Project.Assignments.Assignment:
+                if task.UID.cdata == assignment.TaskUID.cdata:
+                    actioners.append({
+                         # Memo: GanntProject starts numeration of resources from 0, MS Project - from 1
+                        'actioner_id': int(assignment.ResourceUID.cdata),
+                        'nofeedback': False # Default. Will be changed to True if person didn't answer to bot
+                    })
 
             tasks.append({
                 'id': int(task.UID.cdata),
@@ -306,19 +311,33 @@ def load_xml(fp):
                 'basicplan_startdate': xml_date_conversion(task.Start.cdata), # equal to start date on a start of the project
                 'basicplan_enddate': xml_date_conversion(task.Finish.cdata), # date need to be converted # equal to end date on a start of the project
                 'include': [],  # need to be calculated from WBS and OutlineLevel
-                'actioners': [] # will be calculated separately
+                'actioners': actioners # will be calculated separately
             })
             # pprint(tasks[i-1])
 
+        # Type of link (depend_type): Values are 0=FF, 1=FS, 2=SF and 3=SS (docs at https://learn.microsoft.com/en-us/office-project/xml-data-interchange/xml-schema-for-the-tasks-element?view=project-client-2016)
+        # Consider using this one instead of Gantt (and change in that function)
         # Start loop again to 
         for task in obj.Project.Tasks.Task:
             # find predecessors and fill them
             if 'PredecessorLink' in task:
                 for record in tasks:
+                    successors = []
                     for predecessor in task.PredecessorLink:
                         # pprint(predecessor)
+                        # Recalculate offset from LinkLag, which expressed in tenth of minutes (sic!), so 4800 is 8 hours
+                        if int(predecessor.LinkLag.cdata) == 0:
+                            offset = 0
+                        else:
+                            # For project management purposes it's better to be aware of smth earlier than later
+                            offset = floor(int(predecessor.LinkLag.cdata) / 4800)
                         if record['id'] == int(predecessor.PredecessorUID.cdata):
-                            record['successors'].append(int(task.UID.cdata))
+                            successors.append({
+                                'id': int(task.UID.cdata),
+                                'depend_type': int(predecessor.Type.cdata),
+                                'depend_offset': offset
+                            })
+                    record['successors'] = successors
             
             # And to find included tasks
             if task.Type.cdata == '0':
