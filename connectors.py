@@ -137,6 +137,7 @@ def compose_tasks_list(list, task, allocations):
     ''' Function to append to list of tasks information of one task or subtask'''
 
     # Dictionary of id of actioners and their last reaction
+    # Completeness of task assignments will be controlled in /status function
     # pprint(f"Function got these parameters:\n {list}\n{task['name']}\n{allocations}")
     actioners = [] 
     for allocation in allocations:
@@ -151,17 +152,27 @@ def compose_tasks_list(list, task, allocations):
     successors = []
     if 'depend' in dir(task):
         for follower in task.depend:
+            # Because GanttProject and MS Project have different values for dependency type here is the adaptor
+            # Will use MS Project values, because it's more popular program
+            # Type of link (depend_type): Values are 0=FF, 1=FS, 2=SF and 3=SS (docs at https://learn.microsoft.com/en-us/office-project/xml-data-interchange/xml-schema-for-the-tasks-element?view=project-client-2016)
+            # GanttProject type values: 0 = none, 1 = start-start SS, 2 = finish-start FS, 3 - finish-finish FF, 4 - start-finish SF (usually not used)
+            depend_type = 1 # FS - most common
+            match follower['type']:
+                case '1':
+                    depend_type = 3
+                case '2':
+                    depend_type = 1
+                case '3':
+                    depend_type = 0
+                case '4':
+                    depend_type = 2
+                case _:
+                    raise ValueError(f"Unknown dependency type ('{follower['type']}')of successor task: {int(follower['id'])}")
             successors.append({
                 'id': int(follower['id']),
-                'depend_type': follower['type'],
+                'depend_type': depend_type,
                 'depend_offset': int(follower['difference'])
                 })
-                # depend types:
-                # 0 - none
-                # 1 - start-start SS
-                # 2 - finish-start FS
-                # 3 - finish-finish FF
-                # 4 - start-finish SF - usually not used
 
     # Dictionary of subtasks' id of this one. This way helpful to almost infinitely decompose tasks. 
     include = []
@@ -185,10 +196,12 @@ def compose_tasks_list(list, task, allocations):
 
     list.append({
                 'id': int(task['id']),
+                'WBS': None, # For compatibility with MS Project
                 'name': task['name'],
                 'startdate': task['start'],
                 'enddate': enddate, 
                 'duration': int(task['duration']),
+                'predecessors': [], # For compatibility with MS Project
                 'successors': successors,
                 'milestone': milestone,
                 'complete': int(task['complete']),
@@ -248,22 +261,26 @@ def load_xml(fp):
     # Add resources from XML to list of actioners
     if 'Resource' in obj.Project.Resources:
         for actioner in obj.Project.Resources.Resource:
-            # Get telegram username from XML for this actioner
-            tg_username = ''
-            for attr in actioner.ExtendedAttribute:
-                if attr.FieldID.cdata == property_id:
-                    tg_username = attr.Value.cdata
-            if not tg_username:
-                raise ValueError(f"'{actioner.Name.cdata}' have no tg_username value") 
-            actioners.append({
-                'id' : int(actioner.UID.cdata),
-                'name' : actioner.Name.cdata,
-                'email' : actioner.EmailAddress.cdata,
-                # Seems like MS Project does not know about phones :) 
-                # Maybe I'll use ExtendedAttribute for this purpose later
-                'phone' : '',
-                'tg_username' : tg_username               
-            })
+            # Because collection of resources must contain at least one resource (from docs) seems like MS Project adds one with id=0
+            # But it lacks some of the fields like ExtendedAttribute, so it's better to check if current resource has one
+            if 'ExtendedAttribute' in actioner:
+                # Get telegram username from XML for this actioner
+                tg_username = ''
+                for attr in actioner.ExtendedAttribute:
+                    if attr.FieldID.cdata == property_id:
+                        tg_username = attr.Value.cdata
+                if not tg_username:
+                    raise ValueError(f"'{actioner.Name.cdata}' have no tg_username value") 
+                actioners.append({
+                    'id' : int(actioner.UID.cdata),
+                    'name' : actioner.Name.cdata,
+                    # Seems like XML not necessary contain email address field for resource
+                    'email' : actioner.EmailAddress.cdata if 'EmailAddress' in actioner else '',
+                    # Seems like MS Project does not know about phones :) 
+                    # Maybe I'll use ExtendedAttribute for this purpose later
+                    'phone' : '',
+                    'tg_username' : tg_username               
+                })
     else:
         raise ValueError('There are no actioners (resources) in provided file. Who gonna work?')
 
@@ -285,17 +302,28 @@ def load_xml(fp):
             if task.Milestone.cdata == '1':
                 duration = 0
             else:
-                duration = busday_count(xml_date_conversion(task.Start.cdata), xml_date_conversion(task.Finish.cdata)) + 1
+                duration = int(busday_count(xml_date_conversion(task.Start.cdata), xml_date_conversion(task.Finish.cdata)) + 1)
+                # print(f"Duration type is: {type(duration)}")
             # print(f"Start: {task.Start.cdata}, End: {task.Finish.cdata}, duration: {duration}")
 
+            # make actioners list for this task, skipping milestones
+            # Completeness of task assignments will be controlled in /status function
             actioners = []
             for assignment in obj.Project.Assignments.Assignment:
-                if task.UID.cdata == assignment.TaskUID.cdata:
-                    actioners.append({
-                         # Memo: GanntProject starts numeration of resources from 0, MS Project - from 1
-                        'actioner_id': int(assignment.ResourceUID.cdata),
-                        'nofeedback': False # Default. Will be changed to True if person didn't answer to bot
-                    })
+                if task.UID.cdata == assignment.TaskUID.cdata and task.Milestone.cdata == '0':
+                    # MS Project store -65535 in case no resource assigned, I'll leave this list empty
+                    if int(assignment.ResourceUID.cdata) > 0:
+                        actioners.append({
+                            # Memo: GanntProject starts numeration of resources from 0, MS Project - from 1
+                            'actioner_id': int(assignment.ResourceUID.cdata),
+                            'nofeedback': False # Default. Will be changed to True if person didn't answer to bot
+                        })
+
+            # Besides successors will store predecessors for backward compatibility with MS Project
+            predecessors = []
+            if 'PredecessorLink' in task:
+                for predecessor in task.PredecessorLink:
+                    predecessors.append(int(predecessor.PredecessorUID.cdata))
 
             tasks.append({
                 'id': int(task.UID.cdata),
@@ -304,6 +332,7 @@ def load_xml(fp):
                 'startdate': xml_date_conversion(task.Start.cdata), 
                 'enddate': xml_date_conversion(task.Finish.cdata),
                 'duration': duration,
+                'predecessors': predecessors,
                 'successors': [], # # need to be calculated from PredecessorLink
                 'milestone': True if task.Milestone.cdata == '1' else False, 
                 'complete': int(task.PercentComplete.cdata),
@@ -330,7 +359,8 @@ def load_xml(fp):
                             offset = 0
                         else:
                             # For project management purposes it's better to be aware of smth earlier than later
-                            offset = floor(int(predecessor.LinkLag.cdata) / 4800)
+                            offset = int(floor(int(predecessor.LinkLag.cdata) / 4800))
+                            # print(f"Type of offset: {type(offset)}")
                         if record['id'] == int(predecessor.PredecessorUID.cdata):
                             successors.append({
                                 'id': int(task.UID.cdata),
@@ -340,15 +370,14 @@ def load_xml(fp):
                     record['successors'] = successors
             
             # And to find included tasks
-            if task.Type.cdata == '0':
-                # Look at outline level to comprehend level of WBS to look for - more than one
-                if int(task.OutlineLevel.cdata) > 1:
-                # Take part of WBS of task before last dot - this is WBS of Parent task
-                    parentWBS = task.WBS.cdata[:task.WBS.cdata.rindex('.')]
-                    # Find in gathered tasks list task with such WBS and add UID of task to 'include' sublist
-                    for record in tasks:
-                        if record['WBS'] == parentWBS:
-                            record['include'].append(int(task.UID.cdata))
+            # Look at outline level to comprehend level of WBS to look for - more than one
+            if int(task.OutlineLevel.cdata) > 1:
+            # Take part of WBS of task before last dot - this is WBS of Parent task
+                parentWBS = task.WBS.cdata[:task.WBS.cdata.rindex('.')]
+                # Find in gathered tasks list task with such WBS and add UID of task to 'include' sublist
+                for record in tasks:
+                    if record['WBS'] == parentWBS:
+                        record['include'].append(int(task.UID.cdata))
 
     else:        
         raise ValueError('There are no tasks in provided file. Nothing to do.')

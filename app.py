@@ -120,7 +120,6 @@ def get_assignees(task, actioners):
     Helper function for getting name and telegram username 
     of person assigned to given task to insert in a bot message
     '''
-    # people = []
     people = ""
     for doer in task['actioners']:
         for member in actioners:
