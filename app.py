@@ -229,7 +229,7 @@ async def status(update: Update, context: CallbackContext) -> None:
                 # if not - then only tasks for this member
                 else:
                     # Check if user is part of the project team
-                    if [True for x in project['actioners'] if x['telegram_id'] == username]:
+                    if [True for x in project['actioners'] if x['tg_username'] == username]:
                         bot_msg = f"Project status for {username} (will be here)"
                         # Send reply to user in group chat if allowed
                         if ALLOW_POST_STATUS_TO_GROUP == True:
