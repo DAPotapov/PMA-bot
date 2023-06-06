@@ -189,10 +189,14 @@ def compose_tasks_list(list, task, allocations):
         raise ValueError('File may be damaged: milestone field contains invalid value ' + str(task['meeting']))
     
     # TODO in v.2: project apps supports alternative calendars, bot should support them as well.
-    # Construct end date from start date, duration and numpy function:
-    # TODO it calculates in between: on a begining of end date task already must be done, end date not exactly the day of deadline
-    # Should be reconsidered: GanttProject itself calculates right
-    enddate = str(busday_offset(datetime64(task['start']), int(task['duration']), roll='forward'))
+    # Construct end date from start date, duration and numpy function.
+    # Numpy function returns sees duration as days _between_ dates, 
+    # but in project management enddate must be a date of deadline, 
+    # so correct expected return value by decreasing duration by one day.
+    if int(task['duration']) == 0:
+        enddate = task['start']
+    else:
+        enddate = str(busday_offset(datetime64(task['start']), int(task['duration']) - 1, roll='forward'))
 
     list.append({
                 'id': int(task['id']),
@@ -220,7 +224,7 @@ def load_json(fp):
     This connector useful in case we downloaded JSON, manually made some changes, 
     and upload it again to bot 
     '''
-    # TODO:
+    # TODO: Do this connector when i'm sure scheme doesn't changes
     # 1. Limit size of data to load to prevent attacks
     # 2. 
     

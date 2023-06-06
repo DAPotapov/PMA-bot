@@ -17,12 +17,12 @@ Bot can inform user about current status of schedule
 
 ## TODO
 
-[ ] fixbug: last of children tasks rewrites its parent task (in load_gan)  
-[ ] fully implement connector to json format  
 [ ] make status command working for team members too  
+[ ] fully implement connector to json format  
 [ ] ask if PM wants to rewrite project file if new uploaded
 [ ] make bot persistent https://github.com/python-telegram-bot/python-telegram-bot/wiki/Making-your-bot-persistent  
 [ ] Error handling: https://docs.python-telegram-bot.org/en/stable/telegram.ext.application.html#telegram.ext.Application.error_handlers
+[x] fixbug: last of children tasks rewrites its parent task (in load_gan)  
 [x] add example of json structure for project files and requirments for project files to README.  
 [x] make export to json format with readable formatting  
 [x] implement /help command  
