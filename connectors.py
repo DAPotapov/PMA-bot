@@ -311,7 +311,7 @@ def load_xml(fp):
             actioners = []
             for assignment in obj.Project.Assignments.Assignment:
                 if task.UID.cdata == assignment.TaskUID.cdata and task.Milestone.cdata == '0':
-                    # MS Project store -65535 in case no resource assigned, I'll leave this list empty
+                    # MS Project store value '-65535' in case no resource assigned. I'll leave this list empty
                     if int(assignment.ResourceUID.cdata) > 0:
                         actioners.append({
                             # Memo: GanntProject starts numeration of resources from 0, MS Project - from 1

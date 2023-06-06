@@ -33,19 +33,22 @@ Bot can inform user about current status of schedule
 
 First of all: the project file sent to bot should contain field 'tg_username' containing telegram username for members of a project team. Resources obviously should be present in file and assigned to tasks for bot to work :)
 
+
 ```json
 {
     "tasks": [
         {
             "id": 0,
+            "WBS": "1", # Filled when project imported from MS Project, otherwise it's empty; bot not using it for now.
             "name": "Common task",
             "startdate": "2023-05-15",
             "enddate": "2023-05-18",
             "duration": 3, # Business days
+            "predecessor": [], # Filled when project imported from MS Project, otherwise it's empty; bot not using it for now.
             "successors": [], 
-            "milestone": false,
+            "milestone": false, # True if task is a milestone
             "complete": 0, # should 0-100 indicate percentage of completion
-            "curator": "", # for future purposes: if overseer role will be needed
+            "curator": "", # for future purposes - if overseer role will be needed
             "basicplan_startdate": "2023-05-15",
             "basicplan_enddate": "2023-05-18",
             "include": [  # For common task in this list goes ids of included subtasks. 
@@ -57,10 +60,12 @@ First of all: the project file sent to bot should contain field 'tg_username' co
         },
         {
             "id": 1,
+            "WBS": "",
             "name": "First task",
             "startdate": "2023-05-08",
             "enddate": "2023-05-15",
             "duration": 5,
+            "predecessor": [],
             "successors": [],
             "milestone": false,
             "complete": 100, # 100 means completed
@@ -81,19 +86,21 @@ First of all: the project file sent to bot should contain field 'tg_username' co
         },
         {
             "id": 4,
+            "WBS": "",
             "name": "Some milestone",
             "startdate": "2023-05-15",
             "enddate": "2023-05-15",
             "duration": 0, # Milestones have zero duration
+            "predecessor": [],
             "successors": [ # Achiving this milestone means "successors" task started
                 {
                     "id": 2, # id of such task
-                    "depend_type": "2", # Type of dependency (see below)
+                    "depend_type": 1, # Type of dependency (see below)
                     "depend_offset": 0  # Offset in days from current task (negative number means its earlier in time)
                 },
                 {
                     "id": 5,
-                    "depend_type": "2",
+                    "depend_type": 1,
                     "depend_offset": 0
                 }
             ],
@@ -107,14 +114,22 @@ First of all: the project file sent to bot should contain field 'tg_username' co
         },
         {
             "id": 2,
+            "WBS": "",
             "name": "Another task",
             "startdate": "2023-05-15",
             "enddate": "2023-05-18",
             "duration": 3,
+            "predecessor": [
+                {
+                    "id": 4,
+                    "depend_type": 1,
+                    "depend_offset": 0
+                }
+            ],
             "successors": [
                 {
                     "id": 5,
-                    "depend_type": "3",
+                    "depend_type": 0,
                     "depend_offset": 0
                 }
             ],
@@ -138,23 +153,22 @@ First of all: the project file sent to bot should contain field 'tg_username' co
             "name": "John",
             "email": "",
             "phone": "",
-            "telegram_id": "some_user42" # Actually its telegram username
+            "tg_username": "some_user42" 
         },
         {
             "id": "1",
             "name": "Mark",
             "email": "",
             "phone": "",
-            "telegram_id": "some_user666"
+            "tg_username": "some_user666"
         }
     ]
 }
 
 ```
 
-Explanation of types of dependencies between tasks:  
-1 - start-start (SS)  
-2 - finish-start (FS)  
-3 - finish-finish (FF)  
-4 - start-finish (SF) - usually not used  
-This types was inherited from GanttProject because of "duckling law" (it's format I started with)
+Explanation of values for types of dependencies between tasks ([see docs](https://learn.microsoft.com/en-us/office-project/xml-data-interchange/xml-schema-for-the-tasks-element?view=project-client-2016)):  
+0=FF=Finish-finish,  
+1=FS=Finish-start (most common),  
+2=SF=Start-finish (least common),  
+3=SS=Start-start
