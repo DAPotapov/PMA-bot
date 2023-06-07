@@ -9,7 +9,7 @@ import tempfile
 import asyncio
 
 from dotenv import load_dotenv
-from datetime import date
+from datetime import datetime, date, time
 # from io import BufferedIOBase
 from telegram import Bot, BotCommand, Update, ForceReply, InlineKeyboardMarkup, InlineKeyboardButton
 from telegram.constants import ParseMode
@@ -40,9 +40,9 @@ ALLOW_POST_STATUS_TO_GROUP = False
 # Inform actioners of milestones (by default only PM) TODO
 INFORM_ACTIONERS_OF_MILESTONES = False
 # TODO: change according to starter of the bot
-# PM = 'hagen10'
-PM = 'Sokolovaspace'
-PROJECTTITLE = ''
+PM = 'hagen10'
+# PM = 'Sokolovaspace'
+PROJECTTITLE = 'TESTING PROJECT'
 PROJECTJSON = "data/temp.json"
 KNOWN_USERS = {}
 
@@ -348,6 +348,7 @@ async def settings(update: Update, context: CallbackContext) -> None:
     # + Allow status update in group chat
     # 4. interval of intermidiate reminders
     # For this purpose I will need ConversationHandler
+    # 5. Time of daily update of starting and deadline tasks, and days too
 
     # Check if it is PM who wish to change settings
     username = update.message.from_user.username
@@ -483,12 +484,88 @@ async def upload(update: Update, context: CallbackContext) -> None:
                     # Remember telegram user id
                     project = add_user_id(update.message.from_user, project)
                     # Call function to save project in JSON format
-                    bot_msg = save_json(project)            
+                    bot_msg = save_json(project)
+
+                    # Prepare time provide timezone info of user location 
+                    # TODO this should be done in settings set by PM, along with check for correct values. And stored in project settings
+                    time_set = "19:52"
+                    try:
+                        hour, minute = map(int, time_set.split(":"))                    
+                        time2check = time(hour, minute, tzinfo=datetime.now().astimezone().tzinfo)
+                    except ValueError as e:
+                        print(f"Error while parsing time: {e}")
+                    else:
+                        # Set job schedule
+                        context.job_queue.run_daily(daily_update, time=time2check, data=PROJECTTITLE).enabled = True 
+                        for job in context.job_queue.get_jobs_by_name('daily_update'):
+                            print(f"Next time: {job.next_t}, is it on? {job.enabled}")         
             
     else:
         bot_msg = 'Only Project Manager is allowed to upload new schedule'
 
     await update.message.reply_text(bot_msg)
+
+async def daily_update(context: ContextTypes.DEFAULT_TYPE) -> None:
+    '''
+    This routine will be executed on daily basis to control project(s) schedule
+    '''
+    # TODO use data to associate project name with job
+    # TODO how to make observation of project a standalone function to be called elsewhere?
+
+    if os.path.exists(PROJECTJSON):
+        with open(PROJECTJSON, 'r') as fp:
+            try:
+                project = connectors.load_json(fp)
+            except Exception as e:
+                bot_msg = f"ERROR ({e}): Unable to load"
+                logger.info(f'{time.asctime()}\t {type(e)} \t {e.with_traceback}')                  
+            else:
+                # Loop through actioners to inform them about actual tasks
+                for actioner in project['actioners']:
+                    # Bot can inform only ones with known id
+                    if actioner['tg_id']:
+                        for task in project['tasks']:
+                            # Process only tasks in which current actioner participate
+                            if actioner['id'] in task['actioners']:
+                                print(task['actioners'])
+                                bot_msg = ""
+                                # Bot will inform user only of tasks with important dates
+                                # Check if task not completed
+                                if task['complete'] < 100:
+                                    # If delta_start <0 task not started, otherwise already started
+                                    delta_start = date.today() - date.fromisoformat(task['startdate'])
+                                    # If delta_end >0 task overdue, if <0 task in progress
+                                    delta_end = date.today() - date.fromisoformat(task['enddate'])
+                                    # Deal with common task
+                                    if task['include']:
+                                        # For now focus only on subtasks, that can be actually done
+                                        # I'll decide what to do with such tasks after gathering user experience
+                                        pass
+                                    else:
+                                        # Don't inform about milestones, because noone assigned for them
+                                        if task['milestone'] == True:    
+                                                pass
+                                        else:
+                                            if delta_start.days == 0:
+                                                bot_msg = f"task {task['id']} '{task['name']}' starts today."
+                                            elif delta_start.days > 0  and delta_end.days < 0:
+                                                bot_msg = f"task {task['id']} '{task['name']}' is intermidiate. Due date is {task['enddate']}."
+                                            elif delta_end.days == 0:
+                                                bot_msg = f"task {task['id']}  '{task['name']}' must be completed today!"
+                                            elif delta_start.days > 0 and delta_end.days > 0:                                       
+                                                bot_msg = f"task {task['id']} '{task['name']}' is overdue! (had to be completed on {task['enddate']})"
+                                            else:
+                                                print(f"Future tasks as {task['id']} '{task['name']}' goes here")                            
+
+                                    # Check if there is something to report to user
+                                    if bot_msg:
+                                        await context.bot.send_message(
+                                            actioner['tg_id'],
+                                            text=bot_msg,
+                                            parse_mode=ParseMode.HTML)
+
+    for job in context.job_queue.get_jobs_by_name('daily_update'):         
+        logger.info(f'{time.asctime()}\t Job data: {job.data}, Name: {job.name}, next time: {job.next_t}')
 
 def save_json(project):
     ''' 
@@ -516,6 +593,23 @@ async def start(update: Update, context: CallbackContext) -> None:
     bot_msg = f"Hello, {update.effective_user.first_name}!"
     await update.message.reply_text(bot_msg)
 
+async def stop(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    '''
+    Function to stop the bot.
+    Should make bot forget about the user, 
+    and stop all jobs associated with the user
+    '''
+
+    # Remove daily reminder associated with PROJECTTITLE
+    # TODO revise
+    current_jobs = context.job_queue.jobs    
+    if not current_jobs:
+        pass
+    else:
+        for job in current_jobs:
+            if job.data == PROJECTTITLE:
+                job.schedule_removal()
+
 
 # Function to control list of commands in bot itself. Commands itself are global
 async def post_init(application: Application):
@@ -537,12 +631,13 @@ def main() -> None:
     #  Finally, the Application is created by calling builder.build()
     application = Application.builder().token(BOT_TOKEN).post_init(post_init).build()   
 
+
     # Then, we register each handler and the conditions the update must meet to trigger it
     # Register commands
     # Start communicating with user from the new begining
     application.add_handler(CommandHandler("start", start)) 
-    # /stop should make bot 'forget' about this user
-    # dispatcher.add_handler(CommandHandler("stop", stop)) # in case smth went wrong 
+    # /stop should make bot 'forget' about this user and stop jobs
+    application.add_handler(CommandHandler("stop", stop)) # in case smth went wrong 
     application.add_handler(CommandHandler(help_cmd.command, help)) # make it show description
     # PM should have the abibility to change bot behaviour, such as reminder interval and so on
     application.add_handler(CommandHandler(settings_cmd.command, settings))
