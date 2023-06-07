@@ -2,7 +2,7 @@
 
 import logging
 import os
-import time
+import time as tm
 import json
 import connectors
 import tempfile
@@ -86,7 +86,7 @@ async def echo(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     # firstname = update.message.from_user.first_name
     text = str(update.message.text)
     print(f'{user.first_name} wrote {text}')
-    logger.info(f'{time.asctime()}\t{user.id} ({user.username}): {text}')
+    logger.info(f'{tm.asctime()}\t{user.id} ({user.username}): {text}')
 
     # TODO I can use it to gather id from chat members and add them to project
     global KNOWN_USERS
@@ -106,7 +106,7 @@ async def feedback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     This function purpose is to inform developer of user feedback    
     '''
     # Log when and what user sent using feedback command
-    logger.warning(f'{time.asctime()}\tFEEDBACK from {update.message.from_user.username}: {update.message.text}')
+    logger.warning(f'{tm.asctime()}\tFEEDBACK from {update.message.from_user.username}: {update.message.text}')
     # List of args can be parsed to retrieve some information, I'm not sure yet what exactly
     # user_feedback = context.args
     bot_msg = "Feedback sent to developer."
@@ -187,7 +187,7 @@ async def status(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
                 project = connectors.load_json(fp)
             except Exception as e:
                 bot_msg = f"ERROR ({e}): Unable to load"
-                logger.info(f'{time.asctime()}\t {type(e)} \t {e.with_traceback}')                  
+                logger.info(f'{tm.asctime()}\t {type(e)} \t {e.with_traceback}')                  
             else:
                 # Main thread
                 bot_msg = f"Load successfull, wait for updates"
@@ -232,7 +232,7 @@ async def status(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
                                             user_ids = get_user_ids(task, actioners)
                                         except Exception as e:
                                             bot_msg = "Error occured while processing assigned actioners to task task['id']} '{task['name']}' starting today"
-                                            logger.info(f'{time.asctime()}\t {type(e)} \t {e.with_traceback}')
+                                            logger.info(f'{tm.asctime()}\t {type(e)} \t {e.with_traceback}')
                                         else:
                                             # print(f"Actioner: {task['actioners'][0]['actioner_id']}, actioners: {people}")
                                             bot_msg = f"task {task['id']} '{task['name']}' starts today. Assigned to: {people}"
@@ -242,7 +242,7 @@ async def status(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
                                             user_ids = get_user_ids(task, actioners)
                                         except Exception as e:
                                             bot_msg = f"Error occured while processing assigned actioners to task {task['id']} {task['name']}"
-                                            logger.info(f'{time.asctime()}\t {type(e)} \t {e.with_traceback}')
+                                            logger.info(f'{tm.asctime()}\t {type(e)} \t {e.with_traceback}')
                                         else:
                                             bot_msg = f"task {task['id']} '{task['name']}' is intermidiate. Due date is {task['enddate']}. Assigned to: {people}"
                                     elif delta_end.days == 0:
@@ -251,7 +251,7 @@ async def status(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
                                             user_ids = get_user_ids(task, actioners)
                                         except Exception as e:
                                             bot_msg = f"Error occured while processing assigned actioners to task {task['id']} {task['name']}"
-                                            logger.info(f'{time.asctime()}\t {type(e)} \t {e.with_traceback}')
+                                            logger.info(f'{tm.asctime()}\t {type(e)} \t {e.with_traceback}')
                                         else:                                        
                                             bot_msg = f"task {task['id']}  '{task['name']}' must be completed today! Assigned to: {people}"
                                     elif delta_start.days > 0 and delta_end.days > 0:
@@ -260,7 +260,7 @@ async def status(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
                                             user_ids = get_user_ids(task, actioners)
                                         except Exception as e:
                                             bot_msg = f"Error occured while processing assigned actioners to task {task['id']} {task['name']}"
-                                            logger.info(f'{time.asctime()}\t {type(e)} \t {e.with_traceback}')
+                                            logger.info(f'{tm.asctime()}\t {type(e)} \t {e.with_traceback}')
                                         else:                                         
                                             bot_msg = f"task {task['id']} '{task['name']}' is overdue! (had to be completed on {task['enddate']}). Assigned to: {people}"
                                     else:
@@ -478,7 +478,7 @@ async def upload(update: Update, context: CallbackContext) -> None:
                 bot_msg = f'Seems like the file {e} does not exist'
             except Exception as e:
                 bot_msg = f'Unknow error occurred while processing file: {e}'
-                logger.info(f'{time.asctime()}\t {type(e)} \t {e.with_traceback}')
+                logger.info(f'{tm.asctime()}\t {type(e)} \t {e.with_traceback}')
             else:
                 if project:
                     # Remember telegram user id
@@ -488,7 +488,7 @@ async def upload(update: Update, context: CallbackContext) -> None:
 
                     # Prepare time provide timezone info of user location 
                     # TODO this should be done in settings set by PM, along with check for correct values. And stored in project settings
-                    time_set = "19:52"
+                    time_set = "20:45"
                     try:
                         hour, minute = map(int, time_set.split(":"))                    
                         time2check = time(hour, minute, tzinfo=datetime.now().astimezone().tzinfo)
@@ -518,54 +518,56 @@ async def daily_update(context: ContextTypes.DEFAULT_TYPE) -> None:
                 project = connectors.load_json(fp)
             except Exception as e:
                 bot_msg = f"ERROR ({e}): Unable to load"
-                logger.info(f'{time.asctime()}\t {type(e)} \t {e.with_traceback}')                  
+                logger.info(f'{tm.asctime()}\t {type(e)} \t {e.with_traceback}')                  
             else:
                 # Loop through actioners to inform them about actual tasks
                 for actioner in project['actioners']:
                     # Bot can inform only ones with known id
+                    # print(actioner)
                     if actioner['tg_id']:
                         for task in project['tasks']:
                             # Process only tasks in which current actioner participate
-                            if actioner['id'] in task['actioners']:
-                                print(task['actioners'])
-                                bot_msg = ""
-                                # Bot will inform user only of tasks with important dates
-                                # Check if task not completed
-                                if task['complete'] < 100:
-                                    # If delta_start <0 task not started, otherwise already started
-                                    delta_start = date.today() - date.fromisoformat(task['startdate'])
-                                    # If delta_end >0 task overdue, if <0 task in progress
-                                    delta_end = date.today() - date.fromisoformat(task['enddate'])
-                                    # Deal with common task
-                                    if task['include']:
-                                        # For now focus only on subtasks, that can be actually done
-                                        # I'll decide what to do with such tasks after gathering user experience
-                                        pass
-                                    else:
-                                        # Don't inform about milestones, because noone assigned for them
-                                        if task['milestone'] == True:    
-                                                pass
+                            for doer in task['actioners']:
+                                # print(doer)
+                                if actioner['id'] == doer['actioner_id']:
+                                    bot_msg = ""
+                                    # Bot will inform user only of tasks with important dates
+                                    # Check if task not completed
+                                    if task['complete'] < 100:
+                                        # If delta_start <0 task not started, otherwise already started
+                                        delta_start = date.today() - date.fromisoformat(task['startdate'])
+                                        # If delta_end >0 task overdue, if <0 task in progress
+                                        delta_end = date.today() - date.fromisoformat(task['enddate'])
+                                        # Deal with common task
+                                        if task['include']:
+                                            # For now focus only on subtasks, that can be actually done
+                                            # I'll decide what to do with such tasks after gathering user experience
+                                            pass
                                         else:
-                                            if delta_start.days == 0:
-                                                bot_msg = f"task {task['id']} '{task['name']}' starts today."
-                                            elif delta_start.days > 0  and delta_end.days < 0:
-                                                bot_msg = f"task {task['id']} '{task['name']}' is intermidiate. Due date is {task['enddate']}."
-                                            elif delta_end.days == 0:
-                                                bot_msg = f"task {task['id']}  '{task['name']}' must be completed today!"
-                                            elif delta_start.days > 0 and delta_end.days > 0:                                       
-                                                bot_msg = f"task {task['id']} '{task['name']}' is overdue! (had to be completed on {task['enddate']})"
+                                            # Don't inform about milestones, because noone assigned for them
+                                            if task['milestone'] == True:    
+                                                    pass
                                             else:
-                                                print(f"Future tasks as {task['id']} '{task['name']}' goes here")                            
+                                                if delta_start.days == 0:
+                                                    bot_msg = f"task {task['id']} '{task['name']}' starts today."
+                                                elif delta_start.days > 0  and delta_end.days < 0:
+                                                    bot_msg = f"task {task['id']} '{task['name']}' is intermidiate. Due date is {task['enddate']}."
+                                                elif delta_end.days == 0:
+                                                    bot_msg = f"task {task['id']}  '{task['name']}' must be completed today!"
+                                                elif delta_start.days > 0 and delta_end.days > 0:                                       
+                                                    bot_msg = f"task {task['id']} '{task['name']}' is overdue! (had to be completed on {task['enddate']})"
+                                                else:
+                                                    print(f"Future tasks as {task['id']} '{task['name']}' goes here")                            
 
-                                    # Check if there is something to report to user
-                                    if bot_msg:
-                                        await context.bot.send_message(
-                                            actioner['tg_id'],
-                                            text=bot_msg,
-                                            parse_mode=ParseMode.HTML)
+                                        # Check if there is something to report to user
+                                        if bot_msg:
+                                            await context.bot.send_message(
+                                                actioner['tg_id'],
+                                                text=bot_msg,
+                                                parse_mode=ParseMode.HTML)
 
-    for job in context.job_queue.get_jobs_by_name('daily_update'):         
-        logger.info(f'{time.asctime()}\t Job data: {job.data}, Name: {job.name}, next time: {job.next_t}')
+    # for job in context.job_queue.get_jobs_by_name('daily_update'):         
+    #     logger.info(f'{tm.asctime()}\t Job data: {job.data}, Name: {job.name}, next time: {job.next_t}')
 
 def save_json(project):
     ''' 
