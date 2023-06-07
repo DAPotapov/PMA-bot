@@ -122,6 +122,7 @@ def load_gan(fp):
                 'email' : actioner['contacts'],
                 'phone' : actioner['phone'],
                 'tg_username' : tg_username,
+                'tg_id' : ""
             })
     # If no custom property for tg_username found then inform the user
     else:
@@ -283,7 +284,8 @@ def load_xml(fp):
                     # Seems like MS Project does not know about phones :) 
                     # Maybe I'll use ExtendedAttribute for this purpose later
                     'phone' : '',
-                    'tg_username' : tg_username               
+                    'tg_username' : tg_username,
+                    'tg_id' : ""
                 })
     else:
         raise ValueError('There are no actioners (resources) in provided file. Who gonna work?')

@@ -23,6 +23,8 @@ from telegram.ext import (
                             CallbackQueryHandler, 
                             ContextTypes,  
                             filters)
+# For testing purposes
+from pprint import pprint
 
 
 # Configure logging
@@ -38,9 +40,11 @@ ALLOW_POST_STATUS_TO_GROUP = False
 # Inform actioners of milestones (by default only PM) TODO
 INFORM_ACTIONERS_OF_MILESTONES = False
 # TODO: change according to starter of the bot
-PM = 'hagen10'
+# PM = 'hagen10'
+PM = 'Sokolovaspace'
 PROJECTTITLE = ''
 PROJECTJSON = "data/temp.json"
+KNOWN_USERS = {}
 
 # Set list of commands
 help_cmd = BotCommand("help","выводит данное описание")
@@ -69,21 +73,32 @@ freshstart_kbd = [
 settings_kbd = []
 
 
-async def echo(update: Update, context: CallbackContext) -> None:
+async def echo(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+# (update: Update, context: CallbackContext) -> None:
     """
     This function would be added to the application as a handler for messages coming from the Bot API
     """
 
     # Print to console
     # user = update.effective_user
-    user_id = update.message.from_user.id
-    username = update.message.from_user.username
-    firstname = update.message.from_user.first_name
-    text = str(update.message.text) + ', ' + str(username)
-    print(f'{firstname} wrote {text}')
-    logger.info(f'{time.asctime()}\t{user_id} ({username}): {text}')
+    user = update.message.from_user
+    # username = update.message.from_user.username
+    # firstname = update.message.from_user.first_name
+    text = str(update.message.text)
+    print(f'{user.first_name} wrote {text}')
+    logger.info(f'{time.asctime()}\t{user.id} ({user.username}): {text}')
 
-    await update.message.reply_text(text)
+    # TODO I can use it to gather id from chat members and add them to project
+    global KNOWN_USERS
+    KNOWN_USERS.update({
+        user.username: user.id
+    })
+    pprint(KNOWN_USERS)
+    # print (update.message.chat_id)
+
+    # reply only to personal messages
+    if update.message.chat_id == user.id:
+        await update.message.reply_text(text)
 
 
 async def feedback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -132,8 +147,33 @@ def get_assignees(task, actioners):
                     people = f"{people}@{member['tg_username']} ({member['name']})"
     return people
 
+def get_user_ids(task, actioners):
+    user_ids = []
+    for doer in task['actioners']:
+        for member in actioners:
+            # print(f"Doer: {type(doer['actioner_id'])} \t {type(member['id'])}")
+            if doer['actioner_id'] == member['id']:  
+                # print(member['tg_id'])
+                if member['tg_id']:
+                    user_ids.append(member['tg_id'])
+    # print(user_ids)
+    return user_ids
 
-async def status(update: Update, context: CallbackContext) -> None:
+
+def add_user_id(user, project):
+    ''' 
+    Helper function to add telegram id of user to project json
+    '''
+    # Remember telegram user id
+    for actioner in project['actioners']:
+        if actioner['tg_username'] == user.username:
+            # This will overwrite existing id if present, but it should not be an issue
+            actioner['tg_id'] = user.id
+    return project
+
+
+# async def status(update: Update, context: CallbackContext) -> None:
+async def status(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """
     This function handles /status command
     """
@@ -153,6 +193,10 @@ async def status(update: Update, context: CallbackContext) -> None:
                 bot_msg = f"Load successfull, wait for updates"
                 user = update.message.from_user
                 username = user.username
+                # Check if user in project team, update id if not present
+                project = add_user_id(user, project)
+                # Update project file
+                bot_msg = save_json(project)
                 # check Who calls?
                 # if PM then proceed all tasks
                 if username == PM:
@@ -165,6 +209,7 @@ async def status(update: Update, context: CallbackContext) -> None:
                             delta_start = date.today() - date.fromisoformat(task['startdate'])
                             # If delta_end >0 task overdue, if <0 task in progress
                             delta_end = date.today() - date.fromisoformat(task['enddate'])
+                            user_ids = []
                             # Deal with common task
                             if task['include']:
                                 # For now focus only on subtasks, that can be actually done
@@ -184,6 +229,7 @@ async def status(update: Update, context: CallbackContext) -> None:
                                     if delta_start.days == 0:
                                         try:
                                             people = get_assignees(task, actioners)
+                                            user_ids = get_user_ids(task, actioners)
                                         except Exception as e:
                                             bot_msg = "Error occured while processing assigned actioners to task task['id']} '{task['name']}' starting today"
                                             logger.info(f'{time.asctime()}\t {type(e)} \t {e.with_traceback}')
@@ -193,24 +239,27 @@ async def status(update: Update, context: CallbackContext) -> None:
                                     elif delta_start.days > 0  and delta_end.days < 0:
                                         try:
                                             people = get_assignees(task, actioners)
+                                            user_ids = get_user_ids(task, actioners)
                                         except Exception as e:
-                                            bot_msg = "Error occured while processing assigned actioners to task task['id']} '{task['name']}'"
+                                            bot_msg = f"Error occured while processing assigned actioners to task {task['id']} {task['name']}"
                                             logger.info(f'{time.asctime()}\t {type(e)} \t {e.with_traceback}')
                                         else:
                                             bot_msg = f"task {task['id']} '{task['name']}' is intermidiate. Due date is {task['enddate']}. Assigned to: {people}"
                                     elif delta_end.days == 0:
                                         try:
                                             people = get_assignees(task, actioners)
+                                            user_ids = get_user_ids(task, actioners)
                                         except Exception as e:
-                                            bot_msg = "Error occured while processing assigned actioners to task task['id']} '{task['name']}'"
+                                            bot_msg = f"Error occured while processing assigned actioners to task {task['id']} {task['name']}"
                                             logger.info(f'{time.asctime()}\t {type(e)} \t {e.with_traceback}')
                                         else:                                        
                                             bot_msg = f"task {task['id']}  '{task['name']}' must be completed today! Assigned to: {people}"
                                     elif delta_start.days > 0 and delta_end.days > 0:
                                         try:
                                             people = get_assignees(task, actioners)
+                                            user_ids = get_user_ids(task, actioners)
                                         except Exception as e:
-                                            bot_msg = "Error occured while processing assigned actioners to task task['id']} '{task['name']}'"
+                                            bot_msg = f"Error occured while processing assigned actioners to task {task['id']} {task['name']}"
                                             logger.info(f'{time.asctime()}\t {type(e)} \t {e.with_traceback}')
                                         else:                                         
                                             bot_msg = f"task {task['id']} '{task['name']}' is overdue! (had to be completed on {task['enddate']}). Assigned to: {people}"
@@ -225,6 +274,21 @@ async def status(update: Update, context: CallbackContext) -> None:
                                 else:
                                     # Or in private chat
                                     await user.send_message(bot_msg)
+                                # And send msg to actioner
+                                for id in user_ids:
+                                    print(id)
+                                    await context.bot.send_message(
+                                        id,
+                                        text=bot_msg,
+                                        parse_mode=ParseMode.HTML)
+
+                                # print(f"username: {user.username}, id: {user.id}")
+                                # id = 6094650595
+                                # print(f"Write to other id: {id}")
+                                # await context.bot.send_message(
+                                #         id,
+                                #         text=bot_msg,
+                                #         parse_mode=ParseMode.HTML)
 
                 # if not - then only tasks for this member
                 else:
@@ -241,6 +305,9 @@ async def status(update: Update, context: CallbackContext) -> None:
                         bot_msg = f"{username} is not participate in schedule provided."
                         # TODO This case should be certanly send to PM. For time being just keep it this way
                         await update.message.reply_text(bot_msg)
+
+                    print(f"username: {user.username}, id: {user.id}")
+                    
                   
     else:
         bot_msg = f"Project file does not exist, try to load first"
@@ -412,8 +479,10 @@ async def upload(update: Update, context: CallbackContext) -> None:
                 bot_msg = f'Unknow error occurred while processing file: {e}'
                 logger.info(f'{time.asctime()}\t {type(e)} \t {e.with_traceback}')
             else:
-                # Call function to save project in JSON format
                 if project:
+                    # Remember telegram user id
+                    project = add_user_id(update.message.from_user, project)
+                    # Call function to save project in JSON format
                     bot_msg = save_json(project)            
             
     else:
@@ -433,7 +502,19 @@ def save_json(project):
             bot_msg = 'Error saving project to json file'    
         else:
             bot_msg = 'Successfully saved project to json file'
+
+    # TODO reconsider returning None if succeed because there is no need always inform user about every file update
     return bot_msg
+
+async def start(update: Update, context: CallbackContext) -> None:
+    '''
+    Function to handle start of the bot
+    '''
+    # Update PM to current user
+    # global PM
+    # PM = update.effective_user.username
+    bot_msg = f"Hello, {update.effective_user.first_name}!"
+    await update.message.reply_text(bot_msg)
 
 
 # Function to control list of commands in bot itself. Commands itself are global
@@ -458,7 +539,9 @@ def main() -> None:
 
     # Then, we register each handler and the conditions the update must meet to trigger it
     # Register commands
-    # dispatcher.add_handler(CommandHandler("start", start)) 
+    # Start communicating with user from the new begining
+    application.add_handler(CommandHandler("start", start)) 
+    # /stop should make bot 'forget' about this user
     # dispatcher.add_handler(CommandHandler("stop", stop)) # in case smth went wrong 
     application.add_handler(CommandHandler(help_cmd.command, help)) # make it show description
     # PM should have the abibility to change bot behaviour, such as reminder interval and so on

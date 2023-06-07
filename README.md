@@ -153,14 +153,16 @@ First of all: the project file sent to bot should contain field 'tg_username' co
             "name": "John",
             "email": "",
             "phone": "",
-            "tg_username": "some_user42" 
+            "tg_username": "some_user42", 
+            "tg_id": 000000
         },
         {
             "id": "1",
             "name": "Mark",
             "email": "",
             "phone": "",
-            "tg_username": "some_user666"
+            "tg_username": "some_user666",
+            "tg_id": 000000
         }
     ]
 }
