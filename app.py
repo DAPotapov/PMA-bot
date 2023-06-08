@@ -56,6 +56,8 @@ status_cmd = BotCommand("status", "информация о текущем сос
 settings_cmd = BotCommand("settings", "настройка параметров бота")
 freshstart_cmd = BotCommand("freshstart", "начало нового проекта")
 feedback_cmd = BotCommand("feedback", "+<сообщение> отправит такое сообщение разработчику")
+start_cmd = BotCommand("start", "запуск бота")
+stop_cmd = BotCommand("stop", "прекращение работы бота")
 
 
 # Configure buttons for menus
@@ -754,9 +756,9 @@ def main() -> None:
     # Then, we register each handler and the conditions the update must meet to trigger it
     # Register commands
     # Start communicating with user from the new begining
-    application.add_handler(CommandHandler("start", start)) 
+    application.add_handler(CommandHandler(start_cmd.command, start)) 
     # /stop should make bot 'forget' about this user and stop jobs
-    application.add_handler(CommandHandler("stop", stop)) # in case smth went wrong 
+    application.add_handler(CommandHandler(stop_cmd.command, stop)) # in case smth went wrong 
     application.add_handler(CommandHandler(help_cmd.command, help)) # make it show description
     # PM should have the abibility to change bot behaviour, such as reminder interval and so on
     application.add_handler(CommandHandler(settings_cmd.command, settings))
