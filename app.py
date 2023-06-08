@@ -274,21 +274,61 @@ async def status(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
 
                 # if not - then only tasks for this member
                 else:
-                    # Check if user is part of the project team
-                    if [True for x in project['actioners'] if x['tg_username'] == username]:
-                        bot_msg = f"Project status for {username} (will be here)"
+                    user_id = ''
+                    bot_msg = ''
+                    for actioner in project['actioners']:
+                        if user.username == actioner['tg_username']:
+                            user_id = actioner['id']
+                    print(user_id)
+                    # Proceed if user found in team members
+                    if user_id:
+                        for task in project['tasks']:
+                            for doer in task['actioners']:
+                                # Check time constraints if user assigned to this task
+                                if user_id == doer['actioner_id']:
+                                    # Check if task not completed
+                                    if task['complete'] < 100:
+                                        # If delta_start <0 task not started, otherwise already started
+                                        delta_start = date.today() - date.fromisoformat(task['startdate'])
+                                        # If delta_end >0 task overdue, if <0 task in progress
+                                        delta_end = date.today() - date.fromisoformat(task['enddate'])
+                                        # Deal with common task
+                                        if task['include']:
+                                            # For now focus only on subtasks, that can be actually done
+                                            # I'll decide what to do with such tasks after gathering user experience
+                                            pass
+                                        else:
+                                            # Inform about milestone
+                                            if task['milestone'] == True:
+                                                if delta_end.days < 0:
+                                                    # If milestone in future inform user
+                                                    bot_msg = f"Milestone '{task['name']}' is near ({task['enddate']})!"
+                                                else:
+                                                    # if milestone in past do nothing
+                                                    pass
+                                            else:
+                                                if delta_start.days == 0:
+                                                    bot_msg = f"task {task['id']} '{task['name']}' started today."
+                                                elif delta_start.days > 0  and delta_end.days < 0:
+                                                    bot_msg = f"task {task['id']} '{task['name']}' is intermidiate. Due date is {task['enddate']}"
+                                                elif delta_end.days == 0:
+                                                    bot_msg = f"task {task['id']}  '{task['name']}' must be completed today!"
+                                                elif delta_start.days > 0 and delta_end.days > 0:
+                                                    bot_msg = f"task {task['id']} '{task['name']}' is overdue! (had to be completed on {task['enddate']})."
+                                                else:
+                                                    print(f"Future tasks as {task['id']} '{task['name']}' goes here")  
 
-
-
-
+                        if not bot_msg:
+                            bot_msg = f"Seems like there are no critical dates for you now, {user.first_name}."
                         # Send reply to user in group chat if allowed
                         if ALLOW_POST_STATUS_TO_GROUP == True:
                             await update.message.reply_text(bot_msg)
                         else:
                             # Or in private chat
                             await user.send_message(bot_msg)
+                        
                     else:
-                        bot_msg = f"{username} is not participate in schedule provided."
+                        bot_msg = f"{user.username} is not participate in schedule provided."
                         # TODO This case should be certanly send to PM. For time being just keep it this way
                         await update.message.reply_text(bot_msg)
 
@@ -299,6 +339,7 @@ async def status(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         bot_msg = f"Project file does not exist, try to load first"
         # TODO consider send directly to user asked
         await update.message.reply_text(bot_msg)  
+
 
 async def freshstart(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """
