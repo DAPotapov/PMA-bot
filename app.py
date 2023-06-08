@@ -39,6 +39,10 @@ logger = logging.getLogger(__name__)
 ALLOW_POST_STATUS_TO_GROUP = False 
 # Inform actioners of milestones (by default only PM) TODO
 INFORM_ACTIONERS_OF_MILESTONES = False
+# Time for daily reminders
+MORNING = "9:00"
+ONTHEEVE = "16:00"
+
 # TODO: change according to starter of the bot
 PM = 'hagen10'
 # PM = 'Sokolovaspace'
@@ -89,11 +93,11 @@ async def echo(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     logger.info(f'{tm.asctime()}\t{user.id} ({user.username}): {text}')
 
     # TODO I can use it to gather id from chat members and add them to project
-    global KNOWN_USERS
-    KNOWN_USERS.update({
-        user.username: user.id
-    })
-    pprint(KNOWN_USERS)
+    # global KNOWN_USERS
+    # KNOWN_USERS.update({
+    #     user.username: user.id
+    # })
+    # pprint(KNOWN_USERS)
     # print (update.message.chat_id)
 
     # reply only to personal messages
@@ -172,7 +176,6 @@ def add_user_id(user, project):
     return project
 
 
-# async def status(update: Update, context: CallbackContext) -> None:
 async def status(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """
     This function handles /status command
@@ -274,21 +277,14 @@ async def status(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
                                 else:
                                     # Or in private chat
                                     await user.send_message(bot_msg)
-                                # And send msg to actioner
+                                # And send msg to actioner (if it is not a PM)
                                 for id in user_ids:
-                                    print(id)
-                                    await context.bot.send_message(
-                                        id,
-                                        text=bot_msg,
-                                        parse_mode=ParseMode.HTML)
-
-                                # print(f"username: {user.username}, id: {user.id}")
-                                # id = 6094650595
-                                # print(f"Write to other id: {id}")
-                                # await context.bot.send_message(
-                                #         id,
-                                #         text=bot_msg,
-                                #         parse_mode=ParseMode.HTML)
+                                    # print(id)
+                                    if id != user.id: 
+                                        await context.bot.send_message(
+                                            id,
+                                            text=bot_msg,
+                                            parse_mode=ParseMode.HTML)
 
                 # if not - then only tasks for this member
                 else:
