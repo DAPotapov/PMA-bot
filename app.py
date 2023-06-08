@@ -517,6 +517,24 @@ async def file_update_reminder(context: ContextTypes.DEFAULT_TYPE) -> None:
     '''
     This function to remind team members that common files should be updated in the end of the week
     '''
+    if os.path.exists(PROJECTJSON):
+        with open(PROJECTJSON, 'r') as fp:
+            try:
+                project = connectors.load_json(fp)
+            except Exception as e:
+                logger.info(f'{tm.asctime()}\t {type(e)} \t {e.with_traceback}')                  
+            else:
+                # Loop through actioners to inform them about actual tasks
+                bot_msg = "Напоминаю, что сегодня надо освежить файлы по проекту! Чтобы другие участники команды имели актуальную информацию. Спасибо!"
+                for actioner in project['actioners']:
+                    # Bot can inform only ones with known id
+                    # print(actioner)
+                    if actioner['tg_id']:
+                        await context.bot.send_message(
+                            actioner['tg_id'],
+                            text=bot_msg,
+                            parse_mode=ParseMode.HTML)
+    # TODO delete
     print("friday update")
 
 async def on_the_eve_update(context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -730,6 +748,19 @@ def main() -> None:
 
     # Register handler for recieving new project file
     application.add_handler(MessageHandler(filters.Document.ALL, upload))
+
+    # Register friday reminder
+    friday_time = "15:00"
+    try:
+        hour, minute = map(int, friday_time.split(":"))                    
+        time2check = time(hour, minute, tzinfo=datetime.now().astimezone().tzinfo)
+    except ValueError as e:
+        print(f"Error while parsing time: {e}")
+    else:
+        # Add job to queue and enable it
+        application.job_queue.run_daily(file_update_reminder, time=time2check, days=(5,), data=PROJECTTITLE).enabled = True 
+        for job in application.job_queue.get_jobs_by_name('file_update_reminder'):
+            print(f"Next time: {job.next_t}, is it on? {job.enabled}")     
 
     # Start the Bot and run it until Ctrl+C pressed
     application.run_polling()
