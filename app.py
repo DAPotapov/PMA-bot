@@ -22,6 +22,7 @@ from telegram.ext import (
                             CallbackContext, 
                             CallbackQueryHandler, 
                             ContextTypes,  
+                            ConversationHandler,
                             filters)
 # For testing purposes
 from pprint import pprint
@@ -62,21 +63,27 @@ stop_cmd = BotCommand("stop", "прекращение работы бота")
 
 # Configure buttons for menus
 # for settings menu:
-allow_status_option = "Allow status update in group chat: "     
-milestones_anounce_option = "Users get anounces about milestones (by default only PM): "
-settings_done_option = "Done"
+# allow_status_option = "Allow status update in group chat: "     
+# milestones_anounce_option = "Users get anounces about milestones (by default only PM): "
+# settings_done_option = "Done"
+# New one:
+# Stages:
+FIRST_LVL, SECOND_LVL, THIRD_LVL, FOURTH_LVL = range(4)
+# Callback data
+ONE, TWO, THREE, FOUR = range(4)
+
 
 # Build keyboards
 #   for /freshstart
-freshstart_kbd = [
-    [
-    InlineKeyboardButton("Yes", callback_data=1), # it is a string actually
-    InlineKeyboardButton("No", callback_data=2),
-    ],
-[InlineKeyboardButton("Info, please", callback_data=3)]
-]
+# freshstart_kbd = [
+#     [
+#     InlineKeyboardButton("Yes", callback_data=1), # it is a string actually
+#     InlineKeyboardButton("No", callback_data=2),
+#     ],
+# [InlineKeyboardButton("Info, please", callback_data=3)]
+# ]
 #   for /settings
-settings_kbd = []
+# settings_kbd = []
 
 
 async def echo(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -399,6 +406,13 @@ async def settings(update: Update, context: CallbackContext) -> None:
     else:
         bot_msg = "Only Project manager is allowed to change settings."
         await update.message.reply_text(bot_msg)
+
+async def finish(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    return 1
+
+async def allow_status_to_group(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    return 1
+
 
 async def buttons(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """ Function to control buttons in settings """
@@ -781,6 +795,18 @@ def main() -> None:
 
     # Register handler for recieving new project file
     application.add_handler(MessageHandler(filters.Document.ALL, upload))
+
+    # Settings conversation handler
+    settings_conv = ConversationHandler(
+        entry_points=[CommandHandler(settings_cmd, settings)],
+        states={
+            FIRST_LVL: [
+                CallbackQueryHandler(allow_status_to_group)
+            ],
+            SECOND_LVL: [],
+        },
+        fallbacks=[CallbackQueryHandler(finish)]
+    )
 
     # Register friday reminder
     friday_time = "15:00"
