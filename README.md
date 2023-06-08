@@ -5,19 +5,24 @@ Project manager assistant telegram bot
 ## Description
 
 The purpose of this bot is assist Project Manager to control schedule (via reminders) and completion of tasks.  
-It should make free PM from sitting behind dashboard and looking who delaying which task, and which tasks should be done by now.  
-Overview of data structure used for schedule is here:  
+It should make PM free from sitting behind dashboard and looking who delaying which task, and which tasks should be done by now.  
+Overview of data structure used for schedule is [here](#data-structure)  
 
 ## Current state
 
 Bot can inform user about purpose of each command.
 Bot can recieve file from user. And inform user of file formats supported.  
-Bot currently accept .gan (GanttProject) format and translate it to json format for inner use.
-Bot can inform user about current status of schedule
+Bot currently accept .gan (GanttProject) format and MS Project XML and translate them to json format for inner use.
+Bot can inform PM about current status of schedule. Also it send notification to actioner assigned to that task.
+Every day bot looks at schedule and sends notification to actioners about tasks that should start or have deadline tomorrow.
+Every day at the morning bot looks at schedule and sends notification to actioners about current status of schedule.
+Every friday bot reminds team members about necessity of updating shared project files (Customer requirement)
 
 ## TODO
 
 [ ] make status command working for team members too  
+[ ] make reminders' time customizable in /settings
+[ ] make reminders can be turned off and on
 [ ] fully implement connector to json format  
 [ ] ask if PM wants to rewrite project file if new uploaded
 [ ] make bot persistent https://github.com/python-telegram-bot/python-telegram-bot/wiki/Making-your-bot-persistent  
