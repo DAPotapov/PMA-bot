@@ -11,7 +11,7 @@ import asyncio
 from dotenv import load_dotenv
 from datetime import datetime, date, time
 # from io import BufferedIOBase
-from telegram import Bot, BotCommand, Update, ForceReply, InlineKeyboardMarkup, InlineKeyboardButton
+from telegram import Bot, BotCommand, Update, ForceReply, InlineKeyboardMarkup, InlineKeyboardButton, ReplyKeyboardMarkup, ReplyKeyboardRemove
 from telegram.constants import ParseMode
 from telegram.ext import (
                             Application, 
@@ -43,6 +43,7 @@ INFORM_ACTIONERS_OF_MILESTONES = False
 # Time for daily reminders
 MORNING = "10:00"
 ONTHEEVE = "16:00"
+FRIDAY = "15:00"
 
 # TODO: change according to starter of the bot
 PM = 'hagen10'
@@ -66,11 +67,12 @@ stop_cmd = BotCommand("stop", "прекращение работы бота")
 # allow_status_option = "Allow status update in group chat: "     
 # milestones_anounce_option = "Users get anounces about milestones (by default only PM): "
 # settings_done_option = "Done"
+
 # New one:
 # Stages:
 FIRST_LVL, SECOND_LVL, THIRD_LVL, FOURTH_LVL = range(4)
 # Callback data
-ONE, TWO, THREE, FOUR = range(4)
+ONE, TWO, THREE, FOUR, FIVE = range(5)
 
 
 # Build keyboards
@@ -359,7 +361,7 @@ async def freshstart(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None
     await update.message.reply_text(bot_msg, reply_markup=freshstart_markup)
 
 
-async def settings(update: Update, context: CallbackContext) -> None:
+async def settings(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     """
     This function handles /settings command
     """
@@ -387,99 +389,222 @@ async def settings(update: Update, context: CallbackContext) -> None:
     # 5. Time of daily update of starting and deadline tasks, and days too
 
     # Check if it is PM who wish to change settings
-    username = update.message.from_user.username
-    if username == PM:
-        option_suffix = ""
-        option_suffix = "On" if ALLOW_POST_STATUS_TO_GROUP == True else "Off"
-        allow_status_option = "Allow status update in group chat: " + option_suffix        
-        option_suffix = "On" if INFORM_ACTIONERS_OF_MILESTONES == True else "Off"
-        milestones_anounce_option = "Users get anounces about milestones (by default only PM): " + option_suffix
+    # username = update.message.from_user.username
+    # if username == PM:
+    #     option_suffix = ""
+    #     option_suffix = "On" if ALLOW_POST_STATUS_TO_GROUP == True else "Off"
+    #     allow_status_option = "Allow status update in group chat: " + option_suffix        
+    #     option_suffix = "On" if INFORM_ACTIONERS_OF_MILESTONES == True else "Off"
+    #     milestones_anounce_option = "Users get anounces about milestones (by default only PM): " + option_suffix
 
-        settings_kbd = [
-                        [InlineKeyboardButton(allow_status_option, callback_data="allow_status_option")],
-                        [InlineKeyboardButton(milestones_anounce_option, callback_data="milestones_anounce_option")],
-                        [InlineKeyboardButton(settings_done_option, callback_data="done_option")]
-        ]
-        settings_markup = InlineKeyboardMarkup(settings_kbd)     
-        bot_msg = "You can alter this settings:"
-        await update.message.reply_text(bot_msg, reply_markup=settings_markup)
-    else:
-        bot_msg = "Only Project manager is allowed to change settings."
-        await update.message.reply_text(bot_msg)
+    #     settings_kbd = [
+    #                     [InlineKeyboardButton(allow_status_option, callback_data="allow_status_option")],
+    #                     [InlineKeyboardButton(milestones_anounce_option, callback_data="milestones_anounce_option")],
+    #                     [InlineKeyboardButton(settings_done_option, callback_data="done_option")]
+    #     ]
+    #     settings_markup = InlineKeyboardMarkup(settings_kbd)     
+    #     bot_msg = "You can alter this settings:"
+    #     await update.message.reply_text(bot_msg, reply_markup=settings_markup)
+    # else:
+    #     bot_msg = "Only Project manager is allowed to change settings."
+    #     await update.message.reply_text(bot_msg)
 
-async def finish(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
-    return 1
+    # user = update.message.from_user
+    bot_msg = (f"Current settings for project: \n"
+                f"Allow status update in group chat: {'On' if ALLOW_POST_STATUS_TO_GROUP == True else 'Off'} \n"
+                f"Users get anounces about milestones (by default only PM): {'On' if INFORM_ACTIONERS_OF_MILESTONES == True else 'Off'}" 
+    )
+    keyboard = [        
+            [InlineKeyboardButton("Allow status update in group chat", callback_data=str(ONE))],
+            [InlineKeyboardButton("Users get anounces about milestones", callback_data=str(TWO))],
+            [InlineKeyboardButton("Reminders settings", callback_data=str(THREE))],
+            [InlineKeyboardButton("Finish settings", callback_data=str(FOUR))],        
+    ]
+    print(ONE, TWO, THREE, FOUR)
+    reply_markup = InlineKeyboardMarkup(keyboard)
+    await update.message.reply_text(bot_msg, reply_markup=reply_markup)
+    print(FIRST_LVL, SECOND_LVL, THIRD_LVL)
+    return FIRST_LVL
+
+
+async def finish_settings(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    '''
+    Endpoint of settings conversation
+    '''
+    query = update.callback_query
+    print(f"Finish function, query.data = {query.data}")
+    await query.answer()
+    await query.edit_message_text(text="Settings done. You can do something else now.")
+    return ConversationHandler.END
 
 async def allow_status_to_group(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
-    return 1
-
-
-async def buttons(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    """ Function to control buttons in settings """
-    bot_msg = "Bot answer"
-    """Parses the CallbackQuery and updates the message text."""
     query = update.callback_query
-    """ As said in documentation CallbackQueries need to be answered """
+    print(f"Allow status to group function, query.data = {query.data}")
     await query.answer()
-    # Should use global variables
-    global ALLOW_POST_STATUS_TO_GROUP
-    global INFORM_ACTIONERS_OF_MILESTONES
-    match query.data:
-        # Handling buttons
-        case "allow_status_option":
-            # Switch this setting and reconfigure keyboard and markup
-            ALLOW_POST_STATUS_TO_GROUP = True if ALLOW_POST_STATUS_TO_GROUP == False else False
-            option_suffix = "On" if ALLOW_POST_STATUS_TO_GROUP == True else "Off"
-            allow_status_option = "Allow status update in group chat: " + option_suffix   
-            option_suffix = "On" if INFORM_ACTIONERS_OF_MILESTONES == True else "Off"
-            milestones_anounce_option = "Users get anounces about milestones (by default only PM): " + option_suffix                 
-            settings_kbd = [
-                            [InlineKeyboardButton(allow_status_option, callback_data="allow_status_option")],
-                            [InlineKeyboardButton(milestones_anounce_option, callback_data="milestones_anounce_option")],
-                            [InlineKeyboardButton(settings_done_option, callback_data="done_option")]
-            ]
-            settings_markup = InlineKeyboardMarkup(settings_kbd) 
-            bot_msg = "Setting updated. Something else?"
-            await query.edit_message_text(bot_msg, reply_markup=settings_markup)
-        case "milestones_anounce_option":
-            INFORM_ACTIONERS_OF_MILESTONES = True if INFORM_ACTIONERS_OF_MILESTONES == False else False
-            option_suffix = "On" if ALLOW_POST_STATUS_TO_GROUP == True else "Off"
-            allow_status_option = "Allow status update in group chat: " + option_suffix   
-            option_suffix = "On" if INFORM_ACTIONERS_OF_MILESTONES == True else "Off"
-            milestones_anounce_option = "Users get anounces about milestones (by default only PM): " + option_suffix                 
-            settings_kbd = [
-                            [InlineKeyboardButton(allow_status_option, callback_data="allow_status_option")],
-                            [InlineKeyboardButton(milestones_anounce_option, callback_data="milestones_anounce_option")],
-                            [InlineKeyboardButton(settings_done_option, callback_data="done_option")]
-            ]
-            settings_markup = InlineKeyboardMarkup(settings_kbd)             
-            bot_msg = "Setting updated. Something else?"
-            await query.edit_message_text(bot_msg, reply_markup=settings_markup)
-        case "done_option":
-            bot_msg = "Ok. You may call some other commands"
-            await query.edit_message_text(bot_msg)
-        # Handling freshstart buttons here
-        case "1":
-            bot_msg = "As you wish. Upload new project file"
-            await query.edit_message_text(bot_msg)
-        case "2":
-            bot_msg = "Let's continue with current project"
-            await query.edit_message_text(bot_msg)
-        case "3":
-            bot_msg = "Starting new project will replace your current reminders with new schedule"
-            await query.edit_message_text(bot_msg)
-            # Telegram API can't edit markup at this time, so this is workaround: send new message with buttons
-            freshstart_markup = InlineKeyboardMarkup(freshstart_kbd)
-            bot_msg = "So what did you decide?"
-            await context.bot.send_message(
-                update.effective_message.chat_id,
-                parse_mode=ParseMode.MARKDOWN_V2,
-                text=bot_msg,
-                reply_markup=freshstart_markup)
-        # Here we could add new buttons behaviour if we decide to create new menus
-        case _:
-            bot_msg = "Unknown answer"
-            await query.edit_message_text(bot_msg)                        
+    # Switch parameter
+    ALLOW_POST_STATUS_TO_GROUP = False if ALLOW_POST_STATUS_TO_GROUP else True
+    bot_msg = (f"Current settings for project: \n"
+                f"Allow status update in group chat: {'On' if ALLOW_POST_STATUS_TO_GROUP == True else 'Off'} \n"
+                f"Users get anounces about milestones (by default only PM): {'On' if INFORM_ACTIONERS_OF_MILESTONES == True else 'Off'}" 
+    )
+    keyboard = [        
+        [InlineKeyboardButton("Allow status update in group chat", callback_data=str(ONE))],
+        [InlineKeyboardButton("Users get anounces about milestones", callback_data=str(TWO))],
+        [InlineKeyboardButton("Reminders settings", callback_data=str(THREE))],
+        [InlineKeyboardButton("Finish settings", callback_data=str(FOUR))],        
+]
+    reply_markup = InlineKeyboardMarkup(keyboard)
+    await query.edit_message_text(bot_msg, reply_markup=reply_markup)
+    return FIRST_LVL
+
+async def milestones_anounce(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    query = update.callback_query
+    print(f"Milestones function, query.data = {query.data}")
+    await query.answer()
+    # Switch parameter
+    INFORM_ACTIONERS_OF_MILESTONES = False if INFORM_ACTIONERS_OF_MILESTONES else True
+    bot_msg = (f"Current settings for project: \n"
+                f"Allow status update in group chat: {'On' if ALLOW_POST_STATUS_TO_GROUP == True else 'Off'} \n"
+                f"Users get anounces about milestones (by default only PM): {'On' if INFORM_ACTIONERS_OF_MILESTONES == True else 'Off'}" 
+    )
+    keyboard = [        
+        [InlineKeyboardButton("Allow status update in group chat", callback_data=str(ONE))],
+        [InlineKeyboardButton("Users get anounces about milestones", callback_data=str(TWO))],
+        [InlineKeyboardButton("Reminders settings", callback_data=str(THREE))],
+        [InlineKeyboardButton("Finish settings", callback_data=str(FOUR))],        
+]
+    reply_markup = InlineKeyboardMarkup(keyboard)
+    await query.edit_message_text(bot_msg, reply_markup=reply_markup)
+    return FIRST_LVL
+
+async def reminders(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    query = update.callback_query
+    print(f"reminders function, query.data = {query.data}")
+    await query.answer()
+    bot_msg = (f"You can customize reminders here. Current settings are: \n"
+                f"<under construction>"
+    )
+    keyboard = [        
+        [InlineKeyboardButton("Reminder on day before", callback_data=str(ONE))],
+        [InlineKeyboardButton("Everyday morning reminder", callback_data=str(TWO))],
+        [InlineKeyboardButton("Friday reminder of project files update", callback_data=str(THREE))],
+        [InlineKeyboardButton("Back", callback_data=str(FOUR))],        
+        [InlineKeyboardButton("Finish settings", callback_data=str(FIVE))],        
+]
+    reply_markup = InlineKeyboardMarkup(keyboard)
+    await query.edit_message_text(bot_msg, reply_markup=reply_markup)
+
+    return SECOND_LVL
+
+async def settings_back(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+#     '''
+#     Determin
+#     '''
+    # I can (can i?) store and access state via     
+    # user_data = context.user_data 
+    # see:  https://docs.python-telegram-bot.org/en/stable/telegram.ext.application.html#telegram.ext.Application.user_data
+
+# WHAT if i don't change response here?
+    lvl = FIRST_LVL
+    print(update.callback_query.data)
+
+    return lvl
+# Or should I call some of other functions depending on lvl?
+# Or should I provide different keybords here depending on level?
+
+
+async def day_before_reminder(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    query = update.callback_query
+    print(f"day before reminder function, query.data = {query.data}")
+    await query.answer()
+    bot_msg = (f"You can customize reminders here. Current settings are: \n"
+                f"<under construction>"
+    )
+    keyboard = [        
+        # [InlineKeyboardButton("Reminder on day before", callback_data=str(ONE))],
+        # [InlineKeyboardButton("Everyday morning reminder", callback_data=str(TWO))],
+        # [InlineKeyboardButton("Friday reminder of project files update", callback_data=str(THREE))],
+        # [InlineKeyboardButton("Back", callback_data=str(FOUR))],        
+        # [InlineKeyboardButton("Finish settings", callback_data=str(FIVE))],        
+]
+    reply_markup = InlineKeyboardMarkup(keyboard)
+    await query.edit_message_text(bot_msg, reply_markup=reply_markup)
+    return THIRD_LVL
+
+async def morning_reminder(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    query = update.callback_query
+    print(f"morning reminder function, query.data = {query.data}")
+    await query.answer()
+    await query.edit_message_text(text="'Morning Reminder' button pressed'")
+    print(update.callback_query.data)
+    return SECOND_LVL
+
+# async def buttons(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+#     """ Function to control buttons in settings """
+#     bot_msg = "Bot answer"
+#     """Parses the CallbackQuery and updates the message text."""
+#     query = update.callback_query
+#     """ As said in documentation CallbackQueries need to be answered """
+#     await query.answer()
+#     # Should use global variables
+#     global ALLOW_POST_STATUS_TO_GROUP
+#     global INFORM_ACTIONERS_OF_MILESTONES
+#     match query.data:
+#         # Handling buttons
+#         case "allow_status_option":
+#             # Switch this setting and reconfigure keyboard and markup
+#             ALLOW_POST_STATUS_TO_GROUP = True if ALLOW_POST_STATUS_TO_GROUP == False else False
+#             option_suffix = "On" if ALLOW_POST_STATUS_TO_GROUP == True else "Off"
+#             allow_status_option = "Allow status update in group chat: " + option_suffix   
+#             option_suffix = "On" if INFORM_ACTIONERS_OF_MILESTONES == True else "Off"
+#             milestones_anounce_option = "Users get anounces about milestones (by default only PM): " + option_suffix                 
+#             settings_kbd = [
+#                             [InlineKeyboardButton(allow_status_option, callback_data="allow_status_option")],
+#                             [InlineKeyboardButton(milestones_anounce_option, callback_data="milestones_anounce_option")],
+#                             [InlineKeyboardButton(settings_done_option, callback_data="done_option")]
+#             ]
+#             settings_markup = InlineKeyboardMarkup(settings_kbd) 
+#             bot_msg = "Setting updated. Something else?"
+#             await query.edit_message_text(bot_msg, reply_markup=settings_markup)
+#         case "milestones_anounce_option":
+#             INFORM_ACTIONERS_OF_MILESTONES = True if INFORM_ACTIONERS_OF_MILESTONES == False else False
+#             option_suffix = "On" if ALLOW_POST_STATUS_TO_GROUP == True else "Off"
+#             allow_status_option = "Allow status update in group chat: " + option_suffix   
+#             option_suffix = "On" if INFORM_ACTIONERS_OF_MILESTONES == True else "Off"
+#             milestones_anounce_option = "Users get anounces about milestones (by default only PM): " + option_suffix                 
+#             settings_kbd = [
+#                             [InlineKeyboardButton(allow_status_option, callback_data="allow_status_option")],
+#                             [InlineKeyboardButton(milestones_anounce_option, callback_data="milestones_anounce_option")],
+#                             [InlineKeyboardButton(settings_done_option, callback_data="done_option")]
+#             ]
+#             settings_markup = InlineKeyboardMarkup(settings_kbd)             
+#             bot_msg = "Setting updated. Something else?"
+#             await query.edit_message_text(bot_msg, reply_markup=settings_markup)
+#         case "done_option":
+#             bot_msg = "Ok. You may call some other commands"
+#             await query.edit_message_text(bot_msg)
+#         # Handling freshstart buttons here
+#         case "1":
+#             bot_msg = "As you wish. Upload new project file"
+#             await query.edit_message_text(bot_msg)
+#         case "2":
+#             bot_msg = "Let's continue with current project"
+#             await query.edit_message_text(bot_msg)
+#         case "3":
+#             bot_msg = "Starting new project will replace your current reminders with new schedule"
+#             await query.edit_message_text(bot_msg)
+#             # Telegram API can't edit markup at this time, so this is workaround: send new message with buttons
+#             freshstart_markup = InlineKeyboardMarkup(freshstart_kbd)
+#             bot_msg = "So what did you decide?"
+#             await context.bot.send_message(
+#                 update.effective_message.chat_id,
+#                 parse_mode=ParseMode.MARKDOWN_V2,
+#                 text=bot_msg,
+#                 reply_markup=freshstart_markup)
+#         # Here we could add new buttons behaviour if we decide to create new menus
+#         case _:
+#             bot_msg = "Unknown answer"
+#             await query.edit_message_text(bot_msg)                        
 
 
 async def upload(update: Update, context: CallbackContext) -> None:
@@ -774,10 +899,9 @@ def main() -> None:
     # /stop should make bot 'forget' about this user and stop jobs
     application.add_handler(CommandHandler(stop_cmd.command, stop)) # in case smth went wrong 
     application.add_handler(CommandHandler(help_cmd.command, help)) # make it show description
-    # PM should have the abibility to change bot behaviour, such as reminder interval and so on
-    application.add_handler(CommandHandler(settings_cmd.command, settings))
+
     # Command to trigger project status check.
-    application.add_handler(CommandHandler(status_cmd.command, status))
+    # application.add_handler(CommandHandler(status_cmd.command, status))
     # Initialize start of the project: project name, db initialization and so on, previous project should be archived
     application.add_handler(CommandHandler(freshstart_cmd.command, freshstart))  
     # Bot should have the ability for user to inform developer of something: bugs, features and so on
@@ -788,7 +912,7 @@ def main() -> None:
     # dispatcher.add_handler(CommandHandler("download", download))
 
     # Handler to control buttons 
-    application.add_handler(CallbackQueryHandler(buttons))    
+    # application.add_handler(CallbackQueryHandler(buttons))    
 
     # Echo any message that is text and not a command
     application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, echo))
@@ -796,22 +920,10 @@ def main() -> None:
     # Register handler for recieving new project file
     application.add_handler(MessageHandler(filters.Document.ALL, upload))
 
-    # Settings conversation handler
-    settings_conv = ConversationHandler(
-        entry_points=[CommandHandler(settings_cmd, settings)],
-        states={
-            FIRST_LVL: [
-                CallbackQueryHandler(allow_status_to_group)
-            ],
-            SECOND_LVL: [],
-        },
-        fallbacks=[CallbackQueryHandler(finish)]
-    )
 
     # Register friday reminder
-    friday_time = "15:00"
     try:
-        hour, minute = map(int, friday_time.split(":"))                    
+        hour, minute = map(int, FRIDAY.split(":"))                    
         time2check = time(hour, minute, tzinfo=datetime.now().astimezone().tzinfo)
     except ValueError as e:
         print(f"Error while parsing time: {e}")
@@ -819,7 +931,32 @@ def main() -> None:
         # Add job to queue and enable it
         application.job_queue.run_daily(file_update_reminder, time=time2check, days=(5,), data=PROJECTTITLE).enabled = True 
         for job in application.job_queue.get_jobs_by_name('file_update_reminder'):
-            print(f"Next time: {job.next_t}, is it on? {job.enabled}")     
+            print(f"Next time: {job.next_t}, is it on? {job.enabled}")            
+
+    # PM should have the abibility to change bot behaviour, such as reminder interval and so on
+    # application.add_handler(CommandHandler(settings_cmd.command, settings))
+    # Settings conversation handler added here 
+    settings_conv = ConversationHandler(
+        entry_points=[CommandHandler(settings_cmd.command, settings)],
+        states={
+            FIRST_LVL: [
+                CallbackQueryHandler(allow_status_to_group, pattern="^" + str(ONE) + "$"),
+                CallbackQueryHandler(milestones_anounce, pattern="^" + str(TWO) + "$"),
+                CallbackQueryHandler(reminders, pattern="^" + str(THREE) + "$"),
+                CallbackQueryHandler(finish_settings, pattern="^" + str(FOUR) + "$"),
+            ],
+            SECOND_LVL: [
+                CallbackQueryHandler(day_before_reminder, pattern="^" + str(ONE) + "$"),
+                CallbackQueryHandler(morning_reminder, pattern="^" + str(TWO) + "$"),
+                CallbackQueryHandler(friday_reminder, pattern="^" + str(THREE) + "$"),
+                CallbackQueryHandler(settings_back, pattern="^" + str(FOUR) + "$"),
+                CallbackQueryHandler(finish_settings, pattern="^" + str(FIVE) + "$"),
+            ],
+        },
+        fallbacks=[CallbackQueryHandler(finish_settings)]
+    )
+    application.add_handler(settings_conv)
+
 
     # Start the Bot and run it until Ctrl+C pressed
     application.run_polling()
