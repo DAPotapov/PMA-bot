@@ -410,18 +410,18 @@ async def settings(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     #     await update.message.reply_text(bot_msg)
 
     # user = update.message.from_user
-    bot_msg = (f"Current settings for project: \n"
-                f"Allow status update in group chat: {'On' if ALLOW_POST_STATUS_TO_GROUP == True else 'Off'} \n"
-                f"Users get anounces about milestones (by default only PM): {'On' if INFORM_ACTIONERS_OF_MILESTONES == True else 'Off'}" 
-    )
+    # bot_msg = (f"Current settings for project: \n"
+    #             f"Allow status update in group chat: {'On' if ALLOW_POST_STATUS_TO_GROUP == True else 'Off'} \n"
+    #             f"Users get anounces about milestones (by default only PM): {'On' if INFORM_ACTIONERS_OF_MILESTONES == True else 'Off'}" 
+    # )
     # keyboard = [        
     #         [InlineKeyboardButton("Allow status update in group chat", callback_data=str(ONE))],
     #         [InlineKeyboardButton("Users get anounces about milestones", callback_data=str(TWO))],
     #         [InlineKeyboardButton("Reminders settings", callback_data=str(THREE))],
     #         [InlineKeyboardButton("Finish settings", callback_data=str(FOUR))],        
     # ]
-    keyboard = get_keybord(FIRST_LVL)
-    if keyboard == None:
+    keyboard, bot_msg = get_keybord_and_msg(FIRST_LVL)
+    if keyboard == None or bot_msg == None:
         bot_msg = "Some error happened. Unable to show a menu."
         await update.message.reply_text(bot_msg)
     else:
@@ -453,18 +453,18 @@ async def allow_status_to_group(update: Update, context: ContextTypes.DEFAULT_TY
     # Switch parameter
     global ALLOW_POST_STATUS_TO_GROUP
     ALLOW_POST_STATUS_TO_GROUP = False if ALLOW_POST_STATUS_TO_GROUP else True
-    bot_msg = (f"Current settings for project: \n"
-                f"Allow status update in group chat: {'On' if ALLOW_POST_STATUS_TO_GROUP == True else 'Off'} \n"
-                f"Users get anounces about milestones (by default only PM): {'On' if INFORM_ACTIONERS_OF_MILESTONES == True else 'Off'}" 
-    )
+    # bot_msg = (f"Current settings for project: \n"
+    #             f"Allow status update in group chat: {'On' if ALLOW_POST_STATUS_TO_GROUP == True else 'Off'} \n"
+    #             f"Users get anounces about milestones (by default only PM): {'On' if INFORM_ACTIONERS_OF_MILESTONES == True else 'Off'}" 
+    # )
 #     keyboard = [        
 #         [InlineKeyboardButton("Allow status update in group chat", callback_data=str(ONE))],
 #         [InlineKeyboardButton("Users get anounces about milestones", callback_data=str(TWO))],
 #         [InlineKeyboardButton("Reminders settings", callback_data=str(THREE))],
 #         [InlineKeyboardButton("Finish settings", callback_data=str(FOUR))],        
 # ]
-    keyboard = get_keybord(FIRST_LVL)
-    if keyboard == None:
+    keyboard, bot_msg = get_keybord_and_msg(FIRST_LVL)
+    if keyboard == None or bot_msg == None:
         bot_msg = "Some error happened. Unable to show a menu."
         await update.message.reply_text(bot_msg)
     else:
@@ -492,8 +492,8 @@ async def milestones_anounce(update: Update, context: ContextTypes.DEFAULT_TYPE)
 #         [InlineKeyboardButton("Finish settings", callback_data=str(FOUR))],        
 # ]
 
-    keyboard = get_keybord(FIRST_LVL)
-    if keyboard == None:
+    keyboard, bot_msg = get_keybord_and_msg(FIRST_LVL)
+    if keyboard == None or bot_msg == None:
         bot_msg = "Some error happened. Unable to show a menu."
         await update.message.reply_text(bot_msg)
     else:
@@ -508,9 +508,9 @@ async def reminders(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     await query.answer()
     context.user_data['level'] = SECOND_LVL
     # TODO add information about reminder settings
-    bot_msg = (f"You can customize reminders here. Current settings are: \n"
-                f"<under construction>"
-    )
+    # bot_msg = (f"You can customize reminders here. Current settings are: \n"
+    #             f"<under construction>"
+    # )
 
 #     keyboard = [        
 #         [InlineKeyboardButton("Reminder on day before", callback_data=str(ONE))],
@@ -519,9 +519,9 @@ async def reminders(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
 #         [InlineKeyboardButton("Back", callback_data=str(FOUR))],        
 #         [InlineKeyboardButton("Finish settings", callback_data=str(FIVE))],        
 # ]
-    keyboard = get_keybord(SECOND_LVL)
+    keyboard, bot_msg = get_keybord_and_msg(SECOND_LVL)
     # If somehow app couldn't build a keyboard it is safier to return first level state
-    if keyboard == None:
+    if keyboard == None or bot_msg == None:
         bot_msg = "Some error happened. Unable to show a menu."
         await update.message.reply_text(bot_msg)
         return FIRST_LVL
@@ -548,24 +548,35 @@ async def settings_back(update: Update, context: ContextTypes.DEFAULT_TYPE) -> i
     if context.user_data['level'] > 0:
         context.user_data['level'] = context.user_data['level'] - 1  
     # Make keyboard appropriate to a level we are returning to
-    keyboard = get_keybord(context.user_data['level'])
-    reply_markup = InlineKeyboardMarkup(keyboard)
-    await query.edit_message_text(bot_msg, reply_markup=reply_markup)
-    print(f"Hit back and now level is: {context.user_data['level']}")
-    return context.user_data['level']
+    keyboard, bot_msg = get_keybord_and_msg(context.user_data['level'])
+    # If somehow app couldn't build a keyboard it is safier to return first level state
+    if keyboard == None or bot_msg == None:
+        bot_msg = "Some error happened. Unable to show a menu."
+        await update.message.reply_text(bot_msg)
+        return FIRST_LVL
+    else:    
+        reply_markup = InlineKeyboardMarkup(keyboard)
+        await query.edit_message_text(bot_msg, reply_markup=reply_markup)
+        print(f"Hit 'back' and now level is: {context.user_data['level']}")
+        return context.user_data['level']
 # Or should I call some of other functions depending on lvl? - I don't quite understand how make it work...
 # Or should I provide different keybords here depending on level? - 
 # But I can make standalone function to make same keybords instead of making them every time again and again
 
 
-def get_keybord(level: int):
+def get_keybord_and_msg(level: int, info: str = None):
     '''
     Helper function to provide specific keyboard on different levels of settings menu
     '''
     keyboard = None
+    msg = None
     match level:
         case 0:
             # First level menu keyboard
+            msg = (f"Current settings for project: \n"
+                f"Allow status update in group chat: {'On' if ALLOW_POST_STATUS_TO_GROUP == True else 'Off'} \n"
+                f"Users get anounces about milestones (by default only PM): {'On' if INFORM_ACTIONERS_OF_MILESTONES == True else 'Off'}" 
+                )
             keyboard = [        
                 [InlineKeyboardButton("Allow status update in group chat", callback_data=str(ONE))],
                 [InlineKeyboardButton("Users get anounces about milestones", callback_data=str(TWO))],
@@ -573,6 +584,9 @@ def get_keybord(level: int):
                 [InlineKeyboardButton("Finish settings", callback_data=str(FOUR))],        
             ]
         case 1:
+            msg = (f"You can customize reminders here. Current settings are: \n"
+                    f"<under construction>"
+                    )
             # Second level menu keyboard
             keyboard = [        
                 [InlineKeyboardButton("Reminder on day before", callback_data=str(ONE))],
@@ -582,6 +596,8 @@ def get_keybord(level: int):
                 [InlineKeyboardButton("Finish settings", callback_data=str(FIVE))],        
             ]
         case 2:
+             # What message, depends on a branch of menu, For now None is ok
+            # msg=
             # Third level menu keyboard
             keyboard = [        
                 [InlineKeyboardButton("Turn on/off", callback_data=str(ONE))],
@@ -593,7 +609,7 @@ def get_keybord(level: int):
         case _:
             keyboard = None
 
-    return keyboard
+    return keyboard, msg
 
 
 async def day_before_reminder(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
@@ -603,10 +619,6 @@ async def day_before_reminder(update: Update, context: ContextTypes.DEFAULT_TYPE
     context.user_data['level'] = THIRD_LVL
     # Remember what job we are modifying right now
     context.user_data['last_position'] = 'on_the_eve_update'
-
-    bot_msg = (f"The day before reminder has to be set here. Current state: : \n"
-                f"<under construction>"
-    )
 #     keyboard = [        
 #         [InlineKeyboardButton("Turn on/off", callback_data=str(ONE))],
 #         [InlineKeyboardButton("Set time", callback_data=str(TWO))],
@@ -614,8 +626,12 @@ async def day_before_reminder(update: Update, context: ContextTypes.DEFAULT_TYPE
 #         [InlineKeyboardButton("Back", callback_data=str(FOUR))],        
 #         [InlineKeyboardButton("Finish settings", callback_data=str(FIVE))],        
 # ]
-    keyboard = get_keybord(THIRD_LVL)
-    if keyboard == None:
+    keyboard, bot_msg = get_keybord_and_msg(THIRD_LVL)
+    # Here we can concatenate message from function and predefined
+    bot_msg = (f"The day before reminder has to be set here. Current state: : \n"
+                f"<under construction>"
+                )
+    if keyboard == None or bot_msg == None:
         bot_msg = "Some error happened. Unable to show a menu."
         await update.message.reply_text(bot_msg)
         return FIRST_LVL
@@ -631,9 +647,7 @@ async def morning_reminder(update: Update, context: ContextTypes.DEFAULT_TYPE) -
     context.user_data['level'] = THIRD_LVL
     # Remember what job we are modifying right now
     context.user_data['last_position'] = 'morning_update'
-    bot_msg = (f"Daily morining reminder has to be set here. Current state: : \n"
-                f"<under construction>"
-    )
+
 #     keyboard = [        
 #         [InlineKeyboardButton("Turn on/off", callback_data=str(ONE))],
 #         [InlineKeyboardButton("Set time", callback_data=str(TWO))],
@@ -641,8 +655,11 @@ async def morning_reminder(update: Update, context: ContextTypes.DEFAULT_TYPE) -
 #         [InlineKeyboardButton("Back", callback_data=str(FOUR))],        
 #         [InlineKeyboardButton("Finish settings", callback_data=str(FIVE))],        
 # ]
-    keyboard = get_keybord(THIRD_LVL)
-    if keyboard == None:
+    keyboard, bot_msg = get_keybord_and_msg(THIRD_LVL)
+    bot_msg = (f"Daily morining reminder has to be set here. Current state: : \n"
+                f"<under construction>"
+    )
+    if keyboard == None or bot_msg == None:
         bot_msg = "Some error happened. Unable to show a menu."
         await update.message.reply_text(bot_msg)
         return FIRST_LVL
@@ -651,6 +668,7 @@ async def morning_reminder(update: Update, context: ContextTypes.DEFAULT_TYPE) -
         await query.edit_message_text(bot_msg, reply_markup=reply_markup)
         return THIRD_LVL
 
+
 async def friday_reminder(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     query = update.callback_query
     print(f"friday reminder function, query.data = {query.data}")
@@ -658,9 +676,7 @@ async def friday_reminder(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
     context.user_data['level'] = THIRD_LVL
     # Remember what job we are modifying right now
     context.user_data['last_position'] = 'file_update_reminder'
-    bot_msg = (f"Reminder for file updates on friday has to be set here. Current state: : \n"
-                f"<under construction>"
-    )
+
 #     keyboard = [        
 #         [InlineKeyboardButton("Turn on/off", callback_data=str(ONE))],
 #         [InlineKeyboardButton("Set time", callback_data=str(TWO))],
@@ -668,8 +684,11 @@ async def friday_reminder(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
 #         [InlineKeyboardButton("Back", callback_data=str(FOUR))],        
 #         [InlineKeyboardButton("Finish settings", callback_data=str(FIVE))],        
 # ]
-    keyboard = get_keybord(THIRD_LVL)
-    if keyboard == None:
+    keyboard, bot_msg = get_keybord_and_msg(THIRD_LVL)
+    bot_msg = (f"Reminder for file updates on friday has to be set here. Current state: : \n"
+            f"<under construction>"
+    )
+    if keyboard == None or bot_msg == None:
         bot_msg = "Some error happened. Unable to show a menu."
         await update.message.reply_text(bot_msg)
         return FIRST_LVL
