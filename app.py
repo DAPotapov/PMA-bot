@@ -414,17 +414,23 @@ async def settings(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
                 f"Allow status update in group chat: {'On' if ALLOW_POST_STATUS_TO_GROUP == True else 'Off'} \n"
                 f"Users get anounces about milestones (by default only PM): {'On' if INFORM_ACTIONERS_OF_MILESTONES == True else 'Off'}" 
     )
-    keyboard = [        
-            [InlineKeyboardButton("Allow status update in group chat", callback_data=str(ONE))],
-            [InlineKeyboardButton("Users get anounces about milestones", callback_data=str(TWO))],
-            [InlineKeyboardButton("Reminders settings", callback_data=str(THREE))],
-            [InlineKeyboardButton("Finish settings", callback_data=str(FOUR))],        
-    ]
-    print(ONE, TWO, THREE, FOUR)
-    reply_markup = InlineKeyboardMarkup(keyboard)
-    await update.message.reply_text(bot_msg, reply_markup=reply_markup)
-    print(FIRST_LVL, SECOND_LVL, THIRD_LVL)
-    return FIRST_LVL
+    # keyboard = [        
+    #         [InlineKeyboardButton("Allow status update in group chat", callback_data=str(ONE))],
+    #         [InlineKeyboardButton("Users get anounces about milestones", callback_data=str(TWO))],
+    #         [InlineKeyboardButton("Reminders settings", callback_data=str(THREE))],
+    #         [InlineKeyboardButton("Finish settings", callback_data=str(FOUR))],        
+    # ]
+    keyboard = get_keybord(FIRST_LVL)
+    if keyboard == None:
+        bot_msg = "Some error happened. Unable to show a menu."
+        await update.message.reply_text(bot_msg)
+    else:
+        # Let's control which level of settings we are at any given moment
+        context.user_data['level'] = FIRST_LVL
+        reply_markup = InlineKeyboardMarkup(keyboard)
+        print(update.message)
+        await update.message.reply_text(bot_msg, reply_markup=reply_markup)
+        return FIRST_LVL
 
 
 async def finish_settings(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
@@ -433,68 +439,96 @@ async def finish_settings(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
     '''
     query = update.callback_query
     print(f"Finish function, query.data = {query.data}")
+    print(f"Current level is: {context.user_data['level']}")
     await query.answer()
     await query.edit_message_text(text="Settings done. You can do something else now.")
     return ConversationHandler.END
 
+
 async def allow_status_to_group(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     query = update.callback_query
     print(f"Allow status to group function, query.data = {query.data}")
+    print(f"Current level is: {context.user_data['level']}")
     await query.answer()
     # Switch parameter
+    global ALLOW_POST_STATUS_TO_GROUP
     ALLOW_POST_STATUS_TO_GROUP = False if ALLOW_POST_STATUS_TO_GROUP else True
     bot_msg = (f"Current settings for project: \n"
                 f"Allow status update in group chat: {'On' if ALLOW_POST_STATUS_TO_GROUP == True else 'Off'} \n"
                 f"Users get anounces about milestones (by default only PM): {'On' if INFORM_ACTIONERS_OF_MILESTONES == True else 'Off'}" 
     )
-    keyboard = [        
-        [InlineKeyboardButton("Allow status update in group chat", callback_data=str(ONE))],
-        [InlineKeyboardButton("Users get anounces about milestones", callback_data=str(TWO))],
-        [InlineKeyboardButton("Reminders settings", callback_data=str(THREE))],
-        [InlineKeyboardButton("Finish settings", callback_data=str(FOUR))],        
-]
-    reply_markup = InlineKeyboardMarkup(keyboard)
-    await query.edit_message_text(bot_msg, reply_markup=reply_markup)
+#     keyboard = [        
+#         [InlineKeyboardButton("Allow status update in group chat", callback_data=str(ONE))],
+#         [InlineKeyboardButton("Users get anounces about milestones", callback_data=str(TWO))],
+#         [InlineKeyboardButton("Reminders settings", callback_data=str(THREE))],
+#         [InlineKeyboardButton("Finish settings", callback_data=str(FOUR))],        
+# ]
+    keyboard = get_keybord(FIRST_LVL)
+    if keyboard == None:
+        bot_msg = "Some error happened. Unable to show a menu."
+        await update.message.reply_text(bot_msg)
+    else:
+        reply_markup = InlineKeyboardMarkup(keyboard)
+        await query.edit_message_text(bot_msg, reply_markup=reply_markup)
     return FIRST_LVL
+
 
 async def milestones_anounce(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     query = update.callback_query
     print(f"Milestones function, query.data = {query.data}")
+    print(f"Current level is: {context.user_data['level']}")
     await query.answer()
     # Switch parameter
+    global INFORM_ACTIONERS_OF_MILESTONES
     INFORM_ACTIONERS_OF_MILESTONES = False if INFORM_ACTIONERS_OF_MILESTONES else True
     bot_msg = (f"Current settings for project: \n"
                 f"Allow status update in group chat: {'On' if ALLOW_POST_STATUS_TO_GROUP == True else 'Off'} \n"
                 f"Users get anounces about milestones (by default only PM): {'On' if INFORM_ACTIONERS_OF_MILESTONES == True else 'Off'}" 
     )
-    keyboard = [        
-        [InlineKeyboardButton("Allow status update in group chat", callback_data=str(ONE))],
-        [InlineKeyboardButton("Users get anounces about milestones", callback_data=str(TWO))],
-        [InlineKeyboardButton("Reminders settings", callback_data=str(THREE))],
-        [InlineKeyboardButton("Finish settings", callback_data=str(FOUR))],        
-]
-    reply_markup = InlineKeyboardMarkup(keyboard)
-    await query.edit_message_text(bot_msg, reply_markup=reply_markup)
+#     keyboard = [        
+#         [InlineKeyboardButton("Allow status update in group chat", callback_data=str(ONE))],
+#         [InlineKeyboardButton("Users get anounces about milestones", callback_data=str(TWO))],
+#         [InlineKeyboardButton("Reminders settings", callback_data=str(THREE))],
+#         [InlineKeyboardButton("Finish settings", callback_data=str(FOUR))],        
+# ]
+
+    keyboard = get_keybord(FIRST_LVL)
+    if keyboard == None:
+        bot_msg = "Some error happened. Unable to show a menu."
+        await update.message.reply_text(bot_msg)
+    else:
+        reply_markup = InlineKeyboardMarkup(keyboard)
+        await query.edit_message_text(bot_msg, reply_markup=reply_markup)
     return FIRST_LVL
+
 
 async def reminders(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     query = update.callback_query
     print(f"reminders function, query.data = {query.data}")
     await query.answer()
+    context.user_data['level'] = SECOND_LVL
+    # TODO add information about reminder settings
     bot_msg = (f"You can customize reminders here. Current settings are: \n"
                 f"<under construction>"
     )
-    keyboard = [        
-        [InlineKeyboardButton("Reminder on day before", callback_data=str(ONE))],
-        [InlineKeyboardButton("Everyday morning reminder", callback_data=str(TWO))],
-        [InlineKeyboardButton("Friday reminder of project files update", callback_data=str(THREE))],
-        [InlineKeyboardButton("Back", callback_data=str(FOUR))],        
-        [InlineKeyboardButton("Finish settings", callback_data=str(FIVE))],        
-]
-    reply_markup = InlineKeyboardMarkup(keyboard)
-    await query.edit_message_text(bot_msg, reply_markup=reply_markup)
 
-    return SECOND_LVL
+#     keyboard = [        
+#         [InlineKeyboardButton("Reminder on day before", callback_data=str(ONE))],
+#         [InlineKeyboardButton("Everyday morning reminder", callback_data=str(TWO))],
+#         [InlineKeyboardButton("Friday reminder of project files update", callback_data=str(THREE))],
+#         [InlineKeyboardButton("Back", callback_data=str(FOUR))],        
+#         [InlineKeyboardButton("Finish settings", callback_data=str(FIVE))],        
+# ]
+    keyboard = get_keybord(SECOND_LVL)
+    # If somehow app couldn't build a keyboard it is safier to return first level state
+    if keyboard == None:
+        bot_msg = "Some error happened. Unable to show a menu."
+        await update.message.reply_text(bot_msg)
+        return FIRST_LVL
+    else:
+        reply_markup = InlineKeyboardMarkup(keyboard)
+        await query.edit_message_text(bot_msg, reply_markup=reply_markup)
+        return SECOND_LVL
 
 async def settings_back(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
 #     '''
@@ -505,39 +539,144 @@ async def settings_back(update: Update, context: ContextTypes.DEFAULT_TYPE) -> i
     # see:  https://docs.python-telegram-bot.org/en/stable/telegram.ext.application.html#telegram.ext.Application.user_data
 
 # WHAT if i don't change response here?
-    lvl = FIRST_LVL
-    print(update.callback_query.data)
+    print(f"Current level is: {context.user_data['level']}")
+    query = update.callback_query
+    print(f"Back function, query.data = {query.data}")
+    await query.answer()
+    bot_msg = "Back from back function. Should add 'bot_msg' to helper function too. "
+    # We can return back only if we are not on 1st level
+    if context.user_data['level'] > 0:
+        context.user_data['level'] = context.user_data['level'] - 1  
+    # Make keyboard appropriate to a level we are returning to
+    keyboard = get_keybord(context.user_data['level'])
+    reply_markup = InlineKeyboardMarkup(keyboard)
+    await query.edit_message_text(bot_msg, reply_markup=reply_markup)
+    print(f"Hit back and now level is: {context.user_data['level']}")
+    return context.user_data['level']
+# Or should I call some of other functions depending on lvl? - I don't quite understand how make it work...
+# Or should I provide different keybords here depending on level? - 
+# But I can make standalone function to make same keybords instead of making them every time again and again
 
-    return lvl
-# Or should I call some of other functions depending on lvl?
-# Or should I provide different keybords here depending on level?
+
+def get_keybord(level: int):
+    '''
+    Helper function to provide specific keyboard on different levels of settings menu
+    '''
+    keyboard = None
+    match level:
+        case 0:
+            # First level menu keyboard
+            keyboard = [        
+                [InlineKeyboardButton("Allow status update in group chat", callback_data=str(ONE))],
+                [InlineKeyboardButton("Users get anounces about milestones", callback_data=str(TWO))],
+                [InlineKeyboardButton("Reminders settings", callback_data=str(THREE))],
+                [InlineKeyboardButton("Finish settings", callback_data=str(FOUR))],        
+            ]
+        case 1:
+            # Second level menu keyboard
+            keyboard = [        
+                [InlineKeyboardButton("Reminder on day before", callback_data=str(ONE))],
+                [InlineKeyboardButton("Everyday morning reminder", callback_data=str(TWO))],
+                [InlineKeyboardButton("Friday reminder of project files update", callback_data=str(THREE))],
+                [InlineKeyboardButton("Back", callback_data=str(FOUR))],        
+                [InlineKeyboardButton("Finish settings", callback_data=str(FIVE))],        
+            ]
+        case 2:
+            # Third level menu keyboard
+            keyboard = [        
+                [InlineKeyboardButton("Turn on/off", callback_data=str(ONE))],
+                [InlineKeyboardButton("Set time", callback_data=str(TWO))],
+                [InlineKeyboardButton("Set days of week", callback_data=str(THREE))],
+                [InlineKeyboardButton("Back", callback_data=str(FOUR))],        
+                [InlineKeyboardButton("Finish settings", callback_data=str(FIVE))],        
+            ]
+        case _:
+            keyboard = None
+
+    return keyboard
 
 
 async def day_before_reminder(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     query = update.callback_query
     print(f"day before reminder function, query.data = {query.data}")
     await query.answer()
-    bot_msg = (f"You can customize reminders here. Current settings are: \n"
+    context.user_data['level'] = THIRD_LVL
+    # Remember what job we are modifying right now
+    context.user_data['last_position'] = 'on_the_eve_update'
+
+    bot_msg = (f"The day before reminder has to be set here. Current state: : \n"
                 f"<under construction>"
     )
-    keyboard = [        
-        # [InlineKeyboardButton("Reminder on day before", callback_data=str(ONE))],
-        # [InlineKeyboardButton("Everyday morning reminder", callback_data=str(TWO))],
-        # [InlineKeyboardButton("Friday reminder of project files update", callback_data=str(THREE))],
-        # [InlineKeyboardButton("Back", callback_data=str(FOUR))],        
-        # [InlineKeyboardButton("Finish settings", callback_data=str(FIVE))],        
-]
-    reply_markup = InlineKeyboardMarkup(keyboard)
-    await query.edit_message_text(bot_msg, reply_markup=reply_markup)
-    return THIRD_LVL
+#     keyboard = [        
+#         [InlineKeyboardButton("Turn on/off", callback_data=str(ONE))],
+#         [InlineKeyboardButton("Set time", callback_data=str(TWO))],
+#         [InlineKeyboardButton("Set days of week", callback_data=str(THREE))],
+#         [InlineKeyboardButton("Back", callback_data=str(FOUR))],        
+#         [InlineKeyboardButton("Finish settings", callback_data=str(FIVE))],        
+# ]
+    keyboard = get_keybord(THIRD_LVL)
+    if keyboard == None:
+        bot_msg = "Some error happened. Unable to show a menu."
+        await update.message.reply_text(bot_msg)
+        return FIRST_LVL
+    else:
+        reply_markup = InlineKeyboardMarkup(keyboard)
+        await query.edit_message_text(bot_msg, reply_markup=reply_markup)
+        return THIRD_LVL
 
 async def morning_reminder(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     query = update.callback_query
     print(f"morning reminder function, query.data = {query.data}")
     await query.answer()
-    await query.edit_message_text(text="'Morning Reminder' button pressed'")
-    print(update.callback_query.data)
-    return SECOND_LVL
+    context.user_data['level'] = THIRD_LVL
+    # Remember what job we are modifying right now
+    context.user_data['last_position'] = 'morning_update'
+    bot_msg = (f"Daily morining reminder has to be set here. Current state: : \n"
+                f"<under construction>"
+    )
+#     keyboard = [        
+#         [InlineKeyboardButton("Turn on/off", callback_data=str(ONE))],
+#         [InlineKeyboardButton("Set time", callback_data=str(TWO))],
+#         [InlineKeyboardButton("Set days of week", callback_data=str(THREE))],
+#         [InlineKeyboardButton("Back", callback_data=str(FOUR))],        
+#         [InlineKeyboardButton("Finish settings", callback_data=str(FIVE))],        
+# ]
+    keyboard = get_keybord(THIRD_LVL)
+    if keyboard == None:
+        bot_msg = "Some error happened. Unable to show a menu."
+        await update.message.reply_text(bot_msg)
+        return FIRST_LVL
+    else:
+        reply_markup = InlineKeyboardMarkup(keyboard)
+        await query.edit_message_text(bot_msg, reply_markup=reply_markup)
+        return THIRD_LVL
+
+async def friday_reminder(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    query = update.callback_query
+    print(f"friday reminder function, query.data = {query.data}")
+    await query.answer()
+    context.user_data['level'] = THIRD_LVL
+    # Remember what job we are modifying right now
+    context.user_data['last_position'] = 'file_update_reminder'
+    bot_msg = (f"Reminder for file updates on friday has to be set here. Current state: : \n"
+                f"<under construction>"
+    )
+#     keyboard = [        
+#         [InlineKeyboardButton("Turn on/off", callback_data=str(ONE))],
+#         [InlineKeyboardButton("Set time", callback_data=str(TWO))],
+#        # [InlineKeyboardButton("Set days of week", callback_data=str(THREE))], # Because it is friday by requirement
+#         [InlineKeyboardButton("Back", callback_data=str(FOUR))],        
+#         [InlineKeyboardButton("Finish settings", callback_data=str(FIVE))],        
+# ]
+    keyboard = get_keybord(THIRD_LVL)
+    if keyboard == None:
+        bot_msg = "Some error happened. Unable to show a menu."
+        await update.message.reply_text(bot_msg)
+        return FIRST_LVL
+    else:
+        reply_markup = InlineKeyboardMarkup(keyboard)
+        await query.edit_message_text(bot_msg, reply_markup=reply_markup)
+        return THIRD_LVL
 
 # async def buttons(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
 #     """ Function to control buttons in settings """
@@ -952,6 +1091,15 @@ def main() -> None:
                 CallbackQueryHandler(settings_back, pattern="^" + str(FOUR) + "$"),
                 CallbackQueryHandler(finish_settings, pattern="^" + str(FIVE) + "$"),
             ],
+            THIRD_LVL: [
+                # just for testing
+                CallbackQueryHandler(finish_settings, pattern="^" + str(ONE) + "$"),
+                CallbackQueryHandler(finish_settings, pattern="^" + str(TWO) + "$"),
+                CallbackQueryHandler(finish_settings, pattern="^" + str(THREE) + "$"),
+                CallbackQueryHandler(settings_back, pattern="^" + str(FOUR) + "$"),
+                CallbackQueryHandler(finish_settings, pattern="^" + str(FIVE) + "$"),
+
+            ]
         },
         fallbacks=[CallbackQueryHandler(finish_settings)]
     )
