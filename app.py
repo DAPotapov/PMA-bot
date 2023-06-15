@@ -195,8 +195,9 @@ async def status(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
                 bot_msg = f"ERROR ({e}): Unable to load"
                 logger.info(f'{tm.asctime()}\t {type(e)} \t {e.with_traceback}')                  
             else:
+                print(f"For testing purposes list jobs: {context.job_queue.jobs()}")
                 # Main thread
-                bot_msg = f"Load successfull, wait for updates"
+                # bot_msg = f"Load successfull, wait for updates" # TODO delete
                 user = update.message.from_user
                 username = user.username
                 # Check if user in project team, update id if not present
@@ -606,15 +607,15 @@ def get_keybord_and_msg(level: int, info: str = None):
             # which should return text to append to message
              # Message contants depend on a branch of menu, return None if nonsense given
             match info:
-                case 'morning_update_job':                    
+                case 'morning_update':                    
                     msg = (f"Daily morning reminder has to be set here. Current state: : \n"
                             f"<under construction>"
                             )
-                case 'day_before_update_job':
+                case 'day_before_update':
                     msg = (f"The day before reminder has to be set here. Current state: : \n"
                             f"<under construction>"
                             )
-                case 'file_update_job':
+                case 'file_update':
                     msg = (f"Reminder for file updates on friday has to be set here. Current state: : \n"
                             f"<under construction>"
                             )
@@ -646,7 +647,7 @@ async def day_before_update_item(update: Update, context: ContextTypes.DEFAULT_T
     await query.answer()
     context.user_data['level'] = THIRD_LVL
     # Remember name of JOB this menu item coresponds to.
-    context.user_data['last_position'] = 'day_before_update_job'
+    context.user_data['last_position'] = 'day_before_update'
 #     keyboard = [        
 #         [InlineKeyboardButton("Turn on/off", callback_data=str(ONE))],
 #         [InlineKeyboardButton("Set time", callback_data=str(TWO))],
@@ -654,6 +655,7 @@ async def day_before_update_item(update: Update, context: ContextTypes.DEFAULT_T
 #         [InlineKeyboardButton("Back", callback_data=str(FOUR))],        
 #         [InlineKeyboardButton("Finish settings", callback_data=str(FIVE))],        
 # ]
+    print(f"What's in context? {context.user_data}")
     keyboard, bot_msg = get_keybord_and_msg(THIRD_LVL, context.user_data['last_position'])
     if keyboard == None or bot_msg == None:
         bot_msg = "Some error happened. Unable to show a menu."
@@ -670,7 +672,7 @@ async def morning_update_item(update: Update, context: ContextTypes.DEFAULT_TYPE
     await query.answer()
     context.user_data['level'] = THIRD_LVL
     # Remember name of JOB this menu item coresponds to.
-    context.user_data['last_position'] = 'morning_update_job'
+    context.user_data['last_position'] = 'morning_update'
 
 #     keyboard = [        
 #         [InlineKeyboardButton("Turn on/off", callback_data=str(ONE))],
@@ -697,7 +699,7 @@ async def file_update_item(update: Update, context: ContextTypes.DEFAULT_TYPE) -
     await query.answer()
     context.user_data['level'] = THIRD_LVL
     # Remember what job we are modifying right now
-    context.user_data['last_position'] = 'file_update_job'
+    context.user_data['last_position'] = 'file_update'
 
 #     keyboard = [        
 #         [InlineKeyboardButton("Turn on/off", callback_data=str(ONE))],
@@ -719,11 +721,15 @@ async def file_update_item(update: Update, context: ContextTypes.DEFAULT_TYPE) -
 
 
 async def reminder_switcher(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    '''
+    Handles menu item for turning on/off choosen reminder
+    '''
     query = update.callback_query
     print(f"Reminder switcher function, query.data = {query.data}")
     await query.answer()
     # Recall reminder we are working with
     reminder = context.user_data['last_position']
+    print(f"Reminder in reminder switcher: {reminder}")
     # Find a job with given name for current user
     for job in context.job_queue.get_jobs_by_name(reminder):
         # Assume that user can have only one job with given name
@@ -743,22 +749,32 @@ async def reminder_switcher(update: Update, context: ContextTypes.DEFAULT_TYPE) 
 
 
 async def reminder_time_pressed(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    # TODO: Should refactor these functions to one universal function
     query = update.callback_query
     print(f"Change time pressed, query.data = {query.data}")
     await query.answer()
     # Recall reminder we are working with
     reminder = context.user_data['last_position']
+    reminder_time = ''
+    print(f"What context in set time? {context.user_data} and in reminder var: {reminder}")
+    print(f"What in jobqueue? {context.job_queue.jobs()}")
     # Find a job with given name for current user
     for job in context.job_queue.get_jobs_by_name(reminder):
-        # Assume that user can have only one job with given name
-        if job.user_id == update.message.from_user.id:
+        print(f"Looking for job: {job}") # <- doesn't get here
+        # There should be only one job with given name for a project and for PM
+        if job.user_id == update.effective_user.id and job.data == PROJECTTITLE:
             reminder_time = job.next_t
-            
-    bot_msg = (f"Next reminder scheduled for: \n"
-                f"{reminder_time}"
-                f"Enter new time in format: 12:30"
-                )
-    await query.edit_message_text(bot_msg)
+            # If somehow there are more such jobs, then work with 1st one found
+            break
+    
+    if reminder_time:          
+        bot_msg = (f"Next reminder scheduled for: \n"
+                    f"{reminder_time}"
+                    f"Enter new time in format: 12:30"
+                    )
+        await query.edit_message_text(bot_msg)
+    else:
+        bot_msg = (f"Seems that {reminder} doesn't set")
 
     return FOURTH_LVL
 
@@ -769,17 +785,22 @@ async def reminder_days_pressed(update: Update, context: ContextTypes.DEFAULT_TY
     await query.answer()
     # Recall reminder we are working with
     reminder = context.user_data['last_position']
+    reminder_time = ''
     # Find a job with given name for current user
     for job in context.job_queue.get_jobs_by_name(reminder):
-        # Assume that user can have only one job with given name
-        if job.user_id == update.message.from_user.id:
+        # There should be only one job with given name for a project and for PM
+        if job.user_id == update.message.from_user.id and job.data == PROJECTTITLE:
             reminder_time = job.next_t
-            
-    bot_msg = (f"Next reminder scheduled for: \n"
-                f"{reminder_time}"
-                f"Write days of week when reminder should work in this format:"
-                f"monday, wednesday, friday"
-    )
+            # If somehow there are more such jobs, then work with 1st one found
+            break
+    if reminder_time:
+        bot_msg = (f"Next reminder scheduled for: \n"
+                    f"{reminder_time}"
+                    f"Write days of week when reminder should work in this format:"
+                    f"monday, wednesday, friday"
+        )
+    else:
+        bot_msg = (f"Seems that {reminder} doesn't set")
 
     await query.edit_message_text(bot_msg)
 
@@ -787,24 +808,124 @@ async def reminder_days_pressed(update: Update, context: ContextTypes.DEFAULT_TY
 
 
 async def reminder_time_setter(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
-    query = update.callback_query
-    print(f"User answer got, query.data = {query.data}")
-    await query.answer()
+    # query = update.callback_query  # query in None here
+    reminder = context.user_data['last_position']
+    # print(f"User answer got, query.data = {query.data}")
+    # await query.answer() # Because query in None here, i think this line needless
+    bot_msg = (f"Unable to reschedule the reminder")
+    # Try to convert user provided input (time) to hours and minutes
+    try:
+        hour, minute = map(int, update.message.text.split(":"))                    
+        # time2check = time(hour, minute, tzinfo=datetime.now().astimezone().tzinfo)
+    except ValueError as e:
+        # Prepare message if not succeded
+        bot_msg = "Did not recognize time. Please use 24h format: 15:05"
+    else:
+        for job in context.job_queue.get_jobs_by_name(reminder):
+            # There should be only one job with given name for a project and for PM
+            if job.user_id == update.message.from_user.id and job.data == PROJECTTITLE:
+                # Get timezone attribute from current job
+                tz = job.trigger.timezone
+                # Get list of days of week by index of this attribute in list of fields
+                day_of_week = job.trigger.fields[job.trigger.FIELD_NAMES.index('day_of_week')]
+                # Reschedule the job
+                try:
+                    job.job.reschedule(trigger='cron', hour=hour, minute=minute, day_of_week=day_of_week, timezone=tz)
+                except Exception as e:
+                    bot_msg = (f"Unable to reschedule the reminder")
+                    logger.info(f'{tm.asctime()}\t {type(e)} \t {e.with_traceback}')
+                bot_msg = (f"Time updated. Next time: "
+                            f"{job.next_t}, is it on? {job.enabled}"
+                            )                  
+                break
 
-    # TODO: Parse user input and inform of results 
+    # Inform the user how reschedule went
+    await update.message.reply_text(bot_msg)
 
-    # TODO from here we should get to 3d level of menu
+    # Provide keyboard of level 3 menu 
+    keyboard, bot_msg = get_keybord_and_msg(THIRD_LVL, reminder)
+    if keyboard == None or bot_msg == None:
+        bot_msg = "Some error happened. Unable to show a menu."
+        await update.message.reply_text(bot_msg)
+    else:
+        reply_markup = InlineKeyboardMarkup(keyboard)
+        # Query is None so this will not work:
+        # await query.edit_message_text(bot_msg, reply_markup=reply_markup)
+        await update.message.reply_text(bot_msg, reply_markup=reply_markup)
+    # Tell conversation handler to process query from this keyboard as STATE3
+
     return THIRD_LVL    
 
 
 async def reminder_days_setter(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     query = update.callback_query
+    reminder = context.user_data['last_position']
     print(f"User answer got, query.data = {query.data}")
     await query.answer()
+    bot_msg = (f"Unable to reschedule the reminder")
+    new_days = []
+    # days_of_week = ['mon','tue','wed','thu','fri','sat','sun']
+    # Separate user input to list, clean from whitespaces, convert to lower case
+    if update.message.text:
+        user_input = update.message.text.split(',')
+        # TODO: better use variables for names of days for later translation
+        for day in user_input:
+            day = day.strip().lower()
+            if day == 'monday' or day == 'mon' or day == 'понедельник' or day == 'пн':
+                # Do not add dubles
+                if not 'mon' in new_days:
+                    new_days.append('mon')
+            if day == 'tuesday' or day == 'tue' or day == 'вторник' or day == 'вт':
+                if not 'tue' in new_days:               
+                    new_days.append('tue')
+            if day == 'wednesday' or day == 'wed' or day == 'среда' or day == 'ср':
+                if not 'wed' in new_days:
+                    new_days.append('wed')  
+            if day == 'thursday' or day == 'thu' or day == 'четверг' or day == 'чт':
+                if not 'thu' in new_days:
+                    new_days.append('thu')
+            if day == 'friday' or day == 'fri' or day == 'пятница' or day == 'пт':
+                if not 'fri' in new_days:
+                    new_days.append('fri')
+            if day == 'saturday' or day == 'sat' or day == 'суббота' or day == 'сб':
+                if not 'sat' in new_days:
+                    new_days.append('sat')
+            if day == 'sunday' or day == 'sun' or day == 'воскресенье' or day == 'вс':
+                if not 'sun' in new_days:
+                    new_days.append('sun') 
 
-    # TODO: Parse user input and inform of results 
+        # Find a job to reschedule
+        for job in context.job_queue.get_jobs_by_name(reminder):
+            # There should be only one job with given name for a project and for PM
+            if job.user_id == update.message.from_user.id and job.data == PROJECTTITLE:
+                # Get current parameters of job
+                tz = job.trigger.timezone
+                hour = job.trigger.fields[job.trigger.FIELD_NAMES.index('hour')]
+                minute = job.trigger.fields[job.trigger.FIELD_NAMES.index('minute')]                                  
+                # Reschedule the job
+                try:
+                    job.job.reschedule(trigger='cron', hour=hour, minute=minute, day_of_week=','.join(new_days), timezone=tz)
+                except Exception as e:
+                    bot_msg = (f"Unable to reschedule the reminder")
+                    logger.info(f'{tm.asctime()}\t {type(e)} \t {e.with_traceback}')
+                bot_msg = (f"Time updated. Next time: "
+                            f"{job.next_t}, is it on? {job.enabled}"
+                            )   
+    else:
+        bot_msg = (f"Sorry, can't here you: got empty message")
 
-    # TODO from here we should get to 3d level of menu
+    # Inform the user how reschedule went
+    await update.message.reply_text(bot_msg)
+
+    # Provide keyboard of level 3 menu 
+    keyboard, bot_msg = get_keybord_and_msg(THIRD_LVL, reminder)
+    if keyboard == None or bot_msg == None:
+        bot_msg = "Some error happened. Unable to show a menu."
+        await update.message.reply_text(bot_msg)
+    else:
+        reply_markup = InlineKeyboardMarkup(keyboard)
+        await query.edit_message_text(bot_msg, reply_markup=reply_markup)
+    # Tell conversation handler to process query from this keyboard as STATE3
     return THIRD_LVL  
 
 # async def buttons(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -931,10 +1052,11 @@ async def upload(update: Update, context: CallbackContext) -> None:
                     except ValueError as e:
                         print(f"Error while parsing time: {e}")
                     else:
-                        # Set job schedule and enable it
-                        context.job_queue.run_daily(morning_update_job, time=time2check, data=PROJECTTITLE).enabled = True 
-                        for job in context.job_queue.get_jobs_by_name('morning_update_job'):
-                            print(f"Next time: {job.next_t}, is it on? {job.enabled}")      
+                        # Set job schedule 
+                        morning_update_job = context.job_queue.run_daily(morning_update, user_id=update.effective_user.id, time=time2check, data=PROJECTTITLE)
+                        # and enable it. TODO store job id for further use
+                        morning_update_job.enabled = True 
+                        print(f"Next time: {morning_update_job.next_t}, is it on? {morning_update_job.enabled}")      
                             
                     # 2nd - daily on the eve of task reminder
                     try:
@@ -944,16 +1066,28 @@ async def upload(update: Update, context: CallbackContext) -> None:
                         print(f"Error while parsing time: {e}")
                     else:
                         # Add job to queue and enable it
-                        context.job_queue.run_daily(day_before_update_job, time=time2check, data=PROJECTTITLE).enabled = True 
-                        for job in context.job_queue.get_jobs_by_name('day_before_update_job'):
-                            print(f"Next time: {job.next_t}, is it on? {job.enabled}")     
+                        day_before_update_job = context.job_queue.run_daily(day_before_update, user_id=update.effective_user.id, time=time2check, data=PROJECTTITLE)
+                        day_before_update_job.enabled = True
+                        print(f"Next time: {day_before_update_job.next_t}, is it on? {day_before_update_job.enabled}")   
+
+                    # Register friday reminder
+                    try:
+                        hour, minute = map(int, FRIDAY.split(":"))                    
+                        time2check = time(hour, minute, tzinfo=datetime.now().astimezone().tzinfo)
+                    except ValueError as e:
+                        print(f"Error while parsing time: {e}")
+                    else:
+                        # Add job to queue and enable it
+                        file_update_job = context.job_queue.run_daily(file_update, user_id=update.effective_user.id, time=time2check, days=(5,), data=PROJECTTITLE)
+                        file_update_job.enabled = True
+                        print(f"Next time: {file_update_job.next_t}, is it on? {file_update_job.enabled}") 
             
     else:
         bot_msg = 'Only Project Manager is allowed to upload new schedule'
 
     await update.message.reply_text(bot_msg)
 
-async def file_update_job(context: ContextTypes.DEFAULT_TYPE) -> None:
+async def file_update(context: ContextTypes.DEFAULT_TYPE) -> None:
     '''
     This function to remind team members that common files should be updated in the end of the week
     '''
@@ -977,7 +1111,7 @@ async def file_update_job(context: ContextTypes.DEFAULT_TYPE) -> None:
     # TODO delete
     print("friday update")
 
-async def day_before_update_job(context: ContextTypes.DEFAULT_TYPE) -> None:
+async def day_before_update(context: ContextTypes.DEFAULT_TYPE) -> None:
     '''
     This reminder must be send to all team members on the day before of the important dates:
     start of task, deadline
@@ -1031,7 +1165,7 @@ async def day_before_update_job(context: ContextTypes.DEFAULT_TYPE) -> None:
                                                 parse_mode=ParseMode.HTML)
 
 
-async def morning_update_job(context: ContextTypes.DEFAULT_TYPE) -> None:
+async def morning_update(context: ContextTypes.DEFAULT_TYPE) -> None:
     '''
     This routine will be executed on daily basis to control project(s) schedule
     '''
@@ -1169,7 +1303,7 @@ def main() -> None:
     application.add_handler(CommandHandler(help_cmd.command, help)) # make it show description
 
     # Command to trigger project status check.
-    # application.add_handler(CommandHandler(status_cmd.command, status))
+    application.add_handler(CommandHandler(status_cmd.command, status))
     # Initialize start of the project: project name, db initialization and so on, previous project should be archived
     application.add_handler(CommandHandler(freshstart_cmd.command, freshstart))  
     # Bot should have the ability for user to inform developer of something: bugs, features and so on
@@ -1187,22 +1321,10 @@ def main() -> None:
     # application.add_handler(CallbackQueryHandler(buttons))    
 
     # Echo any message that is text and not a command
-    application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, echo))
+    # application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, echo))
 
     # Register handler for recieving new project file
     application.add_handler(MessageHandler(filters.Document.ALL, upload))
-
-    # Register friday reminder
-    try:
-        hour, minute = map(int, FRIDAY.split(":"))                    
-        time2check = time(hour, minute, tzinfo=datetime.now().astimezone().tzinfo)
-    except ValueError as e:
-        print(f"Error while parsing time: {e}")
-    else:
-        # Add job to queue and enable it
-        application.job_queue.run_daily(file_update_job, time=time2check, days=(5,), data=PROJECTTITLE).enabled = True 
-        for job in application.job_queue.get_jobs_by_name('file_update_job'):
-            print(f"Next time: {job.next_t}, is it on? {job.enabled}")            
 
     # PM should have the abibility to change bot behaviour, such as reminder interval and so on
     # application.add_handler(CommandHandler(settings_cmd.command, settings))
