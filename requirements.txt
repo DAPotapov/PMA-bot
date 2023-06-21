@@ -1,4 +1,5 @@
 datetime
 numpy
+python-dotenv
 python-telegram-bot[job-queue]
 untangle
