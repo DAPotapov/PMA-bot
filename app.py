@@ -739,28 +739,12 @@ async def reminder_time_pressed(update: Update, context: ContextTypes.DEFAULT_TY
     await query.answer()
     # Recall reminder we are working with
     reminder = context.user_data['last_position']
-    reminder_time = ''
-    # Find a job with given name for current user
-    for job in context.job_queue.get_jobs_by_name(reminder):
-        # There should be only one job with given name for a project and for PM
-        if job.user_id == update.effective_user.id and job.data == PROJECTTITLE:
-            reminder_time = job.next_t
-            # If somehow there are more such jobs, then work with 1st one found
-            break
-    # TODO: насколько корректна данная проверка? если задача просто отключена? проверить НЕКОРРЕКТНА!!! 
-    # If reminder present continue conversation, otherwise return previous menu
-    if reminder_time:          
-        bot_msg = (f"Next reminder scheduled for: \n"
-                    f"{reminder_time} \n"
-                    f"Enter new time in format: 12:30"
-                    )
-        await query.edit_message_text(bot_msg)
-        # Tell conversationHandler to treat answer in a State4 function
-        return FOURTH_LVL
-    else:
-        text = (f"Seems that {reminder} doesn't set")
+    preset = get_job_preset(reminder, update.effective_user.id, PROJECTTITLE, context)
+
+    # Check if job found and inform user accordingly
+    if not preset:
+        text = (f"Seems that reminder doesn't set")
         keyboard, bot_msg = get_keybord_and_msg(THIRD_LVL, reminder)
-        preset = get_job_preset(context.user_data['last_position'], update.effective_user.id, PROJECTTITLE, context)
         if keyboard == None or bot_msg == None:
             bot_msg = f"{text}\nSome error happened. Unable to show a menu."
             await query.edit_message_text(bot_msg)
@@ -769,8 +753,15 @@ async def reminder_time_pressed(update: Update, context: ContextTypes.DEFAULT_TY
             reply_markup = InlineKeyboardMarkup(keyboard)  
             bot_msg = f"{text}\n{bot_msg}"  
             await query.edit_message_text(bot_msg, reply_markup=reply_markup)
-        # 
-        return THIRD_LVL # проверить
+        return THIRD_LVL
+    else:
+        bot_msg = (f"Current preset for reminder:\n"
+                    f"{preset} \n"
+                    f"Enter new time in format: 12:30"
+                    )
+        await query.edit_message_text(bot_msg)
+        # Tell conversationHandler to treat answer in a State4 function
+        return FOURTH_LVL
 
 
 async def reminder_days_pressed(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
@@ -779,30 +770,31 @@ async def reminder_days_pressed(update: Update, context: ContextTypes.DEFAULT_TY
     await query.answer()
     # Recall reminder we are working with
     reminder = context.user_data['last_position']
-    reminder_time = ''
-    # Find a job with given name for current user
-    for job in context.job_queue.get_jobs_by_name(reminder):
-        # There should be only one job with given name for a project and for PM
-        if job.user_id == update.effective_user.id and job.data == PROJECTTITLE:
-            reminder_time = job.next_t
-            # If somehow there are more such jobs, then work with 1st one found
-            break
-
-    if reminder_time:
-        bot_msg = (f"Next reminder scheduled for: \n"
-                    f"{reminder_time} \n"
+    preset = get_job_preset(reminder, update.effective_user.id, PROJECTTITLE, context)
+    # Check if job found and inform user accordingly
+    if not preset:
+        text = (f"Seems that reminder doesn't set")
+        keyboard, bot_msg = get_keybord_and_msg(THIRD_LVL, reminder)
+        if keyboard == None or bot_msg == None:
+            bot_msg = f"{text}\nSome error happened. Unable to show a menu."
+            await query.edit_message_text(bot_msg)
+            return ConversationHandler.END
+        else:
+            reply_markup = InlineKeyboardMarkup(keyboard)  
+            bot_msg = f"{text}\n{bot_msg}"  
+            await query.edit_message_text(bot_msg, reply_markup=reply_markup)
+        return THIRD_LVL
+    else:
+        bot_msg = (f"Current preset for reminder:\n"
+                    f"{preset} \n"
                     f"Write days of week when reminder should work in this format: \n"
                     f"monday, wednesday, friday \n"
                     f"or\n"
                     f"mon,wed,fri"
                     )
-    else:
-        bot_msg = (f"Seems that {reminder} doesn't set")
-    await query.edit_message_text(bot_msg)
-
-    # It is non actually a 5th level but a way to destinguish 
-    # functions of setting time and setting days of week
-    return FIFTH_LVL
+        await query.edit_message_text(bot_msg)
+        # Tell conversationHandler to treat answer in a State4 function
+        return FIFTH_LVL
 
 
 async def reminder_time_setter(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
