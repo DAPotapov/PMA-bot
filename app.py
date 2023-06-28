@@ -4,15 +4,23 @@ import logging
 import os
 import time as tm
 import json
-import connectors
 import tempfile
 import asyncio
 import re
+import connectors
 
 from dotenv import load_dotenv
 from datetime import datetime, date, time
 # from io import BufferedIOBase
-from telegram import Bot, BotCommand, Update, ForceReply, InlineKeyboardMarkup, InlineKeyboardButton, ReplyKeyboardMarkup, ReplyKeyboardRemove
+from telegram import (
+                        Bot, 
+                        BotCommand, 
+                        Update, 
+                        ForceReply, 
+                        InlineKeyboardMarkup, 
+                        InlineKeyboardButton, 
+                        ReplyKeyboardMarkup, 
+                        ReplyKeyboardRemove)
 from telegram.constants import ParseMode
 from telegram.ext import (
                             Application, 
@@ -27,6 +35,11 @@ from telegram.ext import (
                             filters)
 # For testing purposes
 from pprint import pprint
+from helpers import (
+    add_user_id, 
+    get_assignees, 
+    get_job_preset, 
+    save_json)
 
 
 # Configure logging
@@ -66,6 +79,65 @@ stop_cmd = BotCommand("stop", "прекращение работы бота")
 FIRST_LVL, SECOND_LVL, THIRD_LVL, FOURTH_LVL, FIFTH_LVL = range(5)
 # Callback data for settings menu
 ONE, TWO, THREE, FOUR, FIVE = range(5)
+
+
+def get_keybord_and_msg(level: int, info: str = None, user_id: int = None):
+    '''
+    Helper function to provide specific keyboard on different levels of settings menu
+    '''
+
+    keyboard = None
+    msg = None
+    match level:
+        case 0:
+            # First level menu keyboard
+            msg = (f"Current settings for project: ")
+            keyboard = [        
+                [InlineKeyboardButton(f"Allow status update in group chat: {'On' if ALLOW_POST_STATUS_TO_GROUP == True else 'Off'}", callback_data=str(ONE))],
+                [InlineKeyboardButton(f"Users get anounces about milestones {'On' if INFORM_ACTIONERS_OF_MILESTONES == True else 'Off'}", callback_data=str(TWO))],
+                [InlineKeyboardButton("Reminders settings", callback_data=str(THREE))],
+                [InlineKeyboardButton("Finish settings", callback_data=str(FOUR))],        
+            ]
+        case 1:
+            # TODO: Here I could construct keyboard out of jobs registered for current user
+            msg = (f"You can customize reminders here.")
+            # Second level menu keyboard
+            keyboard = [        
+                [InlineKeyboardButton("Reminder on day before", callback_data=str(ONE))],
+                [InlineKeyboardButton("Everyday morning reminder", callback_data=str(TWO))],
+                [InlineKeyboardButton("Friday reminder of project files update", callback_data=str(THREE))],
+                [InlineKeyboardButton("Back", callback_data=str(FOUR))],        
+                [InlineKeyboardButton("Finish settings", callback_data=str(FIVE))],        
+            ]
+        case 2:
+            # TODO: make helper function on a stage when I store job ids (in mongoDB)
+            # def get_job_info(info)
+            # which should return text to append to message
+             # Message contents depend on a branch of menu, return None if nonsense given
+            match info:
+                case 'morning_update':                    
+                    msg = (f"Daily morning reminder has to be set here.\n"
+                            )
+                case 'day_before_update':
+                    msg = (f"The day before reminder has to be set here. \n"
+                            )
+                case 'file_update':
+                    msg = (f"Reminder for file updates on friday has to be set here. \n"
+                            )
+                case _:
+                    msg = None
+            # Third level menu keyboard
+            keyboard = [        
+                [InlineKeyboardButton("Turn on/off", callback_data=str(ONE))],
+                [InlineKeyboardButton("Set time", callback_data=str(TWO))],
+                [InlineKeyboardButton("Set days of week", callback_data=str(THREE))],
+                [InlineKeyboardButton("Back", callback_data=str(FOUR))],        
+                [InlineKeyboardButton("Finish settings", callback_data=str(FIVE))],        
+            ]
+        case _:
+            keyboard = None
+
+    return keyboard, msg
 
 
 async def echo(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -108,6 +180,41 @@ async def feedback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     await update.message.reply_text(bot_msg)
 
 
+async def file_update(context: ContextTypes.DEFAULT_TYPE) -> None:
+    '''
+    This function is a reminder for team members that common files should be updated in the end of the week
+    '''
+
+    if os.path.exists(PROJECTJSON):
+        with open(PROJECTJSON, 'r') as fp:
+            try:
+                project = connectors.load_json(fp)
+            except Exception as e:
+                logger.error(f'{tm.asctime()}\t {type(e)} \t {e.with_traceback}')                  
+            else:
+
+                # Loop through actioners to inform them about actual tasks
+                bot_msg = "Напоминаю, что сегодня надо освежить файлы по проекту! Чтобы другие участники команды имели актуальную информацию. Спасибо!"
+                for actioner in project['actioners']:
+
+                    # Bot can inform only ones with known id
+                    # print(actioner)
+                    if actioner['tg_id']:
+                        await context.bot.send_message(
+                            actioner['tg_id'],
+                            text=bot_msg,
+                            parse_mode=ParseMode.HTML)
+
+
+async def freshstart(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """
+    TODO: This function handles /freshstart command
+    """
+    freshstart_markup = InlineKeyboardMarkup(freshstart_kbd)
+    bot_msg = "Are you really want to start a new project?"
+    await update.message.reply_text(bot_msg, reply_markup=freshstart_markup)
+
+
 async def help(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """
     This function handles /help command
@@ -125,41 +232,7 @@ async def help(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
             bot_msg = f"/{command.command} - {command.description}\n" + bot_msg
 
     await update.message.reply_text(bot_msg)
-
-    
-def get_assignees(task, actioners):
-    '''
-    Helper function for getting names and telegram usernames
-    of person assigned to given task to insert in a bot message
-    Returns string of the form: '@johntherevelator (John) and @judasofkerioth (Judas)'
-    Also returns list of their telegram ids
-    '''
-    people = ""
-    user_ids = []
-    for doer in task['actioners']:
-        for member in actioners:
-            # print(f"Doer: {type(doer['actioner_id'])} \t {type(member['id'])}")
-            if doer['actioner_id'] == member['id']:                                                    
-                if member['tg_id']:
-                    user_ids.append(member['tg_id'])              
-                if len(people) > 0:
-                    people = people + "and @" + member['tg_username'] + " (" + member['name'] + ")"
-                else:
-                    people = f"{people}@{member['tg_username']} ({member['name']})"
-    return people, user_ids
-
-
-def add_user_id(user, project):
-    ''' 
-    Helper function to add telegram id of username provided to project json
-    '''
-    # Remember telegram user id
-    for actioner in project['actioners']:
-        if actioner['tg_username'] == user.username:
-            # This will overwrite existing id if present, but it should not be an issue
-            actioner['tg_id'] = user.id
-    return project
-
+ 
 
 async def status(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """
@@ -190,7 +263,7 @@ async def status(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
                 project = add_user_id(user, project)
 
                 # Update project file
-                bot_msg = save_json(project)
+                bot_msg = save_json(project, PROJECTJSON)
 
                 # Check Who calls? If PM then proceed all tasks
                 if username == PM:
@@ -345,7 +418,7 @@ async def status(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
                         if ALLOW_POST_STATUS_TO_GROUP == True:
                             await update.message.reply_text(bot_msg)
                         else:
-                            
+
                             # Or in private chat
                             await user.send_message(bot_msg)
                         
@@ -360,14 +433,6 @@ async def status(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         # TODO consider send directly to user asked
         await update.message.reply_text(bot_msg)  
 
-
-async def freshstart(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    """
-    TODO: This function handles /freshstart command
-    """
-    freshstart_markup = InlineKeyboardMarkup(freshstart_kbd)
-    bot_msg = "Are you really want to start a new project?"
-    await update.message.reply_text(bot_msg, reply_markup=freshstart_markup)
 
 
 async def settings(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
@@ -516,64 +581,6 @@ async def settings_back(update: Update, context: ContextTypes.DEFAULT_TYPE) -> i
         await query.edit_message_text(bot_msg, reply_markup=reply_markup)
         # print(f"Hit 'back' and now level is: {context.user_data['level']}")
         return context.user_data['level']
-
-
-def get_keybord_and_msg(level: int, info: str = None, user_id: int = None):
-    '''
-    Helper function to provide specific keyboard on different levels of settings menu
-    '''
-    keyboard = None
-    msg = None
-    match level:
-        case 0:
-            # First level menu keyboard
-            msg = (f"Current settings for project: ")
-            keyboard = [        
-                [InlineKeyboardButton(f"Allow status update in group chat: {'On' if ALLOW_POST_STATUS_TO_GROUP == True else 'Off'}", callback_data=str(ONE))],
-                [InlineKeyboardButton(f"Users get anounces about milestones {'On' if INFORM_ACTIONERS_OF_MILESTONES == True else 'Off'}", callback_data=str(TWO))],
-                [InlineKeyboardButton("Reminders settings", callback_data=str(THREE))],
-                [InlineKeyboardButton("Finish settings", callback_data=str(FOUR))],        
-            ]
-        case 1:
-            # TODO: Here I could construct keyboard out of jobs registered for current user
-            msg = (f"You can customize reminders here.")
-            # Second level menu keyboard
-            keyboard = [        
-                [InlineKeyboardButton("Reminder on day before", callback_data=str(ONE))],
-                [InlineKeyboardButton("Everyday morning reminder", callback_data=str(TWO))],
-                [InlineKeyboardButton("Friday reminder of project files update", callback_data=str(THREE))],
-                [InlineKeyboardButton("Back", callback_data=str(FOUR))],        
-                [InlineKeyboardButton("Finish settings", callback_data=str(FIVE))],        
-            ]
-        case 2:
-            # TODO: make helper function on a stage when I store job ids (in mongoDB)
-            # def get_job_info(info)
-            # which should return text to append to message
-             # Message contents depend on a branch of menu, return None if nonsense given
-            match info:
-                case 'morning_update':                    
-                    msg = (f"Daily morning reminder has to be set here.\n"
-                            )
-                case 'day_before_update':
-                    msg = (f"The day before reminder has to be set here. \n"
-                            )
-                case 'file_update':
-                    msg = (f"Reminder for file updates on friday has to be set here. \n"
-                            )
-                case _:
-                    msg = None
-            # Third level menu keyboard
-            keyboard = [        
-                [InlineKeyboardButton("Turn on/off", callback_data=str(ONE))],
-                [InlineKeyboardButton("Set time", callback_data=str(TWO))],
-                [InlineKeyboardButton("Set days of week", callback_data=str(THREE))],
-                [InlineKeyboardButton("Back", callback_data=str(FOUR))],        
-                [InlineKeyboardButton("Finish settings", callback_data=str(FIVE))],        
-            ]
-        case _:
-            keyboard = None
-
-    return keyboard, msg
 
 
 async def day_before_update_item(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
@@ -825,7 +832,7 @@ async def reminder_time_setter(update: Update, context: ContextTypes.DEFAULT_TYP
                     bot_msg = (f"Unable to reschedule the reminder")
                     logger.info(f'{tm.asctime()}\t {type(e)} \t {e.with_traceback}')
                 bot_msg = (f"Time updated. Next time: "
-                            f"{job.next_t}, is it on? {job.enabled}"
+                            f"{job.next_t}"
                             )                  
                 break
 
@@ -905,9 +912,9 @@ async def reminder_days_setter(update: Update, context: ContextTypes.DEFAULT_TYP
                         job.job.reschedule(trigger='cron', hour=hour, minute=minute, day_of_week=','.join(new_days), timezone=tz)
                     except Exception as e:
                         bot_msg = (f"Unable to reschedule the reminder")
-                        logger.info(f'{tm.asctime()}\t {type(e)} \t {e.with_traceback}')
+                        logger.error(f'{tm.asctime()}\t {type(e)} \t {e.with_traceback}')
                     bot_msg = (f"Time updated. Next time: \n"
-                                f"{job.next_t}, is it on? {job.enabled}"
+                                f"{job.next_t}"
                                 )
         else:
             bot_msg = (f"No correct names for days of week found in you message.\n")                       
@@ -1021,7 +1028,7 @@ async def upload(update: Update, context: CallbackContext) -> None:
                     project = add_user_id(update.message.from_user, project)
 
                     # Call function to save project in JSON format
-                    bot_msg = save_json(project)
+                    bot_msg = save_json(project, PROJECTJSON)
 
                     # TODO Reminders should be set after successful upload during start/freshstart routine - Separate function!
                     # Create daily reminders: 1st - daily morining reminder
@@ -1079,61 +1086,6 @@ async def upload(update: Update, context: CallbackContext) -> None:
         bot_msg = 'Only Project Manager is allowed to upload new schedule'
     await update.message.reply_text(bot_msg)
 
-
-def get_job_preset(reminder: str, user_id: int, projectname: str, context: ContextTypes.DEFAULT_TYPE):
-    '''
-    Helper function that returns current reminder preset for given user and project
-    Return None if nothing is found or error occured
-    '''
-    
-    preset = None
-
-    # Look up a job associated with current PM and Project
-    for job in context.job_queue.get_jobs_by_name(reminder):
-        if job.user_id == user_id and job.data == projectname:
-            try:
-                hour = job.trigger.fields[job.trigger.FIELD_NAMES.index('hour')]
-                minute = f"{job.trigger.fields[job.trigger.FIELD_NAMES.index('minute')]}"
-            except:
-                preset = None
-                break
-            else:
-                if int(minute) < 10:
-                    time_preset = f"{hour}:0{minute}"
-                else:
-                    time_preset = f"{hour}:{minute}"
-                state = 'ON' if job.enabled else 'OFF'
-                days_preset = job.trigger.fields[job.trigger.FIELD_NAMES.index('day_of_week')]
-                preset = f"{state} {time_preset}, {days_preset}"
-                # pprint(preset)
-                break
-    return preset
-
-
-async def file_update(context: ContextTypes.DEFAULT_TYPE) -> None:
-    '''
-    This function is a reminder for team members that common files should be updated in the end of the week
-    '''
-
-    if os.path.exists(PROJECTJSON):
-        with open(PROJECTJSON, 'r') as fp:
-            try:
-                project = connectors.load_json(fp)
-            except Exception as e:
-                logger.error(f'{tm.asctime()}\t {type(e)} \t {e.with_traceback}')                  
-            else:
-
-                # Loop through actioners to inform them about actual tasks
-                bot_msg = "Напоминаю, что сегодня надо освежить файлы по проекту! Чтобы другие участники команды имели актуальную информацию. Спасибо!"
-                for actioner in project['actioners']:
-
-                    # Bot can inform only ones with known id
-                    # print(actioner)
-                    if actioner['tg_id']:
-                        await context.bot.send_message(
-                            actioner['tg_id'],
-                            text=bot_msg,
-                            parse_mode=ParseMode.HTML)
 
 
 async def day_before_update(context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -1275,24 +1227,6 @@ async def morning_update(context: ContextTypes.DEFAULT_TYPE) -> None:
                                                 parse_mode=ParseMode.HTML)
 
 
-def save_json(project):
-    ''' 
-    Saves project in JSON format and returns message about success of operation
-    '''
-
-    bot_msg = ''
-    with open(PROJECTJSON, 'w', encoding='utf-8') as json_fh:
-        try:
-            json.dump(project, json_fh, ensure_ascii=False, indent=4)
-        except:
-            bot_msg = 'Error saving project to json file'    
-        else:
-            bot_msg = 'Successfully saved project to json file'
-
-    # TODO reconsider returning None if succeed because there is no need always inform user about every file update
-    return bot_msg
-
-
 async def start(update: Update, context: CallbackContext) -> None:
     '''
     Function to handle start of the bot
@@ -1315,7 +1249,7 @@ async def stop(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     '''
 
     # Remove daily reminder associated with PROJECTTITLE
-    # TODO revise
+    # TODO revise add check for PM
     current_jobs = context.job_queue.jobs    
     if not current_jobs:
         pass
@@ -1323,7 +1257,6 @@ async def stop(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         for job in current_jobs:
             if job.data == PROJECTTITLE:
                 job.schedule_removal()
-
 
  
 async def post_init(application: Application):
