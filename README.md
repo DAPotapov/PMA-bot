@@ -17,16 +17,18 @@ Bot can inform PM about current status of schedule. Also it send notification to
 Every day bot looks at schedule and sends notification to actioners about tasks that should start or have deadline tomorrow.
 Every day at the morning bot looks at schedule and sends notification to actioners about current status of schedule.
 Every friday bot reminds team members about necessity of updating shared project files (Customer requirement)
+PM can change settings of notifications: time to send reminders to actioners, turn them off and on, change days of week on which reminders should be sent.
 
 ## TODO
 
 [ ] make status command working for team members too  
-[ ] make reminders' time customizable in /settings
-[ ] make reminders can be turned off and on
+[ ] make /cancel command to work in conversation handler if user don't want to enter time or days of week
 [ ] fully implement connector to json format  
 [ ] ask if PM wants to rewrite project file if new uploaded
 [ ] make bot persistent https://github.com/python-telegram-bot/python-telegram-bot/wiki/Making-your-bot-persistent  
 [ ] Error handling: https://docs.python-telegram-bot.org/en/stable/telegram.ext.application.html#telegram.ext.Application.error_handlers
+[x] make reminders can be turned off and on
+[x] make reminders' time customizable in /settings
 [x] fixbug: last of children tasks rewrites its parent task (in load_gan)  
 [x] add example of json structure for project files and requirments for project files to README.  
 [x] make export to json format with readable formatting  
@@ -37,7 +39,6 @@ Every friday bot reminds team members about necessity of updating shared project
 ## Data structure
 
 First of all: the project file sent to bot should contain field 'tg_username' containing telegram username for members of a project team. Resources obviously should be present in file and assigned to tasks for bot to work :)
-
 
 ```json
 {

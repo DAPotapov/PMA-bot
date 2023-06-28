@@ -815,7 +815,7 @@ async def reminder_time_setter(update: Update, context: ContextTypes.DEFAULT_TYP
             # There should be only one job with given name for a project and for PM
             if job.user_id == update.message.from_user.id and job.data == PROJECTTITLE:
                 # Get timezone attribute from current job
-                tz = job.trigger.timezone
+                tz = job.job.trigger.timezone
                 # Get list of days of week by index of this attribute in list of fields
                 day_of_week = job.trigger.fields[job.trigger.FIELD_NAMES.index('day_of_week')]
                 # Reschedule the job
