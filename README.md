@@ -21,12 +21,12 @@ PM can change settings of notifications: time to send reminders to actioners, tu
 
 ## TODO
 
-[ ] make status command working for team members too  
 [ ] make /cancel command to work in conversation handler if user don't want to enter time or days of week
 [ ] fully implement connector to json format  
 [ ] ask if PM wants to rewrite project file if new uploaded
 [ ] make bot persistent https://github.com/python-telegram-bot/python-telegram-bot/wiki/Making-your-bot-persistent  
 [ ] Error handling: https://docs.python-telegram-bot.org/en/stable/telegram.ext.application.html#telegram.ext.Application.error_handlers
+[x] make status command working for team members too  
 [x] make reminders can be turned off and on
 [x] make reminders' time customizable in /settings
 [x] fixbug: last of children tasks rewrites its parent task (in load_gan)  

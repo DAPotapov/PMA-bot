@@ -1,4 +1,12 @@
 # Based on https://gitlab.com/Athamaxy/telegram-bot-tutorial/-/blob/main/TutorialBot.py
+# Structure:
+# Imports
+# Constants
+# Sincronuous functions
+# Async functions
+# Settings part (functions for settings functionality)
+# Post init
+# Main function
 
 import logging
 import os
@@ -140,6 +148,72 @@ def get_keybord_and_msg(level: int, info: str = None, user_id: int = None):
     return keyboard, msg
 
 
+async def day_before_update(context: ContextTypes.DEFAULT_TYPE) -> None:
+    '''
+    This reminder must be send to all team members on the day before of the important dates:
+    start of task, deadline
+    '''
+
+    if os.path.exists(PROJECTJSON):
+        with open(PROJECTJSON, 'r') as fp:
+            try:
+                project = connectors.load_json(fp)
+            except Exception as e:
+                bot_msg = f"ERROR ({e}): Unable to load"
+                logger.info(f'{tm.asctime()}\t {type(e)} \t {e.with_traceback}')                  
+            else:
+
+                # Loop through actioners to inform them about actual tasks
+                for actioner in project['actioners']:
+
+                    # Bot can inform only ones with known id
+                    # print(actioner)
+                    if actioner['tg_id']:
+                        for task in project['tasks']:
+
+                            # Process only tasks in which current actioner participate
+                            for doer in task['actioners']:
+                                # print(doer)
+                                if actioner['id'] == doer['actioner_id']:
+                                    bot_msg = ""
+
+                                    # Bot will inform user only of tasks with important dates
+                                    # Check if task not completed
+                                    if task['complete'] < 100:
+
+                                        # If delta_start <0 task not started, otherwise already started
+                                        delta_start = date.today() - date.fromisoformat(task['startdate'])
+
+                                        # If delta_end >0 task overdue, if <0 task in progress
+                                        delta_end = date.today() - date.fromisoformat(task['enddate'])
+
+                                        # Deal with common task
+                                        if task['include']:
+
+                                            # For now focus only on subtasks, that can be actually done
+                                            # I'll decide what to do with such tasks after gathering user experience
+                                            pass
+                                        else:
+
+                                            # Don't inform about milestones, because noone assigned for them
+                                            if task['milestone'] == True:    
+                                                    pass
+                                            else:
+
+                                                # If task starts tomorrow
+                                                if delta_start.days == -1:
+                                                    bot_msg = f"task {task['id']} '{task['name']}' starts tomorrow."
+                                                elif delta_end.days == -1:
+                                                    bot_msg = f"Tomorrow is deadline for task {task['id']} '{task['name']}'!" 
+
+                                        # Inform users if there are something to inform
+                                        if bot_msg:
+                                            await context.bot.send_message(
+                                                actioner['tg_id'],
+                                                text=bot_msg,
+                                                parse_mode=ParseMode.HTML)
+
+
 async def echo(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """
     This function would be added to the application as a handler for messages coming from the Bot API
@@ -233,6 +307,93 @@ async def help(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
 
     await update.message.reply_text(bot_msg)
  
+
+async def morning_update(context: ContextTypes.DEFAULT_TYPE) -> None:
+    '''
+    This routine will be executed on daily basis to control project(s) schedule
+    '''
+
+    # TODO use data to associate project name with job
+    # TODO how to make observation of project a standalone function to be called elsewhere?
+    # because every reminder function load project from file and looks through it
+
+    if os.path.exists(PROJECTJSON):
+        with open(PROJECTJSON, 'r') as fp:
+            try:
+                project = connectors.load_json(fp)
+            except Exception as e:
+                bot_msg = f"ERROR ({e}): Unable to load"
+                logger.error(f'{tm.asctime()}\t {type(e)} \t {e.with_traceback}')                  
+            else:
+
+                # Loop through actioners to inform them about actual tasks
+                for actioner in project['actioners']:
+
+                    # Bot can inform only ones with known id
+                    # print(actioner)
+                    if actioner['tg_id']:
+                        for task in project['tasks']:
+
+                            # Process only tasks in which current actioner participate
+                            for doer in task['actioners']:
+                                # print(doer)
+                                if actioner['id'] == doer['actioner_id']:
+                                    bot_msg = ""
+
+                                    # Bot will inform user only of tasks with important dates
+                                    # Check if task not completed
+                                    if task['complete'] < 100:
+
+                                        # If delta_start <0 task not started, otherwise already started
+                                        delta_start = date.today() - date.fromisoformat(task['startdate'])
+
+                                        # If delta_end >0 task overdue, if <0 task in progress
+                                        delta_end = date.today() - date.fromisoformat(task['enddate'])
+
+                                        # Deal with common task
+                                        if task['include']:
+
+                                            # For now focus only on subtasks, that can be actually done
+                                            # I'll decide what to do with such tasks after gathering user experience
+                                            pass
+                                        else:
+
+                                            # Don't inform about milestones, because noone assigned for them
+                                            if task['milestone'] == True:    
+                                                    pass
+                                            else:
+                                                if delta_start.days == 0:
+                                                    bot_msg = f"task {task['id']} '{task['name']}' started today."
+                                                elif delta_start.days > 0  and delta_end.days < 0:
+                                                    bot_msg = f"task {task['id']} '{task['name']}' is intermidiate. Due date is {task['enddate']}."
+                                                elif delta_end.days == 0:
+                                                    bot_msg = f"task {task['id']}  '{task['name']}' must be completed today!"
+                                                elif delta_start.days > 0 and delta_end.days > 0:                                       
+                                                    bot_msg = f"task {task['id']} '{task['name']}' is overdue! (had to be completed on {task['enddate']})"
+                                                else:
+                                                    print(f"Future tasks as {task['id']} '{task['name']}' goes here")                            
+
+                                        # Check if there is something to report to user
+                                        if bot_msg:
+                                            await context.bot.send_message(
+                                                actioner['tg_id'],
+                                                text=bot_msg,
+                                                parse_mode=ParseMode.HTML)
+
+
+async def start(update: Update, context: CallbackContext) -> None:
+    '''
+    Function to handle start of the bot
+    '''
+
+    # TODO PPP: 
+    # inform user what to do with this bot
+    # Call function to upload project file
+    # Call function to make jobs
+
+    bot_msg = f"Hello, {update.effective_user.first_name}!"
+    await update.message.reply_text(bot_msg)
+    
 
 async def status(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """
@@ -434,6 +595,136 @@ async def status(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         await update.message.reply_text(bot_msg)  
 
 
+async def stop(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    '''
+    Function to stop the bot.
+    Should make bot forget about the user, 
+    and stop all jobs associated with the user
+    '''
+
+    # Remove daily reminder associated with PROJECTTITLE
+    # TODO revise add check for PM
+    current_jobs = context.job_queue.jobs    
+    if not current_jobs:
+        pass
+    else:
+        for job in current_jobs:
+            if job.data == PROJECTTITLE:
+                job.schedule_removal()
+
+
+async def upload(update: Update, context: CallbackContext) -> None:
+    '''
+    Function to upload new project file
+    '''
+
+    # Message to return to user
+    bot_msg = ''
+
+    # Check if user is PM
+    uploader = update.message.from_user.username
+    if uploader == PM:
+
+        # Let's keep files got from user in temporary directory
+        with tempfile.TemporaryDirectory() as tdp:
+            gotfile = await context.bot.get_file(update.message.document)
+            fp = await gotfile.download_to_drive(os.path.join(tdp, update.message.document.file_name))
+
+            # If file is known format: call appropriate function with this file as argument and expect project dictionary on return
+            project = {}
+            try:
+                match fp.suffix:
+                    case '.gan':
+                        project = connectors.load_gan(fp)
+
+                    case '.json':
+                        project = connectors.load_json(fp)
+
+                    case '.xml':
+                        project = connectors.load_xml(fp)
+
+                # else inform user about supported file types
+                    case _:                
+                        bot_msg = 'Bot supports only these project file formats: .gan (GanttProject) and that is all for now.'
+            except AttributeError as e:
+                bot_msg = f'Seems like field for telegram id for team member is absent: {e}'
+                logger.error(f'{tm.asctime()}\t {type(e)} \t {e.with_traceback}')
+            except ValueError as e:
+                bot_msg = f'Error occurred while processing file: {e}'
+                logger.error(f'{tm.asctime()}\t {type(e)} \t {e.with_traceback}')
+            except FileNotFoundError as e:
+                bot_msg = f'Seems like the file {e} does not exist'
+                logger.error(f'{tm.asctime()}\t {type(e)} \t {e.with_traceback}')
+            except Exception as e:
+                bot_msg = f'Unknow error occurred while processing file: {e}'
+                logger.info(f'{tm.asctime()}\t {type(e)} \t {e.with_traceback}')
+            else:
+                if project:
+
+                    # Remember telegram user id
+                    project = add_user_id(update.message.from_user, project)
+
+                    # Call function to save project in JSON format
+                    bot_msg = save_json(project, PROJECTJSON)
+
+                    # TODO Reminders should be set after successful upload during start/freshstart routine - Separate function!
+                    # Create daily reminders: 1st - daily morining reminder
+                    # Prepare time provide timezone info of user location 
+                    # Check if jobs already present and add if not
+                    preset = get_job_preset('morning_update', update.effective_user.id, PROJECTTITLE, context)
+                    if not preset:
+                        try:
+                    # TODO this should be done in settings set by PM, along with check for correct values. And stored in project settings
+                            hour, minute = map(int, MORNING.split(":"))                    
+                            time2check = time(hour, minute, tzinfo=datetime.now().astimezone().tzinfo)
+                        except ValueError as e:
+                            logger.error(f'{tm.asctime()}\tError while parsing time: {type(e)} \t {e.with_traceback}')
+
+                        # Set job schedule 
+                        else:
+                            morning_update_job = context.job_queue.run_daily(morning_update, user_id=update.effective_user.id, time=time2check, data=PROJECTTITLE)
+                            
+                            # and enable it. TODO store job id for further use
+                            morning_update_job.enabled = True 
+                            # print(f"Next time: {morning_update_job.next_t}, is it on? {morning_update_job.enabled}")      
+                            
+                    # 2nd - daily on the eve of task reminder
+                    preset = get_job_preset('day_before_update', update.effective_user.id, PROJECTTITLE, context)
+                    if not preset:                    
+                        try:
+                            hour, minute = map(int, ONTHEEVE.split(":"))                    
+                            time2check = time(hour, minute, tzinfo=datetime.now().astimezone().tzinfo)
+                        except ValueError as e:
+                            logger.error(f'{tm.asctime()}\tError while parsing time: {type(e)} \t {e.with_traceback}')
+                        
+                        # Add job to queue and enable it
+                        else:                            
+                            day_before_update_job = context.job_queue.run_daily(day_before_update, user_id=update.effective_user.id, time=time2check, data=PROJECTTITLE)
+                            day_before_update_job.enabled = True
+                            # print(f"Next time: {day_before_update_job.next_t}, is it on? {day_before_update_job.enabled}")   
+
+                    # Register friday reminder
+                    preset = get_job_preset('file_update', update.effective_user.id, PROJECTTITLE, context)
+                    if not preset:   
+                        try:
+                            hour, minute = map(int, FRIDAY.split(":"))                    
+                            time2check = time(hour, minute, tzinfo=datetime.now().astimezone().tzinfo)
+                        except ValueError as e:
+                            logger.error(f'{tm.asctime()}\tError while parsing time: {type(e)} \t {e.with_traceback}')
+                            # print(f"Error while parsing time: {e}")
+                        
+                        # Add job to queue and enable it
+                        else:
+                            file_update_job = context.job_queue.run_daily(file_update, user_id=update.effective_user.id, time=time2check, days=(5,), data=PROJECTTITLE)
+                            file_update_job.enabled = True
+                            # print(f"Next time: {file_update_job.next_t}, is it on? {file_update_job.enabled}") 
+            
+    else:
+        bot_msg = 'Only Project Manager is allowed to upload new schedule'
+    await update.message.reply_text(bot_msg)
+
+
+### This part contains functions which make settings menu functionality #########################################################################
 
 async def settings(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     """
@@ -940,6 +1231,9 @@ async def reminder_days_setter(update: Update, context: ContextTypes.DEFAULT_TYP
     # Tell conversation handler to process query from this keyboard as STATE3
     return THIRD_LVL  
 
+### END OF SETTINGS PART #################################
+
+
 # async def buttons(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
 #     """ Function to control buttons (for 'fresh start' - early version)"""
 #     bot_msg = "Bot answer"
@@ -976,289 +1270,6 @@ async def reminder_days_setter(update: Update, context: ContextTypes.DEFAULT_TYP
 #             await query.edit_message_text(bot_msg)                        
 
 
-async def upload(update: Update, context: CallbackContext) -> None:
-    '''
-    Function to upload new project file
-    '''
-
-    # Message to return to user
-    bot_msg = ''
-
-    # Check if user is PM
-    uploader = update.message.from_user.username
-    if uploader == PM:
-
-        # Let's keep files got from user in temporary directory
-        with tempfile.TemporaryDirectory() as tdp:
-            gotfile = await context.bot.get_file(update.message.document)
-            fp = await gotfile.download_to_drive(os.path.join(tdp, update.message.document.file_name))
-
-            # If file is known format: call appropriate function with this file as argument and expect project dictionary on return
-            project = {}
-            try:
-                match fp.suffix:
-                    case '.gan':
-                        project = connectors.load_gan(fp)
-
-                    case '.json':
-                        project = connectors.load_json(fp)
-
-                    case '.xml':
-                        project = connectors.load_xml(fp)
-
-                # else inform user about supported file types
-                    case _:                
-                        bot_msg = 'Bot supports only these project file formats: .gan (GanttProject) and that is all for now.'
-            except AttributeError as e:
-                bot_msg = f'Seems like field for telegram id for team member is absent: {e}'
-                logger.error(f'{tm.asctime()}\t {type(e)} \t {e.with_traceback}')
-            except ValueError as e:
-                bot_msg = f'Error occurred while processing file: {e}'
-                logger.error(f'{tm.asctime()}\t {type(e)} \t {e.with_traceback}')
-            except FileNotFoundError as e:
-                bot_msg = f'Seems like the file {e} does not exist'
-                logger.error(f'{tm.asctime()}\t {type(e)} \t {e.with_traceback}')
-            except Exception as e:
-                bot_msg = f'Unknow error occurred while processing file: {e}'
-                logger.info(f'{tm.asctime()}\t {type(e)} \t {e.with_traceback}')
-            else:
-                if project:
-
-                    # Remember telegram user id
-                    project = add_user_id(update.message.from_user, project)
-
-                    # Call function to save project in JSON format
-                    bot_msg = save_json(project, PROJECTJSON)
-
-                    # TODO Reminders should be set after successful upload during start/freshstart routine - Separate function!
-                    # Create daily reminders: 1st - daily morining reminder
-                    # Prepare time provide timezone info of user location 
-                    # Check if jobs already present and add if not
-                    preset = get_job_preset('morning_update', update.effective_user.id, PROJECTTITLE, context)
-                    if not preset:
-                        try:
-                    # TODO this should be done in settings set by PM, along with check for correct values. And stored in project settings
-                            hour, minute = map(int, MORNING.split(":"))                    
-                            time2check = time(hour, minute, tzinfo=datetime.now().astimezone().tzinfo)
-                        except ValueError as e:
-                            logger.error(f'{tm.asctime()}\tError while parsing time: {type(e)} \t {e.with_traceback}')
-
-                        # Set job schedule 
-                        else:
-                            morning_update_job = context.job_queue.run_daily(morning_update, user_id=update.effective_user.id, time=time2check, data=PROJECTTITLE)
-                            
-                            # and enable it. TODO store job id for further use
-                            morning_update_job.enabled = True 
-                            # print(f"Next time: {morning_update_job.next_t}, is it on? {morning_update_job.enabled}")      
-                            
-                    # 2nd - daily on the eve of task reminder
-                    preset = get_job_preset('day_before_update', update.effective_user.id, PROJECTTITLE, context)
-                    if not preset:                    
-                        try:
-                            hour, minute = map(int, ONTHEEVE.split(":"))                    
-                            time2check = time(hour, minute, tzinfo=datetime.now().astimezone().tzinfo)
-                        except ValueError as e:
-                            logger.error(f'{tm.asctime()}\tError while parsing time: {type(e)} \t {e.with_traceback}')
-                        
-                        # Add job to queue and enable it
-                        else:                            
-                            day_before_update_job = context.job_queue.run_daily(day_before_update, user_id=update.effective_user.id, time=time2check, data=PROJECTTITLE)
-                            day_before_update_job.enabled = True
-                            # print(f"Next time: {day_before_update_job.next_t}, is it on? {day_before_update_job.enabled}")   
-
-                    # Register friday reminder
-                    preset = get_job_preset('file_update', update.effective_user.id, PROJECTTITLE, context)
-                    if not preset:   
-                        try:
-                            hour, minute = map(int, FRIDAY.split(":"))                    
-                            time2check = time(hour, minute, tzinfo=datetime.now().astimezone().tzinfo)
-                        except ValueError as e:
-                            logger.error(f'{tm.asctime()}\tError while parsing time: {type(e)} \t {e.with_traceback}')
-                            # print(f"Error while parsing time: {e}")
-                        
-                        # Add job to queue and enable it
-                        else:
-                            file_update_job = context.job_queue.run_daily(file_update, user_id=update.effective_user.id, time=time2check, days=(5,), data=PROJECTTITLE)
-                            file_update_job.enabled = True
-                            # print(f"Next time: {file_update_job.next_t}, is it on? {file_update_job.enabled}") 
-            
-    else:
-        bot_msg = 'Only Project Manager is allowed to upload new schedule'
-    await update.message.reply_text(bot_msg)
-
-
-
-async def day_before_update(context: ContextTypes.DEFAULT_TYPE) -> None:
-    '''
-    This reminder must be send to all team members on the day before of the important dates:
-    start of task, deadline
-    '''
-
-    if os.path.exists(PROJECTJSON):
-        with open(PROJECTJSON, 'r') as fp:
-            try:
-                project = connectors.load_json(fp)
-            except Exception as e:
-                bot_msg = f"ERROR ({e}): Unable to load"
-                logger.info(f'{tm.asctime()}\t {type(e)} \t {e.with_traceback}')                  
-            else:
-
-                # Loop through actioners to inform them about actual tasks
-                for actioner in project['actioners']:
-
-                    # Bot can inform only ones with known id
-                    # print(actioner)
-                    if actioner['tg_id']:
-                        for task in project['tasks']:
-
-                            # Process only tasks in which current actioner participate
-                            for doer in task['actioners']:
-                                # print(doer)
-                                if actioner['id'] == doer['actioner_id']:
-                                    bot_msg = ""
-
-                                    # Bot will inform user only of tasks with important dates
-                                    # Check if task not completed
-                                    if task['complete'] < 100:
-
-                                        # If delta_start <0 task not started, otherwise already started
-                                        delta_start = date.today() - date.fromisoformat(task['startdate'])
-
-                                        # If delta_end >0 task overdue, if <0 task in progress
-                                        delta_end = date.today() - date.fromisoformat(task['enddate'])
-
-                                        # Deal with common task
-                                        if task['include']:
-
-                                            # For now focus only on subtasks, that can be actually done
-                                            # I'll decide what to do with such tasks after gathering user experience
-                                            pass
-                                        else:
-
-                                            # Don't inform about milestones, because noone assigned for them
-                                            if task['milestone'] == True:    
-                                                    pass
-                                            else:
-
-                                                # If task starts tomorrow
-                                                if delta_start.days == -1:
-                                                    bot_msg = f"task {task['id']} '{task['name']}' starts tomorrow."
-                                                elif delta_end.days == -1:
-                                                    bot_msg = f"Tomorrow is deadline for task {task['id']} '{task['name']}'!" 
-
-                                        # Inform users if there are something to inform
-                                        if bot_msg:
-                                            await context.bot.send_message(
-                                                actioner['tg_id'],
-                                                text=bot_msg,
-                                                parse_mode=ParseMode.HTML)
-
-
-async def morning_update(context: ContextTypes.DEFAULT_TYPE) -> None:
-    '''
-    This routine will be executed on daily basis to control project(s) schedule
-    '''
-
-    # TODO use data to associate project name with job
-    # TODO how to make observation of project a standalone function to be called elsewhere?
-    # because every reminder function load project from file and looks through it
-
-    if os.path.exists(PROJECTJSON):
-        with open(PROJECTJSON, 'r') as fp:
-            try:
-                project = connectors.load_json(fp)
-            except Exception as e:
-                bot_msg = f"ERROR ({e}): Unable to load"
-                logger.error(f'{tm.asctime()}\t {type(e)} \t {e.with_traceback}')                  
-            else:
-
-                # Loop through actioners to inform them about actual tasks
-                for actioner in project['actioners']:
-
-                    # Bot can inform only ones with known id
-                    # print(actioner)
-                    if actioner['tg_id']:
-                        for task in project['tasks']:
-
-                            # Process only tasks in which current actioner participate
-                            for doer in task['actioners']:
-                                # print(doer)
-                                if actioner['id'] == doer['actioner_id']:
-                                    bot_msg = ""
-
-                                    # Bot will inform user only of tasks with important dates
-                                    # Check if task not completed
-                                    if task['complete'] < 100:
-
-                                        # If delta_start <0 task not started, otherwise already started
-                                        delta_start = date.today() - date.fromisoformat(task['startdate'])
-
-                                        # If delta_end >0 task overdue, if <0 task in progress
-                                        delta_end = date.today() - date.fromisoformat(task['enddate'])
-
-                                        # Deal with common task
-                                        if task['include']:
-
-                                            # For now focus only on subtasks, that can be actually done
-                                            # I'll decide what to do with such tasks after gathering user experience
-                                            pass
-                                        else:
-
-                                            # Don't inform about milestones, because noone assigned for them
-                                            if task['milestone'] == True:    
-                                                    pass
-                                            else:
-                                                if delta_start.days == 0:
-                                                    bot_msg = f"task {task['id']} '{task['name']}' started today."
-                                                elif delta_start.days > 0  and delta_end.days < 0:
-                                                    bot_msg = f"task {task['id']} '{task['name']}' is intermidiate. Due date is {task['enddate']}."
-                                                elif delta_end.days == 0:
-                                                    bot_msg = f"task {task['id']}  '{task['name']}' must be completed today!"
-                                                elif delta_start.days > 0 and delta_end.days > 0:                                       
-                                                    bot_msg = f"task {task['id']} '{task['name']}' is overdue! (had to be completed on {task['enddate']})"
-                                                else:
-                                                    print(f"Future tasks as {task['id']} '{task['name']}' goes here")                            
-
-                                        # Check if there is something to report to user
-                                        if bot_msg:
-                                            await context.bot.send_message(
-                                                actioner['tg_id'],
-                                                text=bot_msg,
-                                                parse_mode=ParseMode.HTML)
-
-
-async def start(update: Update, context: CallbackContext) -> None:
-    '''
-    Function to handle start of the bot
-    '''
-
-    # TODO PPP: 
-    # inform user what to do with this bot
-    # Call function to upload project file
-    # Call function to make jobs
-
-    bot_msg = f"Hello, {update.effective_user.first_name}!"
-    await update.message.reply_text(bot_msg)
-
-
-async def stop(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    '''
-    Function to stop the bot.
-    Should make bot forget about the user, 
-    and stop all jobs associated with the user
-    '''
-
-    # Remove daily reminder associated with PROJECTTITLE
-    # TODO revise add check for PM
-    current_jobs = context.job_queue.jobs    
-    if not current_jobs:
-        pass
-    else:
-        for job in current_jobs:
-            if job.data == PROJECTTITLE:
-                job.schedule_removal()
-
- 
 async def post_init(application: Application):
     """Function to control list of commands in bot itself. Commands itself are global """
     await application.bot.set_my_commands([
