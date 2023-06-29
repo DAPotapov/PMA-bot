@@ -74,19 +74,12 @@ def get_job_preset(reminder: str, user_id: int, projectname: str, context: Conte
     return preset
 
 
-def save_json(project: dict, PROJECTJSON: str) -> str:
+def save_json(project: dict, PROJECTJSON: str) -> None:
     ''' 
     Saves project in JSON format and returns message about success of operation
     '''
 
-    bot_msg = ''
-    with open(PROJECTJSON, 'w', encoding='utf-8') as json_fh:
-        try:
-            json.dump(project, json_fh, ensure_ascii=False, indent=4)
-        except:
-            bot_msg = 'Error saving project to json file'    
-        else:
-            bot_msg = 'Successfully saved project to json file'
+    json_fh = open(PROJECTJSON, 'w', encoding='utf-8')
+    bot_msg = json.dump(project, json_fh, ensure_ascii=False, indent=4)
 
-    # TODO reconsider returning None if succeed because there is no need always inform user about every file update
     return bot_msg
