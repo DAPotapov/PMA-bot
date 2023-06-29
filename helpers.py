@@ -4,10 +4,11 @@ Some helper functions to help main functions to manupulate with data
 
 import json
 
+from telegram import User
 from telegram.ext import ContextTypes
 
 
-def add_user_id(user, project):
+def add_user_id(user: User, project: dict):
     ''' 
     Helper function to add telegram id of username provided to project json
     '''
@@ -20,7 +21,7 @@ def add_user_id(user, project):
     return project
 
 
-def get_assignees(task, actioners):
+def get_assignees(task: dict, actioners: dict):
     '''
     Helper function for getting names and telegram usernames
     of person assigned to given task to insert in a bot message
@@ -73,7 +74,7 @@ def get_job_preset(reminder: str, user_id: int, projectname: str, context: Conte
     return preset
 
 
-def save_json(project, PROJECTJSON) -> str:
+def save_json(project: dict, PROJECTJSON: str) -> str:
     ''' 
     Saves project in JSON format and returns message about success of operation
     '''

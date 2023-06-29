@@ -429,7 +429,6 @@ async def status(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
                 # Check Who calls? If PM then proceed all tasks
                 if username == PM:
                     for task in project['tasks']:
-
                         # Bot will inform user only of tasks with important dates
                         bot_msg = ""
 
