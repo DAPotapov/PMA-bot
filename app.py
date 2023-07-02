@@ -68,11 +68,12 @@ ONTHEEVE = "16:00"
 FRIDAY = "15:00"
 
 # TODO: change according to starter of the bot
-PM = 'hagen10'
-# PM = 'Sokolovaspace'
 PROJECTTITLE = 'TESTING PROJECT'
-PROJECTJSON = "data/temp.json"
 KNOWN_USERS = {}
+load_dotenv()
+PM = os.environ.get("PM")
+PROJECTJSON = os.environ.get("PROJECTJSON")
+
 
 # Set list of commands
 help_cmd = BotCommand("help","выводит данное описание")
@@ -1298,7 +1299,6 @@ async def post_init(application: Application):
 
 def main() -> None:
 
-    load_dotenv()
     BOT_TOKEN = os.environ.get("BOT_TOKEN")
 
     # Create a builder via Application.builder() and then specifies all required arguments via that builder.
