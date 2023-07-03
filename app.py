@@ -80,7 +80,7 @@ help_cmd = BotCommand("help","выводит данное описание")
 status_cmd = BotCommand("status", "информация о текущем состоянии проекта")
 settings_cmd = BotCommand("settings", "настройка параметров бота")
 freshstart_cmd = BotCommand("freshstart", "начало нового проекта")
-feedback_cmd = BotCommand("feedback", "+<сообщение> отправит такое сообщение разработчику")
+feedback_cmd = BotCommand("feedback", "отправка сообщения разработчику")
 start_cmd = BotCommand("start", "запуск бота")
 stop_cmd = BotCommand("stop", "прекращение работы бота")
 
