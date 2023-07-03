@@ -89,7 +89,6 @@ FIRST_LVL, SECOND_LVL, THIRD_LVL, FOURTH_LVL, FIFTH_LVL = range(5)
 # Callback data for settings menu
 ONE, TWO, THREE, FOUR, FIVE = range(5)
 
-
 def get_keybord_and_msg(level: int, info: str = None, user_id: int = None):
     '''
     Helper function to provide specific keyboard on different levels of settings menu
@@ -242,17 +241,22 @@ async def echo(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         await update.message.reply_text(text)
 
 
-async def feedback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+async def feedback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     '''
-    This function purpose is to inform developer of user feedback    
+    Initiation of feedback dialog with user    
     '''
-    # TODO better to use a Conversation because user struggle with /commands syntax
-    # Log when and what user sent using feedback command
-    logger.warning(f'{tm.asctime()}\tFEEDBACK from {update.message.from_user.username}: {update.message.text}')
-    # List of args can be parsed to retrieve some information, I'm not sure yet what exactly
-    # user_feedback = context.args
+    bot_msg = "What would you like inform developer about? Bugs, comments and suggestions highly appreciated."
+    await update.message.reply_text(bot_msg)
+    return FIRST_LVL
+
+
+async def feedback_answer(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    """ Gather information user provided and answer user"""
+    # TODO Maybe add handling of file or screenshot (PHOTO) recieving from user?
+    logger.warning(f'{tm.asctime()}\tFEEDBACK from {update.message.from_user.username} ({update.message.from_user.id}): {update.message.text}')
     bot_msg = "Feedback sent to developer."
     await update.message.reply_text(bot_msg)
+    return ConversationHandler.END
 
 
 async def file_update(context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -1318,7 +1322,7 @@ def main() -> None:
     # Initialize start of the project: project name, db initialization and so on, previous project should be archived
     application.add_handler(CommandHandler(freshstart_cmd.command, freshstart))  
     # Bot should have the ability for user to inform developer of something: bugs, features and so on
-    application.add_handler(CommandHandler(feedback_cmd.command, feedback))  
+    # application.add_handler(CommandHandler(feedback_cmd.command, feedback))  # see below
     # It will be useful if schedule changed outside the bot
     # application.add_handler(CommandHandler("upload", upload))  
     # And if changes were made inside the bot, PM could download updated schedule (original format?)
@@ -1336,6 +1340,16 @@ def main() -> None:
 
     # Register handler for recieving new project file
     application.add_handler(MessageHandler(filters.Document.ALL, upload))
+
+    # Conversation handler for /feedback command
+    feedback_conv = ConversationHandler(
+        entry_points=[CommandHandler(feedback_cmd.command, feedback)],
+        states={
+            FIRST_LVL: [MessageHandler(filters.TEXT & ~filters.COMMAND, feedback_answer)]
+        },
+        fallbacks=[MessageHandler(filters.TEXT & ~filters.COMMAND, feedback_answer)]
+    )
+    application.add_handler(feedback_conv)
 
     # PM should have the abibility to change bot behaviour, such as reminder interval and so on
     settings_conv = ConversationHandler(
@@ -1361,10 +1375,10 @@ def main() -> None:
                 CallbackQueryHandler(settings_back, pattern="^" + str(FOUR) + "$"),
                 CallbackQueryHandler(finish_settings, pattern="^" + str(FIVE) + "$"),
             ],
-            FOURTH_LVL:[ # TODO
+            FOURTH_LVL:[
                 MessageHandler(filters.TEXT & ~filters.COMMAND, reminder_time_setter),
             ],
-            FIFTH_LVL:[ # TODO
+            FIFTH_LVL:[
                 MessageHandler(filters.TEXT & ~filters.COMMAND, reminder_days_setter),
             ]
         },
