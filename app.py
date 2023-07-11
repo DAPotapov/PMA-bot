@@ -10,7 +10,7 @@
 
 import logging
 import os
-import time as tm
+#import time as tm # do i need that? asctime is in logging
 import json
 import tempfile
 import asyncio
@@ -60,7 +60,7 @@ logger = logging.getLogger(__name__)
 # This setting control whether bot will send status report for PM in private chat 
 # or in group chat if /status command executed in group chat
 ALLOW_POST_STATUS_TO_GROUP = False 
-# Inform actioners of milestones (by default only PM) TODO
+# Inform actioners of milestones (by default only PM) 
 INFORM_ACTIONERS_OF_MILESTONES = False
 # Default values for daily reminders
 MORNING = "10:00"
@@ -160,7 +160,7 @@ async def day_before_update(context: ContextTypes.DEFAULT_TYPE) -> None:
                 project = connectors.load_json(fp)
             except Exception as e:
                 bot_msg = f"ERROR ({e}): Unable to load"
-                logger.info(f'{tm.asctime()}\t {e} \t {e.with_traceback}')                  
+                logger.info(f'{e} \t {e.with_traceback}')                  
             else:
 
                 # Loop through actioners to inform them about actual tasks
@@ -214,6 +214,7 @@ async def day_before_update(context: ContextTypes.DEFAULT_TYPE) -> None:
                                                 parse_mode=ParseMode.HTML)
 
 
+# TURNED OFF
 async def echo(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """
     This function would be added to the application as a handler for messages coming from the Bot API
@@ -225,8 +226,7 @@ async def echo(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     # username = update.message.from_user.username
     # firstname = update.message.from_user.first_name
     text = str(update.message.text)
-    print(f'{user.first_name} wrote {text}')
-    logger.info(f'{tm.asctime()}\t{user.id} ({user.username}): {text}')
+    logger.info(f'{user.id} ({user.username}): {text}')
 
     # TODO I can use it to gather id from chat members and add them to project
     # global KNOWN_USERS
@@ -253,7 +253,7 @@ async def feedback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
 async def feedback_answer(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     """ Gather information user provided and answer user"""
     # TODO Maybe add handling of file or screenshot (PHOTO) recieving from user?
-    logger.warning(f'{tm.asctime()}\tFEEDBACK from {update.message.from_user.username} ({update.message.from_user.id}): {update.message.text}')
+    logger.warning(f'FEEDBACK from {update.message.from_user.username} ({update.message.from_user.id}): {update.message.text}')
     bot_msg = "Feedback sent to developer."
     await update.message.reply_text(bot_msg)
     return ConversationHandler.END
@@ -269,7 +269,7 @@ async def file_update(context: ContextTypes.DEFAULT_TYPE) -> None:
             try:
                 project = connectors.load_json(fp)
             except Exception as e:
-                logger.error(f'{tm.asctime()}\t {e} \t {e.with_traceback}')                  
+                logger.error(f'{e} \t {e.with_traceback}')                  
             else:
 
                 # Loop through actioners to inform them about actual tasks
@@ -328,7 +328,7 @@ async def morning_update(context: ContextTypes.DEFAULT_TYPE) -> None:
                 project = connectors.load_json(fp)
             except Exception as e:
                 bot_msg = f"ERROR ({e}): Unable to load"
-                logger.error(f'{tm.asctime()}\t {e} \t {e.with_traceback}')                  
+                logger.error(f'{e} \t {e.with_traceback}')                  
             else:
 
                 # Loop through actioners to inform them about actual tasks
@@ -414,7 +414,7 @@ async def status(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
                 project = connectors.load_json(fp)
             except Exception as e:
                 bot_msg = f"ERROR ({e}): Unable to load"
-                logger.info(f'{tm.asctime()}\t {e} \t {e.with_traceback}')                  
+                logger.info(f'{e} \t {e.with_traceback}')                  
             else:
                 # print(f"For testing purposes list jobs: {context.job_queue.jobs()}")
                 # for job in context.job_queue.jobs():
@@ -432,10 +432,10 @@ async def status(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
                 try:
                     save_json(project, PROJECTJSON)
                 except FileNotFoundError as e:
-                    logger.error(f'{tm.asctime()}\t {e} \t {e.with_traceback}')
+                    logger.error(f'{e} \t {e.with_traceback}')
                     # TODO better inform PM that there are problems with writing project
                 except Exception as e:
-                    logger.error(f'{tm.asctime()}\t {e} \t {e.with_traceback}')
+                    logger.error(f'{e} \t {e.with_traceback}')
 
                 # Check Who calls? If PM then proceed all tasks
                 if username == PM:
@@ -477,7 +477,7 @@ async def status(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
                                             people, user_ids = get_assignees(task, actioners)
                                         except Exception as e:
                                             bot_msg = "Error occured while processing assigned actioners to task task['id']} '{task['name']}' starting today"
-                                            logger.error(f'{tm.asctime()}\t {e} \t {e.with_traceback}')
+                                            logger.error(f'{e} \t {e.with_traceback}')
                                         else:
                                             bot_msg = f"task {task['id']} '{task['name']}' starts today. Assigned to: {people}"
                                     elif delta_start.days > 0  and delta_end.days < 0:
@@ -485,7 +485,7 @@ async def status(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
                                             people, user_ids = get_assignees(task, actioners)
                                         except Exception as e:
                                             bot_msg = f"Error occured while processing assigned actioners to task {task['id']} {task['name']}"
-                                            logger.error(f'{tm.asctime()}\t {e} \t {e.with_traceback}')
+                                            logger.error(f'{e} \t {e.with_traceback}')
                                         else:
                                             bot_msg = f"task {task['id']} '{task['name']}' is intermidiate. Due date is {task['enddate']}. Assigned to: {people}"
                                     elif delta_end.days == 0:
@@ -493,7 +493,7 @@ async def status(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
                                             people, user_ids = get_assignees(task, actioners)
                                         except Exception as e:
                                             bot_msg = f"Error occured while processing assigned actioners to task {task['id']} {task['name']}"
-                                            logger.error(f'{tm.asctime()}\t {e} \t {e.with_traceback}')
+                                            logger.error(f'{e} \t {e.with_traceback}')
                                         else:                                        
                                             bot_msg = f"task {task['id']}  '{task['name']}' must be completed today! Assigned to: {people}"
                                     elif delta_start.days > 0 and delta_end.days > 0:
@@ -501,11 +501,11 @@ async def status(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
                                             people, user_ids = get_assignees(task, actioners)
                                         except Exception as e:
                                             bot_msg = f"Error occured while processing assigned actioners to task {task['id']} {task['name']}"
-                                            logger.error(f'{tm.asctime()}\t {e} \t {e.with_traceback}')
+                                            logger.error(f'{e} \t {e.with_traceback}')
                                         else:                                         
                                             bot_msg = f"task {task['id']} '{task['name']}' is overdue! (had to be completed on {task['enddate']}). Assigned to: {people}"
                                     else:
-                                        logger.info(f"{tm.asctime()}\tloop through future task '{task['id']}' '{task['name']}'")
+                                        logger.info(f"Loop through future task '{task['id']}' '{task['name']}'")
 
                             # Check if there is something to report to user
                             if bot_msg:
@@ -581,7 +581,7 @@ async def status(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
                                                 elif delta_start.days > 0 and delta_end.days > 0:
                                                     bot_msg = f"task {task['id']} '{task['name']}' is overdue! (had to be completed on {task['enddate']})."
                                                 else:
-                                                    logger.info(f"{tm.asctime()}\tloop through future task '{task['id']}' '{task['name']}'")
+                                                    logger.info(f"loop through future task '{task['id']}' '{task['name']}'")
                         if not bot_msg:
                             bot_msg = f"Seems like there are no critical dates for you now, {user.first_name}."
 
@@ -658,16 +658,16 @@ async def upload(update: Update, context: CallbackContext) -> None:
                         bot_msg = 'Bot supports only these project file formats: .gan (GanttProject) and that is all for now.'
             except AttributeError as e:
                 bot_msg = f'Seems like field for telegram id for team member is absent: {e}'
-                logger.error(f'{tm.asctime()}\t {e} \t {e.with_traceback}')
+                logger.error(f'{e} \t {e.with_traceback}')
             except ValueError as e:
                 bot_msg = f'Error occurred while processing file: {e}'
-                logger.error(f'{tm.asctime()}\t {e} \t {e.with_traceback}')
+                logger.error(f'{e} \t {e.with_traceback}')
             except FileNotFoundError as e:
                 bot_msg = f'Seems like the file {e} does not exist'
-                logger.error(f'{tm.asctime()}\t {e} \t {e.with_traceback}')
+                logger.error(f'{e} \t {e.with_traceback}')
             except Exception as e:
                 bot_msg = f'Unknow error occurred while processing file: {e}'
-                logger.info(f'{tm.asctime()}\t {e} \t {e.with_traceback}')
+                logger.info(f'{e} \t {e.with_traceback}')
             else:
                 if project:
 
@@ -678,11 +678,11 @@ async def upload(update: Update, context: CallbackContext) -> None:
                     try:
                         save_json(project, PROJECTJSON)
                     except FileNotFoundError as e:
-                        logger.error(f'{tm.asctime()}\t {e} \t {e.with_traceback}')
+                        logger.error(f'{e} \t {e.with_traceback}')
                         # TODO better inform PM that there are problems with writing project
                         bot_msg = "Seems like path to save project does not exist"
                     except Exception as e:
-                        logger.error(f'{tm.asctime()}\t {e} \t {e.with_traceback}')
+                        logger.error(f'{e} \t {e.with_traceback}')
                         bot_msg = "Error saving project"
                     else:
                         bot_msg = "Project file saved successfully"
@@ -698,7 +698,7 @@ async def upload(update: Update, context: CallbackContext) -> None:
                             hour, minute = map(int, MORNING.split(":"))                    
                             time2check = time(hour, minute, tzinfo=datetime.now().astimezone().tzinfo)
                         except ValueError as e:
-                            logger.error(f'{tm.asctime()}\tError while parsing time: {e} \t {e.with_traceback}')
+                            logger.error(f'Error while parsing time: {e} \t {e.with_traceback}')
 
                         # Set job schedule 
                         else:
@@ -715,7 +715,7 @@ async def upload(update: Update, context: CallbackContext) -> None:
                             hour, minute = map(int, ONTHEEVE.split(":"))                    
                             time2check = time(hour, minute, tzinfo=datetime.now().astimezone().tzinfo)
                         except ValueError as e:
-                            logger.error(f'{tm.asctime()}\tError while parsing time: {e} \t {e.with_traceback}')
+                            logger.error(f'Error while parsing time: {e} \t {e.with_traceback}')
                         
                         # Add job to queue and enable it
                         else:                            
@@ -730,7 +730,7 @@ async def upload(update: Update, context: CallbackContext) -> None:
                             hour, minute = map(int, FRIDAY.split(":"))                    
                             time2check = time(hour, minute, tzinfo=datetime.now().astimezone().tzinfo)
                         except ValueError as e:
-                            logger.error(f'{tm.asctime()}\tError while parsing time: {e} \t {e.with_traceback}')
+                            logger.error(f'Error while parsing time: {e} \t {e.with_traceback}')
                             # print(f"Error while parsing time: {e}")
                         
                         # Add job to queue and enable it
@@ -1141,7 +1141,7 @@ async def reminder_time_setter(update: Update, context: ContextTypes.DEFAULT_TYP
                     job.job.reschedule(trigger='cron', hour=hour, minute=minute, day_of_week=day_of_week, timezone=tz)
                 except Exception as e:
                     bot_msg = (f"Unable to reschedule the reminder")
-                    logger.info(f'{tm.asctime()}\t {e} \t {e.with_traceback}')
+                    logger.info(f'{e} \t {e.with_traceback}')
                 bot_msg = (f"Time updated. Next time: "
                             f"{job.next_t}"
                             )                  
@@ -1223,7 +1223,7 @@ async def reminder_days_setter(update: Update, context: ContextTypes.DEFAULT_TYP
                         job.job.reschedule(trigger='cron', hour=hour, minute=minute, day_of_week=','.join(new_days), timezone=tz)
                     except Exception as e:
                         bot_msg = (f"Unable to reschedule the reminder")
-                        logger.error(f'{tm.asctime()}\t {e} \t {e.with_traceback}')
+                        logger.error(f'{e} \t {e.with_traceback}')
                     bot_msg = (f"Time updated. Next time: \n"
                                 f"{job.next_t}"
                                 )
