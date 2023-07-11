@@ -14,7 +14,7 @@ def add_user_id(user: User, project: dict):
     '''
 
     # Remember telegram user id
-    for actioner in project['actioners']:
+    for actioner in project['staff']:
         if actioner['tg_username'] == user.username:
             # This will overwrite existing id if present, but it should not be an issue
             actioner['tg_id'] = user.id

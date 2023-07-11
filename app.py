@@ -10,7 +10,6 @@
 
 import logging
 import os
-#import time as tm # do i need that? asctime is in logging
 import json
 import tempfile
 import asyncio
@@ -74,7 +73,6 @@ load_dotenv()
 PM = os.environ.get("PM")
 PROJECTJSON = os.environ.get("PROJECTJSON")
 
-
 # Set list of commands
 help_cmd = BotCommand("help","выводит данное описание")
 status_cmd = BotCommand("status", "информация о текущем состоянии проекта")
@@ -88,6 +86,7 @@ stop_cmd = BotCommand("stop", "прекращение работы бота")
 FIRST_LVL, SECOND_LVL, THIRD_LVL, FOURTH_LVL, FIFTH_LVL = range(5)
 # Callback data for settings menu
 ONE, TWO, THREE, FOUR, FIVE = range(5)
+
 
 def get_keybord_and_msg(level: int, info: str = None, user_id: int = None):
     '''
@@ -164,7 +163,7 @@ async def day_before_update(context: ContextTypes.DEFAULT_TYPE) -> None:
             else:
 
                 # Loop through actioners to inform them about actual tasks
-                for actioner in project['actioners']:
+                for actioner in project['staff']:
 
                     # Bot can inform only ones with known id
                     # print(actioner)
@@ -274,7 +273,7 @@ async def file_update(context: ContextTypes.DEFAULT_TYPE) -> None:
 
                 # Loop through actioners to inform them about actual tasks
                 bot_msg = "Напоминаю, что сегодня надо освежить файлы по проекту! Чтобы другие участники команды имели актуальную информацию. Спасибо!"
-                for actioner in project['actioners']:
+                for actioner in project['staff']:
 
                     # Bot can inform only ones with known id
                     # print(actioner)
@@ -332,7 +331,7 @@ async def morning_update(context: ContextTypes.DEFAULT_TYPE) -> None:
             else:
 
                 # Loop through actioners to inform them about actual tasks
-                for actioner in project['actioners']:
+                for actioner in project['staff']:
 
                     # Bot can inform only ones with known id
                     # print(actioner)
@@ -471,7 +470,7 @@ async def status(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
                                         # if milestone in past do nothing
                                         pass
                                 else:
-                                    actioners = project['actioners']
+                                    actioners = project['staff']
                                     if delta_start.days == 0:
                                         try:
                                             people, user_ids = get_assignees(task, actioners)
@@ -531,7 +530,7 @@ async def status(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
                 else:
                     user_id = ''
                     bot_msg = ''
-                    for actioner in project['actioners']:
+                    for actioner in project['staff']:
                         if user.username == actioner['tg_username']:
                             user_id = actioner['id']
                     # print(user_id)

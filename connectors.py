@@ -129,7 +129,7 @@ def load_gan(fp):
         raise AttributeError("Project file has invalid structure: no 'tg_username' field")
     
     # Append actioners list to project dictionary
-    project['actioners'] = actioners
+    project['staff'] = actioners
 
     return project
 
@@ -243,6 +243,7 @@ def load_xml(fp):
     """
 
     project = {}
+    # List for staff
     actioners = []
     tasks = []
     # Store XML inner ID for field where telegram username located
@@ -290,8 +291,8 @@ def load_xml(fp):
     else:
         raise ValueError('There are no actioners (resources) in provided file. Who gonna work?')
 
-    # Add collected actioners to project dictionary
-    project['actioners'] = actioners
+    # Add collected actioners to project dictionary staff
+    project['staff'] = actioners
 
     # Gathering tasks from XML
     if 'Task' in obj.Project.Tasks:
@@ -395,6 +396,7 @@ def load_xml(fp):
     project['tasks'] = tasks
 
     return project
+
 
 def xml_date_conversion(datestring):
     """
