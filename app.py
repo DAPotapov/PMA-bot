@@ -40,14 +40,14 @@ from telegram.ext import (
                             ContextTypes,  
                             ConversationHandler,
                             filters)
-# For testing purposes
-from pprint import pprint
+from ptbcontrib.ptb_jobstores import PTBMongoDBJobStore
 from helpers import (
     add_user_id, 
     get_assignees, 
     get_job_preset, 
     save_json)
-
+# For testing purposes
+from pprint import pprint
 
 # Configure logging
 logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s', level=logging.INFO)
@@ -72,6 +72,11 @@ KNOWN_USERS = {}
 load_dotenv()
 PM = os.environ.get("PM")
 PROJECTJSON = os.environ.get("PROJECTJSON")
+BOT_NAME = os.environ.get('BOT_NAME')
+BOT_PASS = os.environ.get('BOT_PASS')
+
+# link to database
+DB_URI = f"mongodb://{BOT_NAME}:{BOT_PASS}@localhost:27017/admin?retryWrites=true&w=majority"
 
 # Set list of commands
 help_cmd = BotCommand("help","выводит данное описание")
@@ -117,9 +122,6 @@ def get_keybord_and_msg(level: int, info: str = None, user_id: int = None):
                 [InlineKeyboardButton("Finish settings", callback_data=str(FIVE))],        
             ]
         case 2:
-            # TODO: make helper function on a stage when I store job ids (in mongoDB)
-            # def get_job_info(info)
-            # which should return text to append to message
              # Message contents depend on a branch of menu, return None if nonsense given
             match info:
                 case 'morning_update':                    
@@ -159,7 +161,7 @@ async def day_before_update(context: ContextTypes.DEFAULT_TYPE) -> None:
                 project = connectors.load_json(fp)
             except Exception as e:
                 bot_msg = f"ERROR ({e}): Unable to load"
-                logger.info(f'{e} \t {e.with_traceback}')                  
+                logger.error(f'{e} \t {e.with_traceback}')                  
             else:
 
                 # Loop through actioners to inform them about actual tasks
@@ -689,8 +691,13 @@ async def upload(update: Update, context: CallbackContext) -> None:
                     # TODO Reminders should be set after successful upload during start/freshstart routine - Separate function!
                     # Create daily reminders: 1st - daily morining reminder
                     # Prepare time provide timezone info of user location 
-                    # Check if jobs already present and add if not
-                    preset = get_job_preset('morning_update', update.effective_user.id, PROJECTTITLE, context)
+                    # Check if jobs already present
+                    # First determine job_id:
+                    job_id = str(update.effective_user.id) + '_' + PROJECTTITLE + '_' + 'morning_update'
+                    print(job_id)
+                    # preset = get_job_preset('morning_update', update.effective_user.id, PROJECTTITLE, context)
+                    preset = get_job_preset(job_id, context)
+                    print(preset)
                     if not preset:
                         try:
                     # TODO this should be done in settings set by PM, along with check for correct values. And stored in project settings
@@ -701,14 +708,19 @@ async def upload(update: Update, context: CallbackContext) -> None:
 
                         # Set job schedule 
                         else:
-                            morning_update_job = context.job_queue.run_daily(morning_update, user_id=update.effective_user.id, time=time2check, data=PROJECTTITLE)
+                            ''' To persistence to work job must have explicit ID and 'replace_existing' must be True
+                            or a new copy of the job will be created every time application restarts! '''
+                            job_kwargs = {'id': str(update.effective_user.id) + 'morning_update', 'replace_existing': True}
+                            morning_update_job = context.job_queue.run_daily(morning_update, user_id=update.effective_user.id, time=time2check, data=PROJECTTITLE, job_kwargs=job_kwargs)
                             
-                            # and enable it. TODO store job id for further use
+                            # and enable it.
                             morning_update_job.enabled = True 
                             # print(f"Next time: {morning_update_job.next_t}, is it on? {morning_update_job.enabled}")      
                             
                     # 2nd - daily on the eve of task reminder
-                    preset = get_job_preset('day_before_update', update.effective_user.id, PROJECTTITLE, context)
+                    job_id = str(update.effective_user.id) + '_' + PROJECTTITLE + '_' + 'day_before_update'
+                    print(job_id)
+                    preset = get_job_preset(job_id, context)
                     if not preset:                    
                         try:
                             hour, minute = map(int, ONTHEEVE.split(":"))                    
@@ -718,12 +730,14 @@ async def upload(update: Update, context: CallbackContext) -> None:
                         
                         # Add job to queue and enable it
                         else:                            
-                            day_before_update_job = context.job_queue.run_daily(day_before_update, user_id=update.effective_user.id, time=time2check, data=PROJECTTITLE)
+                            job_kwargs = {'id': job_id, 'replace_existing': True}
+                            day_before_update_job = context.job_queue.run_daily(day_before_update, user_id=update.effective_user.id, time=time2check, data=PROJECTTITLE, job_kwargs=job_kwargs)
                             day_before_update_job.enabled = True
                             # print(f"Next time: {day_before_update_job.next_t}, is it on? {day_before_update_job.enabled}")   
 
                     # Register friday reminder
-                    preset = get_job_preset('file_update', update.effective_user.id, PROJECTTITLE, context)
+                    job_id = str(update.effective_user.id) + '_' + PROJECTTITLE + '_' + 'file_update'
+                    preset = get_job_preset(job_id, context)
                     if not preset:   
                         try:
                             hour, minute = map(int, FRIDAY.split(":"))                    
@@ -734,7 +748,8 @@ async def upload(update: Update, context: CallbackContext) -> None:
                         
                         # Add job to queue and enable it
                         else:
-                            file_update_job = context.job_queue.run_daily(file_update, user_id=update.effective_user.id, time=time2check, days=(5,), data=PROJECTTITLE)
+                            job_kwargs = {'id': str(update.effective_user.id) + 'file_update', 'replace_existing': True}
+                            file_update_job = context.job_queue.run_daily(file_update, user_id=update.effective_user.id, time=time2check, days=(5,), data=PROJECTTITLE, job_kwargs=job_kwargs)
                             file_update_job.enabled = True
                             # print(f"Next time: {file_update_job.next_t}, is it on? {file_update_job.enabled}") 
             
@@ -914,7 +929,10 @@ async def day_before_update_item(update: Update, context: ContextTypes.DEFAULT_T
     # Call function which get current preset of reminder, to inform user.
     # End conversation if that was unsuccessful. 
     keyboard, bot_msg = get_keybord_and_msg(THIRD_LVL, context.user_data['last_position'])
-    preset = get_job_preset(context.user_data['last_position'], update.effective_user.id, PROJECTTITLE, context)
+    job_id = str(update.effective_user.id) + '_' + PROJECTTITLE + '_' + str(context.user_data['last_position'])
+    preset = get_job_preset(job_id, context)
+    
+    # preset = get_job_preset(context.user_data['last_position'], update.effective_user.id, PROJECTTITLE, context)
     if keyboard == None or bot_msg == None:
         bot_msg = "Some error happened. Unable to show a menu."
         await  query.edit_message_text(bot_msg)
@@ -943,7 +961,9 @@ async def morning_update_item(update: Update, context: ContextTypes.DEFAULT_TYPE
     # Call function which get current preset of reminder, to inform user.
     # End conversation if that was unsuccessful. 
     keyboard, bot_msg = get_keybord_and_msg(THIRD_LVL, context.user_data['last_position'])
-    preset = get_job_preset(context.user_data['last_position'], update.effective_user.id, PROJECTTITLE, context)
+    job_id = str(update.effective_user.id) + '_' + PROJECTTITLE + '_' + str(context.user_data['last_position'])
+    preset = get_job_preset(job_id, context)
+    # preset = get_job_preset(context.user_data['last_position'], update.effective_user.id, PROJECTTITLE, context)
     if keyboard == None or bot_msg == None:
         bot_msg = "Some error happened. Unable to show a menu."
         await update.message.reply_text(bot_msg)
@@ -972,7 +992,9 @@ async def file_update_item(update: Update, context: ContextTypes.DEFAULT_TYPE) -
     # Call function which get current preset of reminder, to inform user.
     # End conversation if that was unsuccessful. 
     keyboard, bot_msg = get_keybord_and_msg(THIRD_LVL, context.user_data['last_position'])
-    preset = get_job_preset(context.user_data['last_position'], update.effective_user.id, PROJECTTITLE, context)
+    job_id = str(update.effective_user.id) + '_' + PROJECTTITLE + '_' + str(context.user_data['last_position'])
+    preset = get_job_preset(job_id, context)
+    # preset = get_job_preset(context.user_data['last_position'], update.effective_user.id, PROJECTTITLE, context)
     if keyboard == None or bot_msg == None:
         bot_msg = "Some error happened. Unable to show a menu."
         await update.message.reply_text(bot_msg)
@@ -997,6 +1019,7 @@ async def reminder_switcher(update: Update, context: ContextTypes.DEFAULT_TYPE) 
     reminder = context.user_data['last_position']
     # print(f"Reminder in reminder switcher: {reminder}")
 
+    #TODO refactor with job_id
     # Find a job with given name for current user
     for job in context.job_queue.get_jobs_by_name(reminder):
         # print(context.job_queue.get_jobs_by_name(reminder))
@@ -1012,7 +1035,9 @@ async def reminder_switcher(update: Update, context: ContextTypes.DEFAULT_TYPE) 
     # Call function which get current preset of reminder, to inform user.
     # End conversation if that was unsuccessful. 
     keyboard, bot_msg = get_keybord_and_msg(THIRD_LVL, reminder)
-    preset = get_job_preset(context.user_data['last_position'], update.effective_user.id, PROJECTTITLE, context)
+    job_id = str(update.effective_user.id) + '_' + PROJECTTITLE + '_' + str(context.user_data['last_position'])
+    preset = get_job_preset(job_id, context)
+    # preset = get_job_preset(context.user_data['last_position'], update.effective_user.id, PROJECTTITLE, context)
     if keyboard == None or bot_msg == None:
         bot_msg = "Some error happened. Unable to show a menu."
         await update.message.reply_text(bot_msg)
@@ -1035,7 +1060,9 @@ async def reminder_time_pressed(update: Update, context: ContextTypes.DEFAULT_TY
     reminder = context.user_data['last_position']
 
     # Call function to get current preset for reminder
-    preset = get_job_preset(reminder, update.effective_user.id, PROJECTTITLE, context)
+    job_id = str(update.effective_user.id) + '_' + PROJECTTITLE + '_' + str(context.user_data['last_position'])
+    preset = get_job_preset(job_id, context)
+    # preset = get_job_preset(reminder, update.effective_user.id, PROJECTTITLE, context)
 
     # If reminder not set return menu with reminder settings
     if not preset:
@@ -1076,7 +1103,9 @@ async def reminder_days_pressed(update: Update, context: ContextTypes.DEFAULT_TY
     reminder = context.user_data['last_position']
 
     # Call function to get current preset for reminder
-    preset = get_job_preset(reminder, update.effective_user.id, PROJECTTITLE, context)
+    # preset = get_job_preset(reminder, update.effective_user.id, PROJECTTITLE, context)
+    job_id = str(update.effective_user.id) + '_' + PROJECTTITLE + '_' + reminder
+    preset = get_job_preset(job_id, context)
 
     # If reminder not set return menu with reminder settings
     if not preset:
@@ -1124,6 +1153,7 @@ async def reminder_time_setter(update: Update, context: ContextTypes.DEFAULT_TYP
         # Prepare message if not succeded
         bot_msg = "Did not recognize time. Please use 24h format: 15:05"
     else:
+        # TODO refactor with known job_id
         for job in context.job_queue.get_jobs_by_name(reminder):
 
             # There should be only one job with given name for a project and for PM
@@ -1153,7 +1183,9 @@ async def reminder_time_setter(update: Update, context: ContextTypes.DEFAULT_TYP
     keyboard, bot_msg = get_keybord_and_msg(THIRD_LVL, reminder)
 
     # And get current (updated) preset
-    preset = get_job_preset(context.user_data['last_position'], update.effective_user.id, PROJECTTITLE, context)
+    job_id = str(update.effective_user.id) + '_' + PROJECTTITLE + '_' + reminder
+    preset = get_job_preset(job_id, context)
+    # preset = get_job_preset(context.user_data['last_position'], update.effective_user.id, PROJECTTITLE, context)
     if keyboard == None or bot_msg == None:
         bot_msg = "Some error happened. Unable to show a menu."
         await update.message.reply_text(bot_msg)
@@ -1237,7 +1269,9 @@ async def reminder_days_setter(update: Update, context: ContextTypes.DEFAULT_TYP
     # Provide keyboard of level 3 menu 
     keyboard, bot_msg = get_keybord_and_msg(THIRD_LVL, reminder)
     # And get current preset (updated) of the reminder to show to user
-    preset = get_job_preset(context.user_data['last_position'], update.effective_user.id, PROJECTTITLE, context)
+    job_id = str(update.effective_user.id) + '_' + PROJECTTITLE + '_' + reminder
+    preset = get_job_preset(job_id, context)
+    # preset = get_job_preset(context.user_data['last_position'], update.effective_user.id, PROJECTTITLE, context)
     if keyboard == None or bot_msg == None:
         bot_msg = "Some error happened. Unable to show a menu."
         await update.message.reply_text(bot_msg)
@@ -1307,6 +1341,14 @@ def main() -> None:
     # Create a builder via Application.builder() and then specifies all required arguments via that builder.
     #  Finally, the Application is created by calling builder.build()
     application = Application.builder().token(BOT_TOKEN).post_init(post_init).build()   
+
+    # Add job store MongoDB
+    application.job_queue.scheduler.add_jobstore(
+    PTBMongoDBJobStore(
+        application=application,
+        host=DB_URI,
+        )
+    )
 
     # Then, we register each handler and the conditions the update must meet to trigger it
     # Register commands

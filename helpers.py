@@ -44,33 +44,31 @@ def get_assignees(task: dict, actioners: dict):
     return people, user_ids
 
 
-def get_job_preset(reminder: str, user_id: int, projectname: str, context: ContextTypes.DEFAULT_TYPE):
+def get_job_preset(job_id: str, context: ContextTypes.DEFAULT_TYPE):
     '''
-    Helper function that returns current reminder preset for given user and project
+    Helper function that returns current reminder preset for given job id
     Return None if nothing is found or error occured
-    '''
-    
+    '''  
     preset = None
 
-    # Look up a job associated with current PM and Project
-    for job in context.job_queue.get_jobs_by_name(reminder):
-        if job.user_id == user_id and job.data == projectname:
-            try:
-                hour = job.trigger.fields[job.trigger.FIELD_NAMES.index('hour')]
-                minute = f"{job.trigger.fields[job.trigger.FIELD_NAMES.index('minute')]}"
-            except:
-                preset = None
-                break
-            else:
-                if int(minute) < 10:
-                    time_preset = f"{hour}:0{minute}"
-                else:
-                    time_preset = f"{hour}:{minute}"
-                state = 'ON' if job.enabled else 'OFF'
-                days_preset = job.trigger.fields[job.trigger.FIELD_NAMES.index('day_of_week')]
-                preset = f"{state} {time_preset}, {days_preset}"
-                # pprint(preset)
-                break
+    job = context.job_queue.scheduler.get_job(job_id)
+    print(job)
+    try:
+        hour = job.trigger.fields[job.trigger.FIELD_NAMES.index('hour')]
+        minute = f"{job.trigger.fields[job.trigger.FIELD_NAMES.index('minute')]}"
+    except:
+        preset = None        
+    else:
+        if int(minute) < 10:
+            time_preset = f"{hour}:0{minute}"
+        else:
+            time_preset = f"{hour}:{minute}"
+
+        # TODO refactor because property enabled exist only in wrapper class
+        state = 'ON' # if job.enabled else 'OFF'
+        days_preset = job.trigger.fields[job.trigger.FIELD_NAMES.index('day_of_week')]
+        preset = f"{state} {time_preset}, {days_preset}"
+        # pprint(preset)        
     return preset
 
 

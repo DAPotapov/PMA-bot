@@ -1,5 +1,8 @@
 datetime
 numpy
+ptbcontrib @ git+https://github.com/python-telegram-bot/ptbcontrib.git@main
+pymongo>=4.1,<5
 python-dotenv
 python-telegram-bot[job-queue]>=20.3
+SQLAlchemy==1.4.46
 untangle
