@@ -82,7 +82,7 @@ DB_URI = f"mongodb://{BOT_NAME}:{BOT_PASS}@localhost:27017/admin?retryWrites=tru
 help_cmd = BotCommand("help","выводит данное описание")
 status_cmd = BotCommand("status", "информация о текущем состоянии проекта")
 settings_cmd = BotCommand("settings", "настройка параметров бота")
-freshstart_cmd = BotCommand("freshstart", "начало нового проекта")
+# freshstart_cmd = BotCommand("freshstart", "начало нового проекта")
 feedback_cmd = BotCommand("feedback", "отправка сообщения разработчику")
 start_cmd = BotCommand("start", "запуск бота")
 stop_cmd = BotCommand("stop", "прекращение работы бота")
@@ -286,13 +286,13 @@ async def file_update(context: ContextTypes.DEFAULT_TYPE) -> None:
                             parse_mode=ParseMode.HTML)
 
 
-async def freshstart(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    """
-    TODO: This function handles /freshstart command
-    """
-    freshstart_markup = InlineKeyboardMarkup(freshstart_kbd)
-    bot_msg = "Are you really want to start a new project?"
-    await update.message.reply_text(bot_msg, reply_markup=freshstart_markup)
+# async def freshstart(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+#     """
+#     TODO: This function handles /freshstart command
+#     """
+#     freshstart_markup = InlineKeyboardMarkup(freshstart_kbd)
+#     bot_msg = "Are you really want to start a new project?"
+#     await update.message.reply_text(bot_msg, reply_markup=freshstart_markup)
 
 
 async def help(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -386,8 +386,8 @@ async def morning_update(context: ContextTypes.DEFAULT_TYPE) -> None:
                                                 text=bot_msg,
                                                 parse_mode=ParseMode.HTML)
 
-
-async def start(update: Update, context: CallbackContext) -> None:
+######### START section ########################
+async def start(update: Update, context: CallbackContext) -> int:
     '''
     Function to handle start of the bot
     '''
@@ -397,9 +397,38 @@ async def start(update: Update, context: CallbackContext) -> None:
     # Call function to upload project file
     # Call function to make jobs
 
-    bot_msg = f"Hello, {update.effective_user.first_name}!"
+    bot_msg = (f"Hello, {update.effective_user.first_name}!"
+               f"You are starting a new project"
+               f"Provide a name for it."
+    )
     await update.message.reply_text(bot_msg)
-    
+    return FIRST_LVL
+
+
+async def naming_project(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    ''' Function for recognizing name of the project '''
+
+    print(f'We recieved input from user and now ask for file upload')
+    return SECOND_LVL
+
+
+async def file_recieved(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    ''' Function to proceed uploaded file and saving to DB'''
+    bot_msg = f"At this step file recieved and proceeded"
+    await update.message.reply_text(bot_msg)
+    return ConversationHandler.END
+    # TODO if smth not right:
+    # bot_msg = f"Have some problems with this file. Try upload again"
+    # await update.message.reply_text(bot_msg)
+    # return SECOND_LVL
+
+
+async def start_ended(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    ''' Finish function of start routine'''
+    bot_msg = "This is fallback function. How we get here?"
+    logger.warning(f"User: {update.message.from_user.username} ({update.message.from_user.id}) wrote: {update.message.text}")
+    await update.message.reply_text(bot_msg)
+######### END OF START SECTION ###########
 
 async def status(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """
@@ -1318,8 +1347,9 @@ async def post_init(application: Application):
                                         help_cmd,
                                         status_cmd,
                                         settings_cmd,
-                                        freshstart_cmd,
-                                        feedback_cmd
+                                        # freshstart_cmd,
+                                        feedback_cmd,
+                                        stop_cmd
     ])
 
 
@@ -1350,7 +1380,7 @@ def main() -> None:
     # Command to trigger project status check.
     application.add_handler(CommandHandler(status_cmd.command, status))
     # Initialize start of the project: project name, db initialization and so on, previous project should be archived
-    application.add_handler(CommandHandler(freshstart_cmd.command, freshstart))  
+    # application.add_handler(CommandHandler(freshstart_cmd.command, freshstart))  
     # Bot should have the ability for user to inform developer of something: bugs, features and so on
     # application.add_handler(CommandHandler(feedback_cmd.command, feedback))  # see below
     # It will be useful if schedule changed outside the bot
@@ -1370,6 +1400,16 @@ def main() -> None:
 
     # Register handler for recieving new project file
     application.add_handler(MessageHandler(filters.Document.ALL, upload))
+
+    # Conversation handler for /start
+    start_conv = ConversationHandler(
+        entry_points=[CommandHandler(start_cmd.command, start)],
+        states={
+            FIRST_LVL: [MessageHandler(filters.TEXT & ~filters.COMMAND, naming_project)],
+            SECOND_LVL: [MessageHandler(filters.Document.ALL, file_recieved)]
+        },
+        fallbacks=[MessageHandler(filters.TEXT & ~filters.COMMAND, start_ended)]
+    )
 
     # Conversation handler for /feedback command
     feedback_conv = ConversationHandler(
