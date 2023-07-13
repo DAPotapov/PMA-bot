@@ -1019,23 +1019,19 @@ async def reminder_switcher(update: Update, context: ContextTypes.DEFAULT_TYPE) 
     reminder = context.user_data['last_position']
     # print(f"Reminder in reminder switcher: {reminder}")
 
-    #TODO refactor with job_id
-    # Find a job with given name for current user
-    for job in context.job_queue.get_jobs_by_name(reminder):
-        # print(context.job_queue.get_jobs_by_name(reminder))
-        
-        # There should be only one job with given name for a project and for PM
-        if job.user_id == update.effective_user.id and job.data == PROJECTTITLE:
-            
-            # Switch state for reminder found
-            job.enabled = False if job.enabled else True
+    # Find a job by id and pause it if it's enabled or resume if it's paused
+    job_id = str(update.effective_user.id) + '_' + PROJECTTITLE + '_' + str(context.user_data['last_position'])
+    job = context.job_queue.scheduler.get_job(job_id)
+    if job.next_run_time:
+        job = job.pause()
+    else:
+        job = job.resume()
     
     # Return previous menu:
     # Call function which create keyboard and generate message to send to user. 
     # Call function which get current preset of reminder, to inform user.
     # End conversation if that was unsuccessful. 
     keyboard, bot_msg = get_keybord_and_msg(THIRD_LVL, reminder)
-    job_id = str(update.effective_user.id) + '_' + PROJECTTITLE + '_' + str(context.user_data['last_position'])
     preset = get_job_preset(job_id, context)
     # preset = get_job_preset(context.user_data['last_position'], update.effective_user.id, PROJECTTITLE, context)
     if keyboard == None or bot_msg == None:

@@ -52,7 +52,7 @@ def get_job_preset(job_id: str, context: ContextTypes.DEFAULT_TYPE):
     preset = None
 
     job = context.job_queue.scheduler.get_job(job_id)
-    print(job)
+    # print(f"Got the job: {job}")
     try:
         hour = job.trigger.fields[job.trigger.FIELD_NAMES.index('hour')]
         minute = f"{job.trigger.fields[job.trigger.FIELD_NAMES.index('minute')]}"
@@ -65,7 +65,11 @@ def get_job_preset(job_id: str, context: ContextTypes.DEFAULT_TYPE):
             time_preset = f"{hour}:{minute}"
 
         # TODO refactor because property enabled exist only in wrapper class
-        state = 'ON' # if job.enabled else 'OFF'
+        if job.next_run_time:
+            state = 'ON'
+        else:
+            state = 'OFF'
+        
         days_preset = job.trigger.fields[job.trigger.FIELD_NAMES.index('day_of_week')]
         preset = f"{state} {time_preset}, {days_preset}"
         # pprint(preset)        
