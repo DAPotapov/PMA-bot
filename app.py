@@ -613,15 +613,15 @@ async def stop(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     and stop all jobs associated with the user
     '''
 
-    # Remove daily reminder associated with PROJECTTITLE
-    # TODO revise add check for PM
-    current_jobs = context.job_queue.jobs    
+    # Find all jobs for current user associated with current project and remove them
+    job_id_mask = str(update.effective_user.id) + '_' + PROJECTTITLE
+    current_jobs = context.job_queue.scheduler.get_jobs()   
     if not current_jobs:
         pass
     else:
         for job in current_jobs:
-            if job.data == PROJECTTITLE:
-                job.schedule_removal()
+            if job_id_mask in job.id:
+                job.remove()
 
 
 async def upload(update: Update, context: CallbackContext) -> None:
