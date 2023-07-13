@@ -710,12 +710,12 @@ async def upload(update: Update, context: CallbackContext) -> None:
                         else:
                             ''' To persistence to work job must have explicit ID and 'replace_existing' must be True
                             or a new copy of the job will be created every time application restarts! '''
-                            job_kwargs = {'id': str(update.effective_user.id) + 'morning_update', 'replace_existing': True}
+                            job_kwargs = {'id': job_id, 'replace_existing': True}
                             morning_update_job = context.job_queue.run_daily(morning_update, user_id=update.effective_user.id, time=time2check, data=PROJECTTITLE, job_kwargs=job_kwargs)
                             
                             # and enable it.
                             morning_update_job.enabled = True 
-                            # print(f"Next time: {morning_update_job.next_t}, is it on? {morning_update_job.enabled}")      
+                            print(f"Next time: {morning_update_job.next_t}, is it on? {morning_update_job.enabled}")      
                             
                     # 2nd - daily on the eve of task reminder
                     job_id = str(update.effective_user.id) + '_' + PROJECTTITLE + '_' + 'day_before_update'
@@ -748,7 +748,7 @@ async def upload(update: Update, context: CallbackContext) -> None:
                         
                         # Add job to queue and enable it
                         else:
-                            job_kwargs = {'id': str(update.effective_user.id) + 'file_update', 'replace_existing': True}
+                            job_kwargs = {'id': job_id, 'replace_existing': True}
                             file_update_job = context.job_queue.run_daily(file_update, user_id=update.effective_user.id, time=time2check, days=(5,), data=PROJECTTITLE, job_kwargs=job_kwargs)
                             file_update_job.enabled = True
                             # print(f"Next time: {file_update_job.next_t}, is it on? {file_update_job.enabled}") 
@@ -1149,28 +1149,24 @@ async def reminder_time_setter(update: Update, context: ContextTypes.DEFAULT_TYP
         # Prepare message if not succeded
         bot_msg = "Did not recognize time. Please use 24h format: 15:05"
     else:
-        # TODO refactor with known job_id
-        for job in context.job_queue.get_jobs_by_name(reminder):
+        # Find a job by id for further rescheduling
+        job_id = str(update.effective_user.id) + '_' + PROJECTTITLE + '_' + reminder
+        job = context.job_queue.scheduler.get_job(job_id)
+        # Get timezone attribute from current job
+        tz = job.trigger.timezone
 
-            # There should be only one job with given name for a project and for PM
-            if job.user_id == update.message.from_user.id and job.data == PROJECTTITLE:
+        # Get list of days of week by index of this attribute in list of fields
+        day_of_week = job.trigger.fields[job.trigger.FIELD_NAMES.index('day_of_week')]
 
-                # Get timezone attribute from current job
-                tz = job.job.trigger.timezone
-
-                # Get list of days of week by index of this attribute in list of fields
-                day_of_week = job.trigger.fields[job.trigger.FIELD_NAMES.index('day_of_week')]
-
-                # Reschedule the job
-                try:
-                    job.job.reschedule(trigger='cron', hour=hour, minute=minute, day_of_week=day_of_week, timezone=tz)
-                except Exception as e:
-                    bot_msg = (f"Unable to reschedule the reminder")
-                    logger.info(f'{e} \t {e.with_traceback}')
-                bot_msg = (f"Time updated. Next time: "
-                            f"{job.next_t}"
-                            )                  
-                break
+        # Reschedule the job
+        try:
+            job.reschedule(trigger='cron', hour=hour, minute=minute, day_of_week=day_of_week, timezone=tz)
+        except Exception as e:
+            bot_msg = (f"Unable to reschedule the reminder")
+            logger.info(f'{e} \t {e.with_traceback}')
+        bot_msg = (f"Time updated. Next time: "
+                    f"{job.next_run_time}"
+                    )       
 
     # Inform the user how reschedule went
     await update.message.reply_text(bot_msg)
@@ -1234,26 +1230,23 @@ async def reminder_days_setter(update: Update, context: ContextTypes.DEFAULT_TYP
                     new_days.append('sun') 
         if new_days:
 
-            # Find a job to reschedule
-            for job in context.job_queue.get_jobs_by_name(reminder):
+            # Find job by id to reschedule
+            job_id = str(update.effective_user.id) + '_' + PROJECTTITLE + '_' + reminder
+            job = context.job_queue.scheduler.get_job(job_id)
+            # Get current parameters of job
+            tz = job.trigger.timezone
+            hour = job.trigger.fields[job.trigger.FIELD_NAMES.index('hour')]
+            minute = job.trigger.fields[job.trigger.FIELD_NAMES.index('minute')]  
 
-                # There should be only one job with given name for a project and for PM
-                if job.user_id == update.message.from_user.id and job.data == PROJECTTITLE:
-
-                    # Get current parameters of job
-                    tz = job.trigger.timezone
-                    hour = job.trigger.fields[job.trigger.FIELD_NAMES.index('hour')]
-                    minute = job.trigger.fields[job.trigger.FIELD_NAMES.index('minute')]  
-
-                    # Reschedule the job
-                    try:
-                        job.job.reschedule(trigger='cron', hour=hour, minute=minute, day_of_week=','.join(new_days), timezone=tz)
-                    except Exception as e:
-                        bot_msg = (f"Unable to reschedule the reminder")
-                        logger.error(f'{e} \t {e.with_traceback}')
-                    bot_msg = (f"Time updated. Next time: \n"
-                                f"{job.next_t}"
-                                )
+            # Reschedule the job
+            try:
+                job.reschedule(trigger='cron', hour=hour, minute=minute, day_of_week=','.join(new_days), timezone=tz)
+            except Exception as e:
+                bot_msg = (f"Unable to reschedule the reminder")
+                logger.error(f'{e} \t {e.with_traceback}')
+            bot_msg = (f"Time updated. Next time: \n"
+                        f"{job.next_run_time}"
+                        ) 
         else:
             bot_msg = (f"No correct names for days of week found in you message.\n")                       
     else:
