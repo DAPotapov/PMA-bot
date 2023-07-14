@@ -48,16 +48,14 @@ def main():
 
 def load_gan(fp):
     '''
-        This is a connector from GanttProject format (.gan) to inner format.
-        Get file pointer on input
-        Validates and converts data to inner dict-list-dict.. format
-        Dictionary on output        
+    This is a connector from GanttProject format (.gan) to inner format.
+    Get file pointer on input
+    Validates and converts data to inner dict-list-dict.. format
+    Dictionary on output        
     '''
     
     # Using untangle on GAN - WORKING. This syntax cleaner and have some useful methods like 'children'
     # Declare dictionary to store data
-    project = {}
-
     tasks = []
     
     # Parse the file
@@ -88,9 +86,8 @@ def load_gan(fp):
     # TODO Resolving GanttProject bug of duplication of resource allocation. 
     # Better use standalone function in case they will fix this bug
 
-    # Append tasks list to project dictionary
-    project['tasks'] = tasks
-    actioners = []
+    # Collect actioners
+    staff = []
     property_id = ''
     # Check if special field for telegram id exist and choose correct 
     # custom property if there are several of them
@@ -116,7 +113,7 @@ def load_gan(fp):
                         tg_username = property['value']
 
             # Build list of actioners
-            actioners.append({
+            staff.append({
                 'id' : int(actioner['id']),
                 'name' : actioner['name'],
                 'email' : actioner['contacts'],
@@ -124,14 +121,11 @@ def load_gan(fp):
                 'tg_username' : tg_username,
                 'tg_id' : ""
             })
-    # If no custom property for tg_username found then inform the user
+    # If no custom property for tg_username found then inform developer
     else:
-        raise AttributeError("Project file has invalid structure: no 'tg_username' field")
+        raise AttributeError(f"Project file has invalid structure: no 'tg_username' field")
     
-    # Append actioners list to project dictionary
-    project['staff'] = actioners
-
-    return project
+    return tasks, staff
 
 
 def compose_tasks_list(list, task, allocations):
@@ -230,8 +224,11 @@ def load_json(fp):
     # 2. 
     
     project = json.load(fp)
+    tasks = []
+    staff = []
     # TODO check if it seems like project. Look for inner format structure
-    return project
+    # TODO parse project to corresponding lists
+    return tasks, staff
 
 
 def load_xml(fp):
@@ -242,10 +239,9 @@ def load_xml(fp):
     Dictionary on output    
     """
 
-    project = {}
     # List for staff
-    actioners = []
     tasks = []
+    staff = []
     # Store XML inner ID for field where telegram username located
     property_id = ''
 
@@ -277,7 +273,7 @@ def load_xml(fp):
                         tg_username = attr.Value.cdata
                 if not tg_username:
                     raise ValueError(f"'{actioner.Name.cdata}' have no tg_username value") 
-                actioners.append({
+                staff.append({
                     'id' : int(actioner.UID.cdata),
                     'name' : actioner.Name.cdata,
                     # Seems like XML not necessary contain email address field for resource
@@ -289,10 +285,7 @@ def load_xml(fp):
                     'tg_id' : ""
                 })
     else:
-        raise ValueError('There are no actioners (resources) in provided file. Who gonna work?')
-
-    # Add collected actioners to project dictionary staff
-    project['staff'] = actioners
+        raise ValueError(f'There are no actioners (resources) in provided file. Who gonna work?')
 
     # Gathering tasks from XML
     if 'Task' in obj.Project.Tasks:
@@ -390,12 +383,9 @@ def load_xml(fp):
             record['successors'] = successors
      
     else:        
-        raise ValueError('There are no tasks in provided file. Nothing to do.')
+        raise ValueError(f'There are no tasks in provided file. Nothing to do.')
 
-    # Add collected tasks to project dictionary
-    project['tasks'] = tasks
-
-    return project
+    return tasks, staff
 
 
 def xml_date_conversion(datestring):

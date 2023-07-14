@@ -393,9 +393,19 @@ async def start(update: Update, context: CallbackContext) -> int:
     '''
 
     # TODO PPP: 
+    # check connection to DB
     # inform user what to do with this bot
     # Call function to upload project file
     # Call function to make jobs
+    PM = {
+        'pm_id': update.effective_user.id,
+        'pm_username': update.effective_user.username,
+        'pm_firstname': update.effective_user.first_name,
+        'account_type': 'free',
+        'projects': [],
+    }
+    # Store information about PM in context
+    context.user_data['PM'] = PM
 
     bot_msg = (f"Hello, {update.effective_user.first_name}!"
                f"You are starting a new project"
@@ -407,20 +417,70 @@ async def start(update: Update, context: CallbackContext) -> int:
 
 async def naming_project(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     ''' Function for recognizing name of the project '''
+    
+    #TODO: Clean input and add check for malicous input    
+    global PROJECTTITLE
+    PROJECTTITLE = update.message.text
+    project = {
+        'title': PROJECTTITLE,
+        'active': True,
+        'tg_chat_id': '', # TODO store here group chat where project members discuss project
+        'settings': {
+            ALLOW_POST_STATUS_TO_GROUP: False,
+            INFORM_ACTIONERS_OF_MILESTONES: False,         
+            },
+        'tasks': [],
+        'staff': []
+    }
+    # Add project data to PM dictionary in user_data. One start = one project.
+    context.user_data['PM']['project'] = project
+    #TODO check DB for such name for this user, standalone?
 
-    print(f'We recieved input from user and now ask for file upload')
+    # TODO save PM with project to DB - standalone
+ 
+    bot_msg = f'We recieved input from user and now ask for file upload')
+    await update.message.reply_text(bot_msg)
     return SECOND_LVL
 
 
 async def file_recieved(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     ''' Function to proceed uploaded file and saving to DB'''
-    bot_msg = f"At this step file recieved and proceeded"
-    await update.message.reply_text(bot_msg)
-    return ConversationHandler.END
-    # TODO if smth not right:
-    # bot_msg = f"Have some problems with this file. Try upload again"
-    # await update.message.reply_text(bot_msg)
-    # return SECOND_LVL
+    # TODO reconsider to make this part as standalone function because it's same as in /upload
+    # Call function to recieve file and call converters
+    with tempfile.TemporaryDirectory() as tdp:
+        gotfile = await context.bot.get_file(update.message.document)
+        fp = await gotfile.download_to_drive(os.path.join(tdp, update.message.document.file_name))
+        
+        # Call function which converts given file to dictionaries
+        tasks, staff = file_to_dict(fp)
+        if tasks and staff:
+            # Remember telegram user id
+            staff = add_user_id(update.message.from_user, staff)
+            bot_msg = "File parsed successfully"
+
+            #TODO save to DB
+
+            # If succeed call function to create Jobs
+            # Call function to create jobs:
+            project_title = context.user_data['PM']['project']['title']
+            if schedule_jobs(str(update.effective_user.id), project_title, context):
+                bot_msg = (v"\nReminders were created: on the day before event, in the morning of event and reminder for friday file update."
+                            "You can change them or turn off in /setttings."
+                            "Project initialization complete."
+                )
+            else:
+                bot_msg = (bot_msg + "\nSomething went wrong while scheduling reminders."
+                            "\nPlease, contact bot developer to check the logs.")
+            await update.message.reply_text(bot_msg)
+            return ConversationHandler.END
+        else:
+            bot_msg = (f"Couldn't process given file.\n"
+                        f"Supported formats are: .gan (GanttProject), .json, .xml (MS Project)"
+                        f"Make sure these files contain custom field named 'tg_username', which store usernames of project team members."
+                        f"If you would like to see other formats supported feel free to message bot developer via /feedback command."
+            )
+        await update.message.reply_text(bot_msg)
+        return SECOND_LVL
 
 
 async def start_ended(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -428,7 +488,112 @@ async def start_ended(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
     bot_msg = "This is fallback function. How we get here?"
     logger.warning(f"User: {update.message.from_user.username} ({update.message.from_user.id}) wrote: {update.message.text}")
     await update.message.reply_text(bot_msg)
+
+### HELPERS:
+def file_to_dict(fp):
+    ''' Get file, return dictionaries '''
+    tasks = {}
+    staff = {}
+
+    # If file is known format: call appropriate function with this file as argument and expect project dictionary on return
+    try:
+        match fp.suffix:
+            case '.gan':
+                tasks, staff = connectors.load_gan(fp)
+
+            case '.json':
+                tasks, staff = connectors.load_json(fp)
+
+            case '.xml':
+                tasks, staff = connectors.load_xml(fp)
+
+        # else log what was tried to be loaded
+            case _:
+                logger.warning(f"Someone tried to load '{fp.suffix}' file.")                
+    except Exception as e:
+        logger.error(f'{e} \t {e.with_traceback}')
+        return None, None    
+    else:
+        return tasks, staff
+
+
+def schedule_jobs(user_id: str, project_title: str, context: ContextTypes.DEFAULT_TYPE):
+    ''' 
+    Schedule jobs for main reminders. Return false if not succeded
+    TODO v2: When custom reminders functionality will be added this function must be revised
+    '''    
+    
+    morning_update_job, day_before_update_job, file_update_job = None, None, None
+
+    # TODO create jobs in mongo in apsheduler collection
+
+    job_id = str(user_id) + '_' + project_title + '_' + 'morning_update'
+    print(job_id)
+    preset = get_job_preset(job_id, context)
+    print(preset)
+    if not preset:
+
+        # Use default values from constants
+        try:
+            hour, minute = map(int, MORNING.split(":"))                    
+            time2check = time(hour, minute, tzinfo=datetime.now().astimezone().tzinfo)
+        except ValueError as e:
+            logger.error(f'Error while parsing time: {e} \t {e.with_traceback}')
+
+        # Set job schedule 
+        else:
+            
+            ''' To persistence to work job must have explicit ID and 'replace_existing' must be True
+            or a new copy of the job will be created every time application restarts! '''
+            job_kwargs = {'id': job_id, 'replace_existing': True}
+            morning_update_job = context.job_queue.run_daily(morning_update, user_id=user_id, time=time2check, data=project_title, job_kwargs=job_kwargs)
+            
+            # and enable it.
+            morning_update_job.enabled = True 
+            print(f"Next time: {morning_update_job.next_t}, is it on? {morning_update_job.enabled}")      
+            
+    # 2nd - daily on the eve of task reminder
+    job_id = str(user_id) + '_' + project_title + '_' + 'day_before_update'
+    print(job_id)
+    preset = get_job_preset(job_id, context)
+    if not preset:                    
+        try:
+            hour, minute = map(int, ONTHEEVE.split(":"))                    
+            time2check = time(hour, minute, tzinfo=datetime.now().astimezone().tzinfo)
+        except ValueError as e:
+            logger.error(f'Error while parsing time: {e} \t {e.with_traceback}')
+        
+        # Add job to queue and enable it
+        else:                            
+            job_kwargs = {'id': job_id, 'replace_existing': True}
+            day_before_update_job = context.job_queue.run_daily(day_before_update, user_id=user_id, time=time2check, data=project_title, job_kwargs=job_kwargs)
+            day_before_update_job.enabled = True
+            # print(f"Next time: {day_before_update_job.next_t}, is it on? {day_before_update_job.enabled}")   
+
+    # Register friday reminder
+    job_id = str(user_id) + '_' + project_title + '_' + 'file_update'
+    preset = get_job_preset(job_id, context)
+    if not preset:   
+        try:
+            hour, minute = map(int, FRIDAY.split(":"))                    
+            time2check = time(hour, minute, tzinfo=datetime.now().astimezone().tzinfo)
+        except ValueError as e:
+            logger.error(f'Error while parsing time: {e} \t {e.with_traceback}')
+        
+        # Add job to queue and enable it
+        else:
+            job_kwargs = {'id': job_id, 'replace_existing': True}
+            file_update_job = context.job_queue.run_daily(file_update, user_id=user_id, time=time2check, days=(5,), data=project_title, job_kwargs=job_kwargs)
+            file_update_job.enabled = True
+            # print(f"Next time: {file_update_job.next_t}, is it on? {file_update_job.enabled}") 
+            
+   
+    if morning_update_job and day_before_update_job and file_update_job:
+        return True
+    else:
+        return False
 ######### END OF START SECTION ###########
+
 
 async def status(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """
@@ -664,124 +829,51 @@ async def upload(update: Update, context: CallbackContext) -> None:
     # Check if user is PM
     uploader = update.message.from_user.username
     if uploader == PM:
-
-        # Let's keep files got from user in temporary directory
+        # Let's keep files got from user in temporary directory TODO what's happenning with them there?
         with tempfile.TemporaryDirectory() as tdp:
             gotfile = await context.bot.get_file(update.message.document)
             fp = await gotfile.download_to_drive(os.path.join(tdp, update.message.document.file_name))
-
-            # If file is known format: call appropriate function with this file as argument and expect project dictionary on return
-            project = {}
-            try:
-                match fp.suffix:
-                    case '.gan':
-                        project = connectors.load_gan(fp)
-
-                    case '.json':
-                        project = connectors.load_json(fp)
-
-                    case '.xml':
-                        project = connectors.load_xml(fp)
-
-                # else inform user about supported file types
-                    case _:                
-                        bot_msg = 'Bot supports only these project file formats: .gan (GanttProject) and that is all for now.'
-            except AttributeError as e:
-                bot_msg = f'Seems like field for telegram id for team member is absent: {e}'
-                logger.error(f'{e} \t {e.with_traceback}')
-            except ValueError as e:
-                bot_msg = f'Error occurred while processing file: {e}'
-                logger.error(f'{e} \t {e.with_traceback}')
-            except FileNotFoundError as e:
-                bot_msg = f'Seems like the file {e} does not exist'
-                logger.error(f'{e} \t {e.with_traceback}')
-            except Exception as e:
-                bot_msg = f'Unknow error occurred while processing file: {e}'
-                logger.info(f'{e} \t {e.with_traceback}')
-            else:
-                if project:
-
-                    # Remember telegram user id
-                    project = add_user_id(update.message.from_user, project)
-
-                    # Call function to save project in JSON format and log exception
-                    try:
-                        save_json(project, PROJECTJSON)
-                    except FileNotFoundError as e:
-                        logger.error(f'{e} \t {e.with_traceback}')
-                        # TODO better inform PM that there are problems with writing project
-                        bot_msg = "Seems like path to save project does not exist"
-                    except Exception as e:
-                        logger.error(f'{e} \t {e.with_traceback}')
-                        bot_msg = "Error saving project"
-                    else:
-                        bot_msg = "Project file saved successfully"
- 
-                    # TODO Reminders should be set after successful upload during start/freshstart routine - Separate function!
-                    # Create daily reminders: 1st - daily morining reminder
-                    # Prepare time provide timezone info of user location 
-                    # Check if jobs already present
-                    # First determine job_id:
-                    job_id = str(update.effective_user.id) + '_' + PROJECTTITLE + '_' + 'morning_update'
-                    print(job_id)
-                    # preset = get_job_preset('morning_update', update.effective_user.id, PROJECTTITLE, context)
-                    preset = get_job_preset(job_id, context)
-                    print(preset)
-                    if not preset:
-                        try:
-                    # TODO this should be done in settings set by PM, along with check for correct values. And stored in project settings
-                            hour, minute = map(int, MORNING.split(":"))                    
-                            time2check = time(hour, minute, tzinfo=datetime.now().astimezone().tzinfo)
-                        except ValueError as e:
-                            logger.error(f'Error while parsing time: {e} \t {e.with_traceback}')
-
-                        # Set job schedule 
-                        else:
-                            ''' To persistence to work job must have explicit ID and 'replace_existing' must be True
-                            or a new copy of the job will be created every time application restarts! '''
-                            job_kwargs = {'id': job_id, 'replace_existing': True}
-                            morning_update_job = context.job_queue.run_daily(morning_update, user_id=update.effective_user.id, time=time2check, data=PROJECTTITLE, job_kwargs=job_kwargs)
-                            
-                            # and enable it.
-                            morning_update_job.enabled = True 
-                            print(f"Next time: {morning_update_job.next_t}, is it on? {morning_update_job.enabled}")      
-                            
-                    # 2nd - daily on the eve of task reminder
-                    job_id = str(update.effective_user.id) + '_' + PROJECTTITLE + '_' + 'day_before_update'
-                    print(job_id)
-                    preset = get_job_preset(job_id, context)
-                    if not preset:                    
-                        try:
-                            hour, minute = map(int, ONTHEEVE.split(":"))                    
-                            time2check = time(hour, minute, tzinfo=datetime.now().astimezone().tzinfo)
-                        except ValueError as e:
-                            logger.error(f'Error while parsing time: {e} \t {e.with_traceback}')
-                        
-                        # Add job to queue and enable it
-                        else:                            
-                            job_kwargs = {'id': job_id, 'replace_existing': True}
-                            day_before_update_job = context.job_queue.run_daily(day_before_update, user_id=update.effective_user.id, time=time2check, data=PROJECTTITLE, job_kwargs=job_kwargs)
-                            day_before_update_job.enabled = True
-                            # print(f"Next time: {day_before_update_job.next_t}, is it on? {day_before_update_job.enabled}")   
-
-                    # Register friday reminder
-                    job_id = str(update.effective_user.id) + '_' + PROJECTTITLE + '_' + 'file_update'
-                    preset = get_job_preset(job_id, context)
-                    if not preset:   
-                        try:
-                            hour, minute = map(int, FRIDAY.split(":"))                    
-                            time2check = time(hour, minute, tzinfo=datetime.now().astimezone().tzinfo)
-                        except ValueError as e:
-                            logger.error(f'Error while parsing time: {e} \t {e.with_traceback}')
-                            # print(f"Error while parsing time: {e}")
-                        
-                        # Add job to queue and enable it
-                        else:
-                            job_kwargs = {'id': job_id, 'replace_existing': True}
-                            file_update_job = context.job_queue.run_daily(file_update, user_id=update.effective_user.id, time=time2check, days=(5,), data=PROJECTTITLE, job_kwargs=job_kwargs)
-                            file_update_job.enabled = True
-                            # print(f"Next time: {file_update_job.next_t}, is it on? {file_update_job.enabled}") 
             
+            # Call function which converts given file to dictionaries
+            tasks, staff = file_to_dict(fp)
+            if tasks and staff:
+                # Remember telegram user id
+                staff = add_user_id(update.message.from_user, staff)
+
+                # Call function to save project in JSON format and log exception
+                # TODO delete this is temporariry until I make DB work
+                project = {
+                    'tasks': tasks,
+                    'staff': staff
+                }
+                try:
+                    save_json(project, PROJECTJSON)
+                except FileNotFoundError as e:
+                    logger.error(f'{e} \t {e.with_traceback}')
+                    # TODO better inform PM that there are problems with writing project
+                    bot_msg = "Seems like path to save project does not exist"
+                except Exception as e:
+                    logger.error(f'{e} \t {e.with_traceback}')
+                    bot_msg = "Error saving project"
+                else:
+                    bot_msg = "Project file saved successfully"
+                    
+                    # Call function to create jobs:
+                    project_title = context.user_data['PM']['project']['title']
+                    if schedule_jobs(str(update.effective_user.id), project_title, context):
+                        bot_msg = (bot_msg + "\nReminders were created: on the day before event, in the morning of event and reminder for friday file update."
+                                    "You can change them or turn off in /setttings"
+                        )
+                    else:
+                        bot_msg = (bot_msg + "\nSomething went wrong while scheduling reminders."
+                                    "\nPlease, contact bot developer to check the logs.")
+            else:
+                bot_msg = (f"Couldn't process given file.\n"
+                           f"Supported formats are: .gan (GanttProject), .json, .xml (MS Project)"
+                           f"Make sure these files contain custom field named 'tg_username', which store usernames of project team members."
+                           f"If you would like to see other formats supported feel free to message bot developer via /feedback command."
+                )
+        
     else:
         bot_msg = 'Only Project Manager is allowed to upload new schedule'
     await update.message.reply_text(bot_msg)
@@ -796,7 +888,7 @@ async def settings(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
 
     # Every user could be PM, but project-PM pair is unique
     # TODO: Add buttons to change project settings, such as:
-    # 1. change of PM (see below)
+    # 1. change of PM (see below) (Need to remake Jobs (because of ID))
     # PPP: 
     # Take new PM name, check if he's member of chat members, otherwise do nothing and inform user 
     # 
@@ -809,7 +901,7 @@ async def settings(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     #     message = 'Only project manager is allowed to assign new one'
     # await update.message.reply_text(message)
 
-    # 2. change of project name
+    # 2. change of project name (Needs jobs remake because of job ID)
     # + Allow status update in group chat
     # 4. interval of intermidiate reminders
     # For this purpose I will need ConversationHandler

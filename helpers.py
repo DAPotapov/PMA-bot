@@ -8,17 +8,17 @@ from telegram import User
 from telegram.ext import ContextTypes
 
 
-def add_user_id(user: User, project: dict):
+def add_user_id(user: User, staff: dict):
     ''' 
     Helper function to add telegram id of username provided to project json
     '''
 
     # Remember telegram user id
-    for actioner in project['staff']:
+    for actioner in staff:
         if actioner['tg_username'] == user.username:
             # This will overwrite existing id if present, but it should not be an issue
             actioner['tg_id'] = user.id
-    return project
+    return staff
 
 
 def get_assignees(task: dict, actioners: dict):
