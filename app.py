@@ -15,6 +15,7 @@ import tempfile
 import asyncio
 import re
 import connectors
+import pymongo
 
 from dotenv import load_dotenv
 from datetime import datetime, date, time
@@ -40,6 +41,7 @@ from telegram.ext import (
                             ContextTypes,  
                             ConversationHandler,
                             filters)
+from urllib.parse import quote_plus
 from ptbcontrib.ptb_jobstores import PTBMongoDBJobStore
 from helpers import (
     add_user_id, 
@@ -77,6 +79,17 @@ BOT_PASS = os.environ.get('BOT_PASS')
 
 # link to database
 DB_URI = f"mongodb://{BOT_NAME}:{BOT_PASS}@localhost:27017/admin?retryWrites=true&w=majority"
+DB_NAME = os.environ.get("DB_NAME", "database")
+host = '127.0.0.1:27017'
+uri = "mongodb://%s:%s@%s" % (quote_plus(BOT_NAME), quote_plus(BOT_PASS), host)
+try:
+    # client = pymongo.MongoClient(f"mongodb://{BOT_NAME}:{BOT_PASS}@localhost:27017/admin?retryWrites=true&w=majority")
+    client = pymongo.MongoClient(uri)    
+    DB = client[DB_NAME]
+except ConnectionError as e:
+    logger.error(f"There is problem with connecting to db '{DB_NAME}': {e}")   
+except Exception as e:
+    logger.error(f"Error occurred: {e}")
 
 # Set list of commands
 help_cmd = BotCommand("help","выводит данное описание")
@@ -257,6 +270,7 @@ async def feedback_answer(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
     logger.warning(f'FEEDBACK from {update.message.from_user.username} ({update.message.from_user.id}): {update.message.text}')
     bot_msg = "Feedback sent to developer."
     await update.message.reply_text(bot_msg)
+    # TODO definitely should send message to me (hide tg_id in .env)
     return ConversationHandler.END
 
 
@@ -393,7 +407,7 @@ async def start(update: Update, context: CallbackContext) -> int:
     '''
 
     # TODO PPP: 
-    # check connection to DB
+    # check connection to DB?
     # inform user what to do with this bot
     # Call function to upload project file
     # Call function to make jobs
@@ -407,8 +421,8 @@ async def start(update: Update, context: CallbackContext) -> int:
     # Store information about PM in context
     context.user_data['PM'] = PM
 
-    bot_msg = (f"Hello, {update.effective_user.first_name}!"
-               f"You are starting a new project"
+    bot_msg = (f"Hello, {update.effective_user.first_name}!\n"
+               f"You are starting a new project.\n"
                f"Provide a name for it."
     )
     await update.message.reply_text(bot_msg)
@@ -426,21 +440,68 @@ async def naming_project(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
         'active': True,
         'tg_chat_id': '', # TODO store here group chat where project members discuss project
         'settings': {
-            ALLOW_POST_STATUS_TO_GROUP: False,
-            INFORM_ACTIONERS_OF_MILESTONES: False,         
+            'ALLOW_POST_STATUS_TO_GROUP': False,
+            'INFORM_ACTIONERS_OF_MILESTONES': False,         
             },
         'tasks': [],
         'staff': []
     }
-    # Add project data to PM dictionary in user_data. One start = one project.
-    context.user_data['PM']['project'] = project
-    #TODO check DB for such name for this user, standalone?
+    # Add project data to dictionary in user_data. 
+    # One start = one project. But better keep them separate, because they could be written to DB separately
+    context.user_data['project'] = project
 
-    # TODO save PM with project to DB - standalone
- 
-    bot_msg = f'We recieved input from user and now ask for file upload')
-    await update.message.reply_text(bot_msg)
-    return SECOND_LVL
+    # Check DB for such name for this user, (TODO standalone?)
+    print(context.user_data['PM']['pm_id'])
+    # if check_db_for_user(context.user_data['PM']['pm_id']):
+    db_pm_id = DB.PMs.find_one({"pm_id": context.user_data['PM']['pm_id']})
+    print(db_pm_id)
+    if db_pm_id:
+        prj_id = DB.PMs.find_one({"pm_id": context.user_data['PM']['pm_id'], "projects.title": project['title']})
+        pprint(f"Results for looking this project name in DB: {prj_id}")
+        if prj_id:
+            bot_msg = f"You already started project with name {project['title']}. Try another one."
+            await update.message.reply_text(bot_msg)
+            return FIRST_LVL
+        else:
+            # projects_list = DB.PMs.find_one({"pm_id": context.user_data['PM']['pm_id']}, {"projects": 1, "_id": 0})
+            # new_projects_list = projects_list.append(project)
+            # DB.PMs.update_one({"pm_id": context.user_data['PM']['pm_id']}, {"$set": {"projects": new_projects_list}})
+            # TODO above lines will be done on next step
+            bot_msg = f"Got it. Now you can upload your project file. Supported formats are: .gan (GanttProject), .json, .xml (MS Project)"
+            await update.message.reply_text(bot_msg)
+            return SECOND_LVL
+    else:
+        DB.PMs.insert_one(context.user_data['PM'])
+        # bot_msg = f"Record {} added to DB"
+        bot_msg = f"Got it. Now you can upload your project file. Supported formats are:\n.gan (GanttProject), .json, .xml (MS Project)"
+        await update.message.reply_text(bot_msg)
+        return SECOND_LVL
+
+# TODO DELETE
+    # try:
+    #     # If PM does not present in DB then add him with a project
+    #     # Otherwise add this project to list of projects of this PM
+    #     # If PM already has such project ask user to provide new name
+    #     # TODO: there is no need here to write to DB
+    #     #       Just collect data
+    #     #       Check if project exist to suggest a new name
+    #     #       Но тогда на следующем шаге опять потребуется делать все эти проверки
+    #     #       Если РП нет в БД, то можно на следующем шаге всё сразу записать
+    #     #       Если есть, и имя проекта новое, то обновленный список проектов можно записать на следующем шаге
+        
+    # except Exception as e:
+    #     logger.error(f"Problems with database: {e}")
+    # else:
+    #     await update.message.reply_text(bot_msg)
+    #     return SECOND_LVL
+
+### DELETE? seems that this standalone function doesn't give any advantages
+# def check_db_for_user(pm_id) -> bool:
+#     ''' Function to check whether DB has a PM with provided telegram_id '''
+#     if DB.PMs.find_one({"pm_id": pm_id}):
+#         return True
+#     else:
+#         return False
 
 
 async def file_recieved(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
@@ -458,36 +519,60 @@ async def file_recieved(update: Update, context: ContextTypes.DEFAULT_TYPE) -> i
             staff = add_user_id(update.message.from_user, staff)
             bot_msg = "File parsed successfully"
 
-            #TODO save to DB
+            # Add tasks and staff to user data dictionary in context
+            context.user_data['project']['tasks'] = tasks
+            context.user_data['project']['staff'] = staff
 
-            # If succeed call function to create Jobs
-            # Call function to create jobs:
-            project_title = context.user_data['PM']['project']['title']
-            if schedule_jobs(str(update.effective_user.id), project_title, context):
-                bot_msg = (v"\nReminders were created: on the day before event, in the morning of event and reminder for friday file update."
-                            "You can change them or turn off in /setttings."
-                            "Project initialization complete."
-                )
+            # Save project to DB
+            # At this point PM should be present in DB, so try to append project to it's project list
+            try:
+                projects_list = DB.PMs.find_one({"pm_id": context.user_data['PM']['pm_id']}, {"projects": 1, "_id": 0})
+                # print(f"Projects dict returned: {projects_list['projects']}, it has type: {type(projects_list['projects'])}")
+                # Check if there are projects
+                if projects_list['projects']:
+                    new_projects_list = projects_list['projects'].copy()
+                else:
+                    new_projects_list = []
+                new_projects_list.append(context.user_data['project'])
+                # pprint(f"What is in context? {context.user_data['project']}")
+                # pprint(f"NEW Project list returned: {new_projects_list}, it has type: {type(new_projects_list)}")
+                DB.PMs.update_one({"pm_id": context.user_data['PM']['pm_id']}, {"$set": {"projects": new_projects_list}})
+            except Exception as e:
+                # TODO separate AttributeError(?) (when PM is not present somehow)
+                bot_msg = (bot_msg + f"\nSomething went wrong when writing project to DB:\n{e}")
             else:
-                bot_msg = (bot_msg + "\nSomething went wrong while scheduling reminders."
-                            "\nPlease, contact bot developer to check the logs.")
-            await update.message.reply_text(bot_msg)
-            return ConversationHandler.END
+                # If succeed call function to create Jobs
+                project_title = context.user_data['project']['title']
+                pprint(f"Project title: {project_title}")
+                if schedule_jobs(str(update.effective_user.id), project_title, context):
+                    bot_msg = (bot_msg + "\nReminders were created: on the day before event, in the morning of event and reminder for friday file update. "
+                                "You can change them or turn off in /settings."
+                                "\nProject initialization complete."
+                    )
+                    # Since new project added successfully and it's active, lets make other projects inactive
+                else:
+                    bot_msg = (bot_msg + "\nSomething went wrong while scheduling reminders."
+                                "\nPlease, contact bot developer to check the logs.")
+            finally:
+                await update.message.reply_text(bot_msg)
+                return ConversationHandler.END                                  
         else:
             bot_msg = (f"Couldn't process given file.\n"
-                        f"Supported formats are: .gan (GanttProject), .json, .xml (MS Project)"
-                        f"Make sure these files contain custom field named 'tg_username', which store usernames of project team members."
-                        f"If you would like to see other formats supported feel free to message bot developer via /feedback command."
+                        f"Supported formats are: .gan (GanttProject), .json, .xml (MS Project)\n"
+                        f"Make sure these files contain custom field named 'tg_username', which store usernames of project team members.\n"
+                        f"If you would like to see other formats supported feel free to message bot developer via /feedback command.\n"
+                        f"Try upload another one."
             )
         await update.message.reply_text(bot_msg)
         return SECOND_LVL
 
 
-async def start_ended(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+async def start_ended(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     ''' Finish function of start routine'''
-    bot_msg = "This is fallback function. How we get here?"
+    bot_msg = "This is fallback function. How we get here? When something unexpected happens in conversation. Text message instead of file upload, for example"
     logger.warning(f"User: {update.message.from_user.username} ({update.message.from_user.id}) wrote: {update.message.text}")
     await update.message.reply_text(bot_msg)
+    return ConversationHandler.END
 
 ### HELPERS:
 def file_to_dict(fp):
@@ -586,8 +671,12 @@ def schedule_jobs(user_id: str, project_title: str, context: ContextTypes.DEFAUL
             file_update_job = context.job_queue.run_daily(file_update, user_id=user_id, time=time2check, days=(5,), data=project_title, job_kwargs=job_kwargs)
             file_update_job.enabled = True
             # print(f"Next time: {file_update_job.next_t}, is it on? {file_update_job.enabled}") 
-            
-   
+
+    print("On the exit of job creation function we have:")        
+    pprint(morning_update_job)
+    pprint(day_before_update_job)
+    pprint(file_update_job)
+
     if morning_update_job and day_before_update_job and file_update_job:
         return True
     else:
@@ -841,7 +930,7 @@ async def upload(update: Update, context: CallbackContext) -> None:
                 staff = add_user_id(update.message.from_user, staff)
 
                 # Call function to save project in JSON format and log exception
-                # TODO delete this is temporariry until I make DB work
+                # TODO delete. this is temporariry until I make DB work
                 project = {
                     'tasks': tasks,
                     'staff': staff
@@ -859,7 +948,7 @@ async def upload(update: Update, context: CallbackContext) -> None:
                     bot_msg = "Project file saved successfully"
                     
                     # Call function to create jobs:
-                    project_title = context.user_data['PM']['project']['title']
+                    project_title = context.user_data['project']['title']
                     if schedule_jobs(str(update.effective_user.id), project_title, context):
                         bot_msg = (bot_msg + "\nReminders were created: on the day before event, in the morning of event and reminder for friday file update."
                                     "You can change them or turn off in /setttings"
@@ -1437,6 +1526,7 @@ async def post_init(application: Application):
     """Function to control list of commands in bot itself. Commands itself are global """
     await application.bot.set_my_commands([
                                         help_cmd,
+                                        start_cmd,
                                         status_cmd,
                                         settings_cmd,
                                         # freshstart_cmd,
@@ -1464,7 +1554,7 @@ def main() -> None:
     # Then, we register each handler and the conditions the update must meet to trigger it
     # Register commands
     # Start communicating with user from the new begining
-    application.add_handler(CommandHandler(start_cmd.command, start)) 
+    # application.add_handler(CommandHandler(start_cmd.command, start)) 
     # /stop should make bot 'forget' about this user and stop jobs
     application.add_handler(CommandHandler(stop_cmd.command, stop)) # in case smth went wrong 
     application.add_handler(CommandHandler(help_cmd.command, help)) # make it show description
@@ -1491,7 +1581,8 @@ def main() -> None:
     # application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, echo))
 
     # Register handler for recieving new project file
-    application.add_handler(MessageHandler(filters.Document.ALL, upload))
+    # It's conflicting with /start conversation, better place it in conversation as well
+    # application.add_handler(MessageHandler(filters.Document.ALL, upload))
 
     # Conversation handler for /start
     start_conv = ConversationHandler(
@@ -1502,6 +1593,7 @@ def main() -> None:
         },
         fallbacks=[MessageHandler(filters.TEXT & ~filters.COMMAND, start_ended)]
     )
+    application.add_handler(start_conv)
 
     # Conversation handler for /feedback command
     feedback_conv = ConversationHandler(
