@@ -581,8 +581,8 @@ async def start_ended(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int
 ### HELPERS:
 def file_to_dict(fp):
     ''' Get file, return dictionaries '''
-    tasks = {}
-    staff = {}
+    tasks = []
+    staff = []
 
     # If file is known format: call appropriate function with this file as argument and expect project dictionary on return
     try:
