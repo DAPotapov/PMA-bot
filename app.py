@@ -423,7 +423,8 @@ async def start(update: Update, context: CallbackContext) -> int:
 
     bot_msg = (f"Hello, {update.effective_user.first_name}!\n"
                f"You are starting a new project.\n"
-               f"Provide a name for it."
+               f"Provide a name for it.\n"
+               f"(type 'cancel' if you changed you mind during this process)"
     )
     await update.message.reply_text(bot_msg)
     return FIRST_LVL
@@ -1588,7 +1589,9 @@ def main() -> None:
     start_conv = ConversationHandler(
         entry_points=[CommandHandler(start_cmd.command, start)],
         states={
-            FIRST_LVL: [MessageHandler(filters.TEXT & ~filters.COMMAND, naming_project)],
+            FIRST_LVL: [MessageHandler(filters.TEXT & ~(filters.COMMAND | filters.Regex(re.compile(r'cancel', re.IGNORECASE))), naming_project),
+                        MessageHandler(filters.Regex(re.compile(r'cancel', re.IGNORECASE)), start_ended)
+                        ],
             SECOND_LVL: [MessageHandler(filters.Document.ALL, file_recieved)]
         },
         fallbacks=[MessageHandler(filters.TEXT & ~filters.COMMAND, start_ended)]
