@@ -531,6 +531,9 @@ async def file_recieved(update: Update, context: ContextTypes.DEFAULT_TYPE) -> i
                 # print(f"Projects dict returned: {projects_list['projects']}, it has type: {type(projects_list['projects'])}")
                 # Check if there are projects
                 if projects_list['projects']:
+                    # Make other projects not active
+                    for item in projects_list['projects']:
+                        item['active'] = False
                     new_projects_list = projects_list['projects'].copy()
                 else:
                     new_projects_list = []
