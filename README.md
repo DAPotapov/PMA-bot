@@ -41,138 +41,158 @@ PM can change settings of notifications: time to send reminders to actioners, tu
 First of all: the project file sent to bot should contain field 'tg_username' containing telegram username for members of a project team. Resources obviously should be present in file and assigned to tasks for bot to work :)
 
 ```json
-{
-    "tasks": [
-        {
-            "id": 0,
-            "WBS": "1", # Filled when project imported from MS Project, otherwise it's empty; bot not using it for now.
-            "name": "Common task",
-            "startdate": "2023-05-15",
-            "enddate": "2023-05-18",
-            "duration": 3, # Business days
-            "predecessor": [], # Filled when project imported from MS Project, otherwise it's empty; bot not using it for now.
-            "successors": [], 
-            "milestone": false, # True if task is a milestone
-            "complete": 0, # should 0-100 indicate percentage of completion
-            "curator": "", # for future purposes - if overseer role will be needed
-            "basicplan_startdate": "2023-05-15",
-            "basicplan_enddate": "2023-05-18",
-            "include": [  # For common task in this list goes ids of included subtasks. 
-                1,
-                4,
-                2
-            ],
-            "actioners": []
+{"PMs": {
+    "pm_id": '',            # telegram id of PM
+    "pm_username": '',      # telegram username of PM
+    "pm_firstname": '',     # First name got from telegram too
+    "account_type": 'free', # For future comercial use
+    "settings": {
+        'INFORM_OF_ALL_PROJECTS': False,    #  If set to True /status command will inform PM about all his projects, otherwise   
+},                                          # only about active project  
+    "projects": [                           # PM could manage several projects
+    {
+        "title": '', # Title of the project
+        "active": True,     # Is this an active project? Controlled via settings and used in /status command
+        "tg_chat_id": '',   # store here group chat where project members discuss project
+        "settings": {
+            'ALLOW_POST_STATUS_TO_GROUP': False,        # This option controls whether /status command from group chat 
+                                                        # will send message  to group chat or directly to user
+            'INFORM_ACTIONERS_OF_MILESTONES': False,    # This option controls whether participants will be informed 
+                                                        # not only about tasks but about milestones too
         },
-        {
-            "id": 1,
-            "WBS": "",
-            "name": "First task",
-            "startdate": "2023-05-08",
-            "enddate": "2023-05-15",
-            "duration": 5,
-            "predecessor": [],
-            "successors": [],
-            "milestone": false,
-            "complete": 100, # 100 means completed
-            "curator": "",
-            "basicplan_startdate": "2023-05-08",
-            "basicplan_enddate": "2023-05-15",
-            "include": [],
-            "actioners": [  # Actioner (doer) of this task
-                {
-                    "actioner_id": 1,   # This is id of person in actioners list below
-                    "nofeedback": false # This flag will store if person didn't respond on last reminder
-                },                      # And will be used to inform PM that this task may lack of attention 
-                {
-                    "actioner_id": 2,   # It is better to decompose project to small task  
-                    "nofeedback": false # which can be assigned to one doer, but some tasks (like moving furniture)
-                }                       # need two or more people envolved
-            ]
-        },
-        {
-            "id": 4,
-            "WBS": "",
-            "name": "Some milestone",
-            "startdate": "2023-05-15",
-            "enddate": "2023-05-15",
-            "duration": 0, # Milestones have zero duration
-            "predecessor": [],
-            "successors": [ # Achiving this milestone means "successors" task started
-                {
-                    "id": 2, # id of such task
-                    "depend_type": 1, # Type of dependency (see below)
-                    "depend_offset": 0  # Offset in days from current task (negative number means its earlier in time)
-                },
-                {
-                    "id": 5,
-                    "depend_type": 1,
-                    "depend_offset": 0
-                }
-            ],
-            "milestone": true,
-            "complete": 0,
-            "curator": "",
-            "basicplan_startdate": "2023-05-15",
-            "basicplan_enddate": "2023-05-15",
-            "include": [],
-            "actioners": []
-        },
-        {
-            "id": 2,
-            "WBS": "",
-            "name": "Another task",
-            "startdate": "2023-05-15",
-            "enddate": "2023-05-18",
-            "duration": 3,
-            "predecessor": [
-                {
-                    "id": 4,
-                    "depend_type": 1,
-                    "depend_offset": 0
-                }
-            ],
-            "successors": [
-                {
-                    "id": 5,
-                    "depend_type": 0,
-                    "depend_offset": 0
-                }
-            ],
-            "milestone": false,
-            "complete": 0,
-            "curator": "",
-            "basicplan_startdate": "2023-05-15",
-            "basicplan_enddate": "2023-05-18",
-            "include": [],
-            "actioners": [
-                {
-                    "actioner_id": 0,
-                    "nofeedback": false
-                }
-            ]
-        },        
-    ],
-    "staff": [  # Actioners are stored separately because it is more convinient to write tg_id
-        {       # If they were stored in tasks, then it will be a problem to write tg_id in each task
-            "id": "0",
-            "name": "John",
-            "email": "",
-            "phone": "",
-            "tg_username": "some_user42", 
-            "tg_id": 000000
-        },
-        {
-            "id": "1",
-            "name": "Mark",
-            "email": "",
-            "phone": "",
-            "tg_username": "some_user666",
-            "tg_id": 000000
-        }
+        "tasks": [
+            {
+                "id": 0,
+                "WBS": "1", # Filled when project imported from MS Project, otherwise it's empty; bot not using it for now.
+                "name": "Common task",
+                "startdate": "2023-05-15",
+                "enddate": "2023-05-18",
+                "duration": 3, # Business days
+                "predecessor": [], # Filled when project imported from MS Project, otherwise it's empty; bot not using it for now.
+                "successors": [], 
+                "milestone": false, # True if task is a milestone
+                "complete": 0, # should 0-100 indicate percentage of completion
+                "curator": "", # for future purposes - if overseer role will be needed
+                "basicplan_startdate": "2023-05-15",
+                "basicplan_enddate": "2023-05-18",
+                "include": [  # For common task in this list goes ids of included subtasks. 
+                    1,
+                    4,
+                    2
+                ],
+                "actioners": []
+            },
+            {
+                "id": 1,
+                "WBS": "",
+                "name": "First task",
+                "startdate": "2023-05-08",
+                "enddate": "2023-05-15",
+                "duration": 5,
+                "predecessor": [],
+                "successors": [],
+                "milestone": false,
+                "complete": 100, # 100 means completed
+                "curator": "",
+                "basicplan_startdate": "2023-05-08",
+                "basicplan_enddate": "2023-05-15",
+                "include": [],
+                "actioners": [  # Actioner (doer) of this task
+                    {
+                        "actioner_id": 1,   # This is id of person in actioners list below
+                        "nofeedback": false # This flag will store if person didn't respond on last reminder
+                    },                      # And will be used to inform PM that this task may lack of attention 
+                    {
+                        "actioner_id": 2,   # It is better to decompose project to small task  
+                        "nofeedback": false # which can be assigned to one doer, but some tasks (like moving furniture)
+                    }                       # need two or more people envolved
+                ]
+            },
+            {
+                "id": 4,
+                "WBS": "",
+                "name": "Some milestone",
+                "startdate": "2023-05-15",
+                "enddate": "2023-05-15",
+                "duration": 0, # Milestones have zero duration
+                "predecessor": [],
+                "successors": [ # Achiving this milestone means "successors" task started
+                    {
+                        "id": 2, # id of such task
+                        "depend_type": 1, # Type of dependency (see below)
+                        "depend_offset": 0  # Offset in days from current task (negative number means its earlier in time)
+                    },
+                    {
+                        "id": 5,
+                        "depend_type": 1,
+                        "depend_offset": 0
+                    }
+                ],
+                "milestone": true,
+                "complete": 0,
+                "curator": "",
+                "basicplan_startdate": "2023-05-15",
+                "basicplan_enddate": "2023-05-15",
+                "include": [],
+                "actioners": []
+            },
+            {
+                "id": 2,
+                "WBS": "",
+                "name": "Another task",
+                "startdate": "2023-05-15",
+                "enddate": "2023-05-18",
+                "duration": 3,
+                "predecessor": [
+                    {
+                        "id": 4,
+                        "depend_type": 1,
+                        "depend_offset": 0
+                    }
+                ],
+                "successors": [
+                    {
+                        "id": 5,
+                        "depend_type": 0,
+                        "depend_offset": 0
+                    }
+                ],
+                "milestone": false,
+                "complete": 0,
+                "curator": "",
+                "basicplan_startdate": "2023-05-15",
+                "basicplan_enddate": "2023-05-18",
+                "include": [],
+                "actioners": [
+                    {
+                        "actioner_id": 0,
+                        "nofeedback": false
+                    }
+                ]
+            },        
+        ],
+        "staff": [  # Actioners are stored separately because it is more convinient to write tg_id
+            {       # If they were stored in tasks, then it will be a problem to write tg_id in each task
+                "id": "0",
+                "name": "John",
+                "email": "",
+                "phone": "",
+                "tg_username": "some_user42", 
+                "tg_id": 000000
+            },
+            {
+                "id": "1",
+                "name": "Mark",
+                "email": "",
+                "phone": "",
+                "tg_username": "some_user666",
+                "tg_id": 000000
+            }
+        ]
+    }
     ]
 }
-
+}
 ```
 
 Explanation of values for types of dependencies between tasks ([see docs](https://learn.microsoft.com/en-us/office-project/xml-data-interchange/xml-schema-for-the-tasks-element?view=project-client-2016)):  
