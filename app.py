@@ -416,6 +416,9 @@ async def start(update: Update, context: CallbackContext) -> int:
         'pm_username': update.effective_user.username,
         'pm_firstname': update.effective_user.first_name,
         'account_type': 'free',
+        'settings': {
+            'INFORM_OF_ALL_PROJECTS': False,         
+        },
         'projects': [],
     }
     # Store information about PM in context
@@ -441,8 +444,9 @@ async def naming_project(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
         'active': True,
         'tg_chat_id': '', # TODO store here group chat where project members discuss project
         'settings': {
+            # TODO decide after user testing whether these settings should be stored in here or in PM's settings
             'ALLOW_POST_STATUS_TO_GROUP': False,
-            'INFORM_ACTIONERS_OF_MILESTONES': False,         
+            'INFORM_ACTIONERS_OF_MILESTONES': False,
             },
         'tasks': [],
         'staff': []
@@ -692,205 +696,336 @@ async def status(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """
     This function handles /status command
     """
+    # Dummy message 
     bot_msg = "Should print status to user"
-    # Because /status command could be called anytime, we can't pass project stored in memory to it
-    # so it will be loaded from disk
 
-    if os.path.exists(PROJECTJSON):
-        with open(PROJECTJSON, 'r') as fp:
-            try:
-                project = connectors.load_json(fp)
-            except Exception as e:
-                bot_msg = f"ERROR ({e}): Unable to load"
-                logger.info(f'{e} \t {e.with_traceback}')                  
-            else:
-                # print(f"For testing purposes list jobs: {context.job_queue.jobs()}")
-                # for job in context.job_queue.jobs():
-                    # print(f"Job name: {job.name}, enabled: {job.enabled}")
-                    # pprint(f"has parameters: {job.job.trigger.fields}")
+    # PPP
+    user_id = update.effective_user.id
+    user_name = update.effective_user.username
 
-                # Main thread
-                user = update.message.from_user
-                username = user.username
+    # First look up DB for PM via id
+    result = DB.PMs.find_one({"pm_id": user_id})
+    if not result:
+        # Then by his username
+        result = DB.PMs.find_one({"pm_username": user_name})
+    if result:
+        # Go on and update PM telegram id
+        # TODO - old function isn't useful here
+        # TODO also update username if changed 
+        # Then read settings 
+        INFORM_OF_ALL_PROJECTS = result['settings']['INFORM_OF_ALL_PROJECTS']
+        for project in result['projects']:
+            text_accumulator = ''
+            user_ids = []
+            print(f"We are in this project: {project}") # What if None?
+            ALLOW_POST_STATUS_TO_GROUP = project['settings']['ALLOW_POST_STATUS_TO_GROUP']
+            INFORM_ACTIONERS_OF_MILESTONES = project['settings']['INFORM_ACTIONERS_OF_MILESTONES']
+            # Proceed only if this project is active or PM want to be informed about all projects
+            if INFORM_OF_ALL_PROJECTS or project['active']:
+                bot_msg = f"Status of events for project {project['title']}:"
+                for task in project['tasks']:
+                    # Bot will inform user only of tasks with important dates
 
-                # Check if user in project team, update id if not present
-                project = add_user_id(user, project)
+                    # Check if task not completed
+                    if task['complete'] < 100:
 
-                # Update project file
-                try:
-                    save_json(project, PROJECTJSON)
-                except FileNotFoundError as e:
-                    logger.error(f'{e} \t {e.with_traceback}')
-                    # TODO better inform PM that there are problems with writing project
-                except Exception as e:
-                    logger.error(f'{e} \t {e.with_traceback}')
+                        # If delta_start <0 task not started, otherwise already started
+                        delta_start = date.today() - date.fromisoformat(task['startdate'])
 
-                # Check Who calls? If PM then proceed all tasks
-                if username == PM:
-                    for task in project['tasks']:
-                        # Bot will inform user only of tasks with important dates
-                        bot_msg = ""
+                        # If delta_end >0 task overdue, if <0 task in progress
+                        delta_end = date.today() - date.fromisoformat(task['enddate'])
+                        
+                        # Deal with common task
+                        if task['include']:
 
-                        # Check if task not completed
-                        if task['complete'] < 100:
-
-                            # If delta_start <0 task not started, otherwise already started
-                            delta_start = date.today() - date.fromisoformat(task['startdate'])
-
-                            # If delta_end >0 task overdue, if <0 task in progress
-                            delta_end = date.today() - date.fromisoformat(task['enddate'])
-                            user_ids = []
-
-                            # Deal with common task
-                            if task['include']:
-
-                                # For now focus only on subtasks, that can be actually done
-                                # I'll decide what to do with such tasks after gathering user experience
-                                pass
-                            else:
-
-                                # Inform about milestone
-                                if task['milestone'] == True:
-                                    if delta_end.days < 0:
-
-                                        # If milestone in future inform user
-                                        bot_msg = f"Milestone '{task['name']}' is near ({task['enddate']})!"
-                                    else:
-                                        # if milestone in past do nothing
-                                        pass
-                                else:
-                                    actioners = project['staff']
-                                    if delta_start.days == 0:
-                                        try:
-                                            people, user_ids = get_assignees(task, actioners)
-                                        except Exception as e:
-                                            bot_msg = "Error occured while processing assigned actioners to task task['id']} '{task['name']}' starting today"
-                                            logger.error(f'{e} \t {e.with_traceback}')
-                                        else:
-                                            bot_msg = f"task {task['id']} '{task['name']}' starts today. Assigned to: {people}"
-                                    elif delta_start.days > 0  and delta_end.days < 0:
-                                        try:
-                                            people, user_ids = get_assignees(task, actioners)
-                                        except Exception as e:
-                                            bot_msg = f"Error occured while processing assigned actioners to task {task['id']} {task['name']}"
-                                            logger.error(f'{e} \t {e.with_traceback}')
-                                        else:
-                                            bot_msg = f"task {task['id']} '{task['name']}' is intermidiate. Due date is {task['enddate']}. Assigned to: {people}"
-                                    elif delta_end.days == 0:
-                                        try:
-                                            people, user_ids = get_assignees(task, actioners)
-                                        except Exception as e:
-                                            bot_msg = f"Error occured while processing assigned actioners to task {task['id']} {task['name']}"
-                                            logger.error(f'{e} \t {e.with_traceback}')
-                                        else:                                        
-                                            bot_msg = f"task {task['id']}  '{task['name']}' must be completed today! Assigned to: {people}"
-                                    elif delta_start.days > 0 and delta_end.days > 0:
-                                        try:
-                                            people, user_ids = get_assignees(task, actioners)
-                                        except Exception as e:
-                                            bot_msg = f"Error occured while processing assigned actioners to task {task['id']} {task['name']}"
-                                            logger.error(f'{e} \t {e.with_traceback}')
-                                        else:                                         
-                                            bot_msg = f"task {task['id']} '{task['name']}' is overdue! (had to be completed on {task['enddate']}). Assigned to: {people}"
-                                    else:
-                                        logger.info(f"Loop through future task '{task['id']}' '{task['name']}'")
-
-                            # Check if there is something to report to user
-                            if bot_msg:
-
-                                # Send reply to PM in group chat if allowed
-                                if ALLOW_POST_STATUS_TO_GROUP == True:
-                                    await update.message.reply_text(bot_msg)
-                                else:
-
-                                    # Or in private chat
-                                    await user.send_message(bot_msg)
-
-                                # And send msg to actioner (if it is not a PM)
-                                for id in user_ids:
-                                    # print(id)
-                                    if id != user.id: 
-                                        await context.bot.send_message(
-                                            id,
-                                            text=bot_msg,
-                                            parse_mode=ParseMode.HTML)
-
-                # if not - then only tasks for this member
-                else:
-                    user_id = ''
-                    bot_msg = ''
-                    for actioner in project['staff']:
-                        if user.username == actioner['tg_username']:
-                            user_id = actioner['id']
-                    # print(user_id)
-
-                    # Proceed if user found in team members
-                    if user_id:
-                        for task in project['tasks']:
-                            for doer in task['actioners']:
-
-                                # Check time constraints if user assigned to this task
-                                if user_id == doer['actioner_id']:
-
-                                    # Check if task not completed
-                                    if task['complete'] < 100:
-
-                                        # If delta_start <0 task not started, otherwise already started
-                                        delta_start = date.today() - date.fromisoformat(task['startdate'])
-
-                                        # If delta_end >0 task overdue, if <0 task in progress
-                                        delta_end = date.today() - date.fromisoformat(task['enddate'])
-
-                                        # Deal with common task
-                                        if task['include']:
-
-                                            # For now focus only on subtasks, that can be actually done
-                                            # I'll decide what to do with such tasks after gathering user experience
-                                            pass
-                                        else:
-
-                                            # Inform about milestone
-                                            if task['milestone'] == True:
-                                                if delta_end.days < 0:
-
-                                                    # If milestone in future inform user
-                                                    bot_msg = f"Milestone '{task['name']}' is near ({task['enddate']})!"
-                                                else:
-
-                                                    # if milestone in past do nothing
-                                                    pass
-                                            else:
-                                                if delta_start.days == 0:
-                                                    bot_msg = f"task {task['id']} '{task['name']}' started today."
-                                                elif delta_start.days > 0  and delta_end.days < 0:
-                                                    bot_msg = f"task {task['id']} '{task['name']}' is intermidiate. Due date is {task['enddate']}"
-                                                elif delta_end.days == 0:
-                                                    bot_msg = f"task {task['id']}  '{task['name']}' must be completed today!"
-                                                elif delta_start.days > 0 and delta_end.days > 0:
-                                                    bot_msg = f"task {task['id']} '{task['name']}' is overdue! (had to be completed on {task['enddate']})."
-                                                else:
-                                                    logger.info(f"loop through future task '{task['id']}' '{task['name']}'")
-                        if not bot_msg:
-                            bot_msg = f"Seems like there are no critical dates for you now, {user.first_name}."
-
-                        # Send reply to user in group chat if allowed
-                        if ALLOW_POST_STATUS_TO_GROUP == True:
-                            await update.message.reply_text(bot_msg)
+                            # For now focus only on subtasks, that can be actually done
+                            # I'll decide what to do with such tasks after gathering user experience
+                            pass
                         else:
 
-                            # Or in private chat
-                            await user.send_message(bot_msg)
-                        
-                    else:
-                        bot_msg = f"{user.username} is not participate in schedule provided."
-                        # TODO This case should be certanly send to PM. For time being just keep it this way
-                        await update.message.reply_text(bot_msg)
-                    # print(f"username: {user.username}, id: {user.id}")                
-                  
+                            # Inform about milestone
+                            if task['milestone'] == True:
+                                if delta_end.days < 0:
+
+                                    # If milestone in future inform user
+                                    text_accumulator = text_accumulator + f"\nMilestone '{task['name']}' is near ({task['enddate']})!"
+                                else:
+                                    # if milestone in past do nothing
+                                    pass
+                            else:
+                                actioners = project['staff']
+                                if delta_start.days == 0:
+                                    try:
+                                        people, user_ids = get_assignees(task, actioners)
+                                    except Exception as e:
+                                        text_accumulator = text_accumulator + f"\nError occured while processing assigned actioners to task {task['id']} '{task['name']}' starting today"
+                                        logger.error(f'{e} \t {e.with_traceback}')
+                                    else:
+                                        text_accumulator = text_accumulator + f"\nTask {task['id']} '{task['name']}' starts today. Assigned to: {people}"
+                                elif delta_start.days > 0  and delta_end.days < 0:
+                                    try:
+                                        people, user_ids = get_assignees(task, actioners)
+                                    except Exception as e:
+                                        text_accumulator = text_accumulator + f"\nError occured while processing assigned actioners to task {task['id']} {task['name']}"
+                                        logger.error(f'{e} \t {e.with_traceback}')
+                                    else:
+                                        text_accumulator = text_accumulator + f"\nTask {task['id']} '{task['name']}' is intermidiate. Due date is {task['enddate']}. Assigned to: {people}"
+                                elif delta_end.days == 0:
+                                    try:
+                                        people, user_ids = get_assignees(task, actioners)
+                                    except Exception as e:
+                                        text_accumulator = text_accumulator + f"\nError occured while processing assigned actioners to task {task['id']} {task['name']}"
+                                        logger.error(f'{e} \t {e.with_traceback}')
+                                    else:                                        
+                                        text_accumulator = text_accumulator + f"\nTask {task['id']}  '{task['name']}' must be completed today! Assigned to: {people}"
+                                elif delta_start.days > 0 and delta_end.days > 0:
+                                    try:
+                                        people, user_ids = get_assignees(task, actioners)
+                                    except Exception as e:
+                                        text_accumulator = text_accumulator + f"\nError occured while processing assigned actioners to task {task['id']} {task['name']}"
+                                        logger.error(f'{e} \t {e.with_traceback}')
+                                    else:                                         
+                                        text_accumulator = text_accumulator + f"\nTask {task['id']} '{task['name']}' is overdue! (had to be completed on {task['enddate']}). Assigned to: {people}"
+                                else:
+                                    logger.info(f"Loop through future task '{task['id']}' '{task['name']}'")
+
+            # Check if there is something to report to user
+            if not text_accumulator:
+                bot_msg = f"{bot_msg}\nSeems like there are no events worth mention"
+            
+            bot_msg = f"{bot_msg}\n{text_accumulator}"
+
+            # Send reply to PM in group chat if allowed
+            if ALLOW_POST_STATUS_TO_GROUP == True:
+                await update.message.reply_text(bot_msg)
+            else:
+
+                # Or in private chat
+                await context.bot.send_message(user_id, bot_msg)
+
+            # And send msg to actioner (if it is not a PM)
+            # user_ids should be empty if no events worth mention
+            for id in user_ids:
+                # print(id)
+                if id != user_id: 
+                    await context.bot.send_message(
+                        id,
+                        text=bot_msg,
+                        parse_mode=ParseMode.HTML)
+
     else:
-        bot_msg = f"Project file does not exist, try to load first"
-        # TODO consider send directly to user asked
-        await update.message.reply_text(bot_msg)  
+        # If current user not found in project managers 
+        # then just search him in all records and inform about events
+        # if nothing found - Suggest him to start a project
+        pass
+    # Пишем название проекта и далее ключевые события
+    # TODO(тут можно добавить настройку: уведомлять о всех проектах или только об активном)
+    # если юзера нет среди РП, то:
+        # отбираем записи, где юзер - исполнитель 
+            # TODO(возможно потребуется пересмотреть схему: записи из staff перенести непосредственно в исполнителей таска
+            # !!! Предварительно надо выяснить как будет вести себя updateMany при обновлении tg_id для заданного юзернейма
+                # если возможно обновить все таски с её помощью, то ок
+                # если нет, то справочник staff придется оставить (или сделать его отдельной коллекцией?)
+        # для таких записей: выводим название проекта, имя РП и далее события, относящиеся к юзеру
+
+
+    # Because /status command could be called anytime, we can't pass project stored in memory to it
+    # so it will be loaded from disk
+    # if os.path.exists(PROJECTJSON):
+    #     with open(PROJECTJSON, 'r') as fp:
+    #         try:
+    #             project = connectors.load_json(fp)
+    #         except Exception as e:
+    #             bot_msg = f"ERROR ({e}): Unable to load"
+    #             logger.info(f'{e} \t {e.with_traceback}')                  
+    #         else:
+    #             # print(f"For testing purposes list jobs: {context.job_queue.jobs()}")
+    #             # for job in context.job_queue.jobs():
+    #                 # print(f"Job name: {job.name}, enabled: {job.enabled}")
+    #                 # pprint(f"has parameters: {job.job.trigger.fields}")
+
+    #             # Main thread
+    #             user = update.message.from_user
+    #             username = user.username
+
+    #             # Check if user in project team, update id if not present
+    #             project = add_user_id(user, project)
+
+    #             # Update project file
+    #             try:
+    #                 save_json(project, PROJECTJSON)
+    #             except FileNotFoundError as e:
+    #                 logger.error(f'{e} \t {e.with_traceback}')
+    #                 # TODO better inform PM that there are problems with writing project
+    #             except Exception as e:
+    #                 logger.error(f'{e} \t {e.with_traceback}')
+
+    #             # Check Who calls? If PM then proceed all tasks
+    #             if username == PM:
+    #                 for task in project['tasks']:
+    #                     # Bot will inform user only of tasks with important dates
+    #                     bot_msg = ""
+
+    #                     # Check if task not completed
+    #                     if task['complete'] < 100:
+
+    #                         # If delta_start <0 task not started, otherwise already started
+    #                         delta_start = date.today() - date.fromisoformat(task['startdate'])
+
+    #                         # If delta_end >0 task overdue, if <0 task in progress
+    #                         delta_end = date.today() - date.fromisoformat(task['enddate'])
+    #                         user_ids = []
+
+    #                         # Deal with common task
+    #                         if task['include']:
+
+    #                             # For now focus only on subtasks, that can be actually done
+    #                             # I'll decide what to do with such tasks after gathering user experience
+    #                             pass
+    #                         else:
+
+    #                             # Inform about milestone
+    #                             if task['milestone'] == True:
+    #                                 if delta_end.days < 0:
+
+    #                                     # If milestone in future inform user
+    #                                     bot_msg = f"Milestone '{task['name']}' is near ({task['enddate']})!"
+    #                                 else:
+    #                                     # if milestone in past do nothing
+    #                                     pass
+    #                             else:
+    #                                 actioners = project['staff']
+    #                                 if delta_start.days == 0:
+    #                                     try:
+    #                                         people, user_ids = get_assignees(task, actioners)
+    #                                     except Exception as e:
+    #                                         bot_msg = "Error occured while processing assigned actioners to task task['id']} '{task['name']}' starting today"
+    #                                         logger.error(f'{e} \t {e.with_traceback}')
+    #                                     else:
+    #                                         bot_msg = f"task {task['id']} '{task['name']}' starts today. Assigned to: {people}"
+    #                                 elif delta_start.days > 0  and delta_end.days < 0:
+    #                                     try:
+    #                                         people, user_ids = get_assignees(task, actioners)
+    #                                     except Exception as e:
+    #                                         bot_msg = f"Error occured while processing assigned actioners to task {task['id']} {task['name']}"
+    #                                         logger.error(f'{e} \t {e.with_traceback}')
+    #                                     else:
+    #                                         bot_msg = f"task {task['id']} '{task['name']}' is intermidiate. Due date is {task['enddate']}. Assigned to: {people}"
+    #                                 elif delta_end.days == 0:
+    #                                     try:
+    #                                         people, user_ids = get_assignees(task, actioners)
+    #                                     except Exception as e:
+    #                                         bot_msg = f"Error occured while processing assigned actioners to task {task['id']} {task['name']}"
+    #                                         logger.error(f'{e} \t {e.with_traceback}')
+    #                                     else:                                        
+    #                                         bot_msg = f"task {task['id']}  '{task['name']}' must be completed today! Assigned to: {people}"
+    #                                 elif delta_start.days > 0 and delta_end.days > 0:
+    #                                     try:
+    #                                         people, user_ids = get_assignees(task, actioners)
+    #                                     except Exception as e:
+    #                                         bot_msg = f"Error occured while processing assigned actioners to task {task['id']} {task['name']}"
+    #                                         logger.error(f'{e} \t {e.with_traceback}')
+    #                                     else:                                         
+    #                                         bot_msg = f"task {task['id']} '{task['name']}' is overdue! (had to be completed on {task['enddate']}). Assigned to: {people}"
+    #                                 else:
+    #                                     logger.info(f"Loop through future task '{task['id']}' '{task['name']}'")
+
+    #                         # Check if there is something to report to user
+    #                         if bot_msg:
+
+    #                             # Send reply to PM in group chat if allowed
+    #                             if ALLOW_POST_STATUS_TO_GROUP == True:
+    #                                 await update.message.reply_text(bot_msg)
+    #                             else:
+
+    #                                 # Or in private chat
+    #                                 await user.send_message(bot_msg)
+
+    #                             # And send msg to actioner (if it is not a PM)
+    #                             for id in user_ids:
+    #                                 # print(id)
+    #                                 if id != user.id: 
+    #                                     await context.bot.send_message(
+    #                                         id,
+    #                                         text=bot_msg,
+    #                                         parse_mode=ParseMode.HTML)
+
+    #             # if not - then only tasks for this member
+    #             else:
+    #                 user_id = ''
+    #                 bot_msg = ''
+    #                 for actioner in project['staff']:
+    #                     if user.username == actioner['tg_username']:
+    #                         user_id = actioner['id']
+    #                 # print(user_id)
+
+    #                 # Proceed if user found in team members
+    #                 if user_id:
+    #                     for task in project['tasks']:
+    #                         for doer in task['actioners']:
+
+    #                             # Check time constraints if user assigned to this task
+    #                             if user_id == doer['actioner_id']:
+
+    #                                 # Check if task not completed
+    #                                 if task['complete'] < 100:
+
+    #                                     # If delta_start <0 task not started, otherwise already started
+    #                                     delta_start = date.today() - date.fromisoformat(task['startdate'])
+
+    #                                     # If delta_end >0 task overdue, if <0 task in progress
+    #                                     delta_end = date.today() - date.fromisoformat(task['enddate'])
+
+    #                                     # Deal with common task
+    #                                     if task['include']:
+
+    #                                         # For now focus only on subtasks, that can be actually done
+    #                                         # I'll decide what to do with such tasks after gathering user experience
+    #                                         pass
+    #                                     else:
+
+    #                                         # Inform about milestone
+    #                                         if task['milestone'] == True:
+    #                                             if delta_end.days < 0:
+
+    #                                                 # If milestone in future inform user
+    #                                                 bot_msg = f"Milestone '{task['name']}' is near ({task['enddate']})!"
+    #                                             else:
+
+    #                                                 # if milestone in past do nothing
+    #                                                 pass
+    #                                         else:
+    #                                             if delta_start.days == 0:
+    #                                                 bot_msg = f"task {task['id']} '{task['name']}' started today."
+    #                                             elif delta_start.days > 0  and delta_end.days < 0:
+    #                                                 bot_msg = f"task {task['id']} '{task['name']}' is intermidiate. Due date is {task['enddate']}"
+    #                                             elif delta_end.days == 0:
+    #                                                 bot_msg = f"task {task['id']}  '{task['name']}' must be completed today!"
+    #                                             elif delta_start.days > 0 and delta_end.days > 0:
+    #                                                 bot_msg = f"task {task['id']} '{task['name']}' is overdue! (had to be completed on {task['enddate']})."
+    #                                             else:
+    #                                                 logger.info(f"loop through future task '{task['id']}' '{task['name']}'")
+    #                     if not bot_msg:
+    #                         bot_msg = f"Seems like there are no critical dates for you now, {user.first_name}."
+
+    #                     # Send reply to user in group chat if allowed
+    #                     if ALLOW_POST_STATUS_TO_GROUP == True:
+    #                         await update.message.reply_text(bot_msg)
+    #                     else:
+
+    #                         # Or in private chat
+    #                         await user.send_message(bot_msg)
+                        
+    #                 else:
+    #                     bot_msg = f"{user.username} is not participate in schedule provided."
+    #                     # TODO This case should be certanly send to PM. For time being just keep it this way
+    #                     await update.message.reply_text(bot_msg)
+    #                 # print(f"username: {user.username}, id: {user.id}")                
+                  
+    # else:
+    #     bot_msg = f"Project file does not exist, try to load first"
+    #     # TODO consider send directly to user asked
+    #     await update.message.reply_text(bot_msg)  
 
 
 async def stop(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
