@@ -45,7 +45,8 @@ from urllib.parse import quote_plus
 from ptbcontrib.ptb_jobstores import PTBMongoDBJobStore
 from helpers import (
     add_user_id, 
-    get_assignees, 
+    get_assignees,
+    get_db, 
     get_job_preset, 
     save_json)
 # For testing purposes
@@ -74,22 +75,26 @@ KNOWN_USERS = {}
 load_dotenv()
 PM = os.environ.get("PM")
 PROJECTJSON = os.environ.get("PROJECTJSON")
+
+# Link to DB for storing jobs
 BOT_NAME = os.environ.get('BOT_NAME')
 BOT_PASS = os.environ.get('BOT_PASS')
-
-# link to database
 DB_URI = f"mongodb://{BOT_NAME}:{BOT_PASS}@localhost:27017/admin?retryWrites=true&w=majority"
-DB_NAME = os.environ.get("DB_NAME", "database")
-host = '127.0.0.1:27017'
-uri = "mongodb://%s:%s@%s" % (quote_plus(BOT_NAME), quote_plus(BOT_PASS), host)
-try:
-    # client = pymongo.MongoClient(f"mongodb://{BOT_NAME}:{BOT_PASS}@localhost:27017/admin?retryWrites=true&w=majority")
-    client = pymongo.MongoClient(uri)    
-    DB = client[DB_NAME]
-except ConnectionError as e:
-    logger.error(f"There is problem with connecting to db '{DB_NAME}': {e}")   
-except Exception as e:
-    logger.error(f"Error occurred: {e}")
+
+# TODO DELETE? should work as standalone function
+# # link to database
+# DB_NAME = os.environ.get("DB_NAME", "database")
+# host = '127.0.0.1:27017'
+# uri = "mongodb://%s:%s@%s" % (quote_plus(BOT_NAME), quote_plus(BOT_PASS), host)
+# try:
+#     # client = pymongo.MongoClient(f"mongodb://{BOT_NAME}:{BOT_PASS}@localhost:27017/admin?retryWrites=true&w=majority")
+#     client = pymongo.MongoClient(uri)    
+#     DB = client[DB_NAME]
+# except ConnectionError as e:
+#     logger.error(f"There is problem with connecting to db '{DB_NAME}': {e}")   
+# except Exception as e:
+#     logger.error(f"Error occurred: {e}")
+DB = get_db()
 
 # Set list of commands
 help_cmd = BotCommand("help","выводит данное описание")
@@ -452,7 +457,8 @@ async def naming_project(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
         'staff': []
     }
     # Add project data to dictionary in user_data. 
-    # One start = one project. But better keep them separate, because they could be written to DB separately
+    # One start = one project. But better keep PM and project separated, 
+    # because they could be written to DB separately
     context.user_data['project'] = project
 
     # Check DB for such name for this user, (TODO standalone?)

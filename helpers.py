@@ -3,9 +3,18 @@ Some helper functions to help main functions to manupulate with data
 """
 
 import json
+import logging
+import pymongo
+import os
 
+from dotenv import load_dotenv
 from telegram import User
 from telegram.ext import ContextTypes
+from urllib.parse import quote_plus
+
+# Configure logging
+logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s', level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 
 def add_user_id(user: User, staff: dict):
@@ -42,6 +51,28 @@ def get_assignees(task: dict, actioners: dict):
                 else:
                     people = f"{people}@{member['tg_username']} ({member['name']})"
     return people, user_ids
+
+
+def get_db():
+    load_dotenv()
+    BOT_NAME = os.environ.get('BOT_NAME')
+    BOT_PASS = os.environ.get('BOT_PASS')
+
+    # link to database
+    # DB_URI = f"mongodb://{BOT_NAME}:{BOT_PASS}@localhost:27017/admin?retryWrites=true&w=majority"
+    DB_NAME = os.environ.get("DB_NAME", "database")
+    host = '127.0.0.1:27017'
+    DB = None
+    try:
+        uri = "mongodb://%s:%s@%s" % (quote_plus(BOT_NAME), quote_plus(BOT_PASS), host)
+        # client = pymongo.MongoClient(f"mongodb://{BOT_NAME}:{BOT_PASS}@localhost:27017/admin?retryWrites=true&w=majority")
+        client = pymongo.MongoClient(uri)    
+        DB = client[DB_NAME]
+    except ConnectionError as e:
+        logger.error(f"There is problem with connecting to db '{DB_NAME}': {e}")   
+    except Exception as e:
+        logger.error(f"Error occurred: {e}")
+    return DB
 
 
 def get_job_preset(job_id: str, context: ContextTypes.DEFAULT_TYPE):

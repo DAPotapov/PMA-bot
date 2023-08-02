@@ -51,7 +51,7 @@ def load_gan(fp):
     This is a connector from GanttProject format (.gan) to inner format.
     Get file pointer on input
     Validates and converts data to inner dict-list-dict.. format
-    Dictionary on output        
+    Dictionaries on output        
     '''
     
     # Using untangle on GAN - WORKING. This syntax cleaner and have some useful methods like 'children'
@@ -89,7 +89,7 @@ def load_gan(fp):
     # Collect actioners
     staff = []
     property_id = ''
-    
+
     # Check if special field for telegram id exist and choose correct 
     # custom property if there are several of them
     for custom_property in obj.project.resources.custom_property_definition:
@@ -129,7 +129,20 @@ def load_gan(fp):
     return tasks, staff
 
 
-def compose_tasks_list(list, task, allocations):
+def get_actioner_id(inner_id: int, resources):
+    '''
+    Get id from allocations list and list of resources of the project
+    Checks if such resource already present in staff collection in DB and returns its id
+    If not present: adds it to DB and returns id.
+    If something went wrong return None (should be checked on calling side)
+    '''
+    actioner_id = None
+    for worker in resources:
+        actioner_id = 1
+
+    return actioner_id
+
+def compose_tasks_list(tasks, task, allocations, resources):
     ''' Function to append to list of tasks information of one task or subtask'''
 
     # Dictionary of id of actioners and their last reaction
@@ -138,9 +151,10 @@ def compose_tasks_list(list, task, allocations):
     actioners = [] 
     for allocation in allocations:
         if task['id'] == allocation['task-id']:
+            actioner_id = get_actioner_id(int(allocation['resource-id']), resources)
             actioners.append({
                 # Memo: GanntProject starts numeration of resources from 0, MS Project - from 1
-                'actioner_id': int(allocation['resource-id']), 
+                'actioner_id': actioner_id, 
                 'nofeedback': False # Default. Will be changed to True if person didn't answer to bot
                 })
                              
@@ -194,7 +208,7 @@ def compose_tasks_list(list, task, allocations):
     else:
         enddate = str(busday_offset(datetime64(task['start']), int(task['duration']) - 1, roll='forward'))
 
-    list.append({
+    tasks.append({
                 'id': int(task['id']),
                 'WBS': None, # For compatibility with MS Project
                 'name': task['name'],
@@ -211,7 +225,7 @@ def compose_tasks_list(list, task, allocations):
                 'include': include,
                 'actioners': actioners
             })
-    return list
+    return tasks
 
 
 def load_json(fp):
