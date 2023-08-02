@@ -30,6 +30,32 @@ def add_user_id(user: User, staff: dict):
     return staff
 
 
+def get_actioner_id_from_db(tg_username: str):
+    '''
+    Search staff collection in DB for given telegram username and return DB-id.
+    If not present: adds it to DB and returns id.
+    If something went wrong return None (should be checked on calling side)
+    '''
+    actioner_id = None
+    DB = get_db()
+  
+    result = DB.staff.find_one({'tg_username': tg_username})
+    if result:
+        # print(f"result of searching db for username: {result['_id']}")
+        actioner_id = result['_id']
+    else:
+        record = {
+                "name": "",
+                "email": "",
+                "phone": "",
+                "tg_username": tg_username, 
+                "tg_id": ''
+            }
+        actioner_id = DB.staff.insert_one(record).inserted_id
+
+    return actioner_id
+
+
 def get_assignees(task: dict, actioners: dict):
     '''
     Helper function for getting names and telegram usernames

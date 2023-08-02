@@ -3,6 +3,7 @@ import re
 import untangle
 import json
 
+from helpers import get_actioner_id_from_db
 from numpy import busday_offset, busday_count, floor, datetime64
 # For testing purposes
 from pprint import pprint
@@ -129,18 +130,13 @@ def load_gan(fp):
     return tasks, staff
 
 
-def get_actioner_id(inner_id: int, resources):
-    '''
-    Get id from allocations list and list of resources of the project
-    Checks if such resource already present in staff collection in DB and returns its id
-    If not present: adds it to DB and returns id.
-    If something went wrong return None (should be checked on calling side)
-    '''
-    actioner_id = None
-    for worker in resources:
-        actioner_id = 1
+def get_tg_id_from_resources(resource_id, resources):
+    tg_username = None
+    for actioner in resources:
+        if resource_id == int(actioner['id']):
+            tg_username = actioner['tg_username']
+    return tg_username
 
-    return actioner_id
 
 def compose_tasks_list(tasks, task, allocations, resources):
     ''' Function to append to list of tasks information of one task or subtask'''
@@ -151,12 +147,19 @@ def compose_tasks_list(tasks, task, allocations, resources):
     actioners = [] 
     for allocation in allocations:
         if task['id'] == allocation['task-id']:
-            actioner_id = get_actioner_id(int(allocation['resource-id']), resources)
-            actioners.append({
-                # Memo: GanntProject starts numeration of resources from 0, MS Project - from 1
-                'actioner_id': actioner_id, 
-                'nofeedback': False # Default. Will be changed to True if person didn't answer to bot
-                })
+            # Memo: GanntProject starts numeration of resources from 0, MS Project - from 1
+            tg_username = get_tg_id_from_resources(int(allocation['resource-id']), resources)
+            # pprint(resources)
+            if tg_username:
+                actioner_id = get_actioner_id_from_db(tg_username)
+                actioners.append({
+                    'actioner_id': actioner_id, # Now this field stores id of document in staff collection
+                    'nofeedback': False # Default. Will be changed to True if person didn't answer to bot
+                    })
+            else:
+                raise AttributeError(f"Telegram username not found for task-id='{task['id']}'" 
+                                     f"and resource-id='{allocation['resource-id']}' in resources section of provided file"
+                                     )
                              
     # Dictionary of tasks which succeed from this one
     successors = []
