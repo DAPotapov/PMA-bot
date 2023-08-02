@@ -89,6 +89,7 @@ def load_gan(fp):
     # Collect actioners
     staff = []
     property_id = ''
+    
     # Check if special field for telegram id exist and choose correct 
     # custom property if there are several of them
     for custom_property in obj.project.resources.custom_property_definition:
