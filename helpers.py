@@ -30,30 +30,62 @@ def add_user_id(user: User, staff: dict):
     return staff
 
 
-def get_actioner_id_from_db(tg_username: str):
+def get_worker_id_from_db_by_tg_username(tg_username: str):
     '''
     Search staff collection in DB for given telegram username and return DB-id.
-    If not present: adds it to DB and returns id.
     If something went wrong return None (should be checked on calling side)
     '''
-    actioner_id = None
+
+    worker_id = None
     DB = get_db()
   
     result = DB.staff.find_one({'tg_username': tg_username})
     if result:
         # print(f"result of searching db for username: {result['_id']}")
-        actioner_id = result['_id']
-    else:
-        record = {
-                "name": "",
-                "email": "",
-                "phone": "",
-                "tg_username": tg_username, 
-                "tg_id": ''
-            }
-        actioner_id = DB.staff.insert_one(record).inserted_id
+        worker_id = result['_id']
+        # print(type(worker_id))
 
-    return actioner_id
+    return worker_id
+
+
+def get_worker_id_from_db_by_tg_id(tg_id):
+    '''
+    Search staff collection in DB for given telegram id and return DB-id.
+    If something went wrong return None (should be checked on calling side)
+    '''
+
+    worker_id = None
+    DB = get_db()
+  
+    result = DB.staff.find_one({'tg_id': tg_id})
+    if result:
+        # print(f"result of searching db for username: {result['_id']}")
+        worker_id = result['_id']
+        # print(type(worker_id))
+
+    return worker_id
+
+
+def add_worker_to_staff(worker):
+    ''' 
+    Calls functions to check whether such worker exist in staff collection. 
+    Adds given worker to staff collection if not exist already.
+    '''
+
+    worker_id = None
+    DB = get_db()
+
+    # Check DB if worker already present via telegram id
+    if worker['tg_id']:
+        worker_id = get_worker_id_from_db_by_tg_id(worker['tg_id'])
+    # Othervise via telegram username
+    elif worker['tg_username']:
+        worker_id = get_worker_id_from_db_by_tg_username(worker['tg_username'])
+
+    else:
+        worker_id = DB.staff.insert_one(worker).inserted_id
+
+    return worker_id
 
 
 def get_assignees(task: dict, actioners: dict):

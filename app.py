@@ -759,6 +759,7 @@ async def status(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
                                     # if milestone in past do nothing
                                     pass
                             else:
+                                # TODO should refactor this
                                 actioners = project['staff']
                                 if delta_start.days == 0:
                                     try:

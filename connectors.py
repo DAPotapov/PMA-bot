@@ -1,13 +1,17 @@
+import logging
 import pprint
 import re
 import untangle
 import json
 
-from helpers import get_actioner_id_from_db
+from helpers import add_worker_to_staff, get_worker_id_from_db_by_tg_username
 from numpy import busday_offset, busday_count, floor, datetime64
 # For testing purposes
 from pprint import pprint
 
+# Configure logging
+logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s', level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 def email_validation(email):
     '''
@@ -47,6 +51,20 @@ def main():
     
     return
 
+# def add_staff(staff):
+#     ''' 
+#     Write to staff collection in DB records from given list of personell
+#     Return True if succeed w/o errors
+#     TODO log records that was not added?
+#     '''
+
+
+
+#     result = False
+
+#     return result
+
+
 def load_gan(fp):
     '''
     This is a connector from GanttProject format (.gan) to inner format.
@@ -62,50 +80,112 @@ def load_gan(fp):
     # Parse the file
     obj = untangle.parse(str(fp))
 
-    if 'task' in obj.project.tasks:
-        # Loop through tasks
-        for task in obj.project.tasks.task:
-            # Add relevant data to list containing task information
-            if 'allocation' in obj.project.allocations:
-                allocations = obj.project.allocations.allocation
-                # pprint(f' Tasks list before function call: {tasks}')
-                # pprint(f"This task will be send to function: {task['name']}")
-                tasks = compose_tasks_list(tasks, task, allocations)
-                # pprint(f" .. and after function: {tasks}")
-                # if task has subtask retreive data from it too
-                if 'task' in task:
-                    for subtask in task.task:
-                        # pprint(f' Tasks list before function call: {tasks}')
-                        tasks = compose_tasks_list(tasks, subtask, allocations)
-                        # pprint(f' .. and after: {tasks}')
-
-            else:
-                raise ValueError('There are no assignments made. Whom are you gonna manage?')
+    # Store allocations
+    if 'allocation' in obj.project.allocations:
+        allocations = obj.project.allocations.allocation
     else:
-        raise ValueError('There are no tasks in provided file. Nothing to do.')
+        raise ValueError('There are no assignments made. Whom are you gonna manage?')
 
-    # TODO Resolving GanttProject bug of duplication of resource allocation. 
-    # Better use standalone function in case they will fix this bug
-
-    # Collect actioners
-    staff = []
+    # Store resources
+    if 'resource' in obj.project.resources:
+        resources = obj.project.resources
+    else:
+        raise ValueError('Provided file does not contain information about staff')
+    
+    # Check if special field for telegram id exist and store id of this field
     property_id = ''
-
-    # Check if special field for telegram id exist and choose correct 
-    # custom property if there are several of them
     for custom_property in obj.project.resources.custom_property_definition:
         if custom_property['name'] == 'tg_username':
             property_id = custom_property['id']
             # no need to continue looking through custom properties
             break
-        else:
-            pass
+
+    # Adding workers to DB - should be at first place, before proceeding allocations for tasks
     # Check if custom property for telegram was found
     if property_id:
+
         # If custom property found, then proceed through resources
-        for actioner in obj.project.resources.resource:
+        for actioner in resources.resource:
+
             # Looking in custom properties of each resource for property assosiated with telegram
             tg_username = ''
+            for property in actioner.custom_property:
+                if property['definition-id'] == property_id:
+
+                    # If such property not filled then abort and tell user to do his job and make a proper file
+                    if not property['value']:
+                        raise ValueError(f"'{actioner['name']}' have no tg_username value")
+                    else:
+                        tg_username = property['value']
+
+            # Make dict of actioner
+            worker = {
+                'id' : int(actioner['id']),
+                'name' : actioner['name'],
+                'email' : actioner['contacts'],
+                'phone' : actioner['phone'],
+                'tg_username' : tg_username,
+                'tg_id' : ""
+            }
+
+            # Add record to DB and see result
+            if not add_worker_to_staff(worker):
+                logger.warning("Something went wrong while adding worker to staff collection")
+
+            # Build list of actioners
+            # staff.append({
+            #     'id' : int(actioner['id']),
+            #     'name' : actioner['name'],
+            #     'email' : actioner['contacts'],
+            #     'phone' : actioner['phone'],
+            #     'tg_username' : tg_username,
+            #     'tg_id' : ""
+            # })
+
+    # If no custom property for tg_username found then inform developer
+    else:
+        raise AttributeError(f"Project file has invalid structure: no 'tg_username' field")
+
+    if 'task' in obj.project.tasks:
+        # Loop through tasks
+        for task in obj.project.tasks.task:
+            # Add relevant data to list containing task information
+            
+                # pprint(f' Tasks list before function call: {tasks}')
+                # pprint(f"This task will be send to function: {task['name']}")
+                tasks = compose_tasks_list(tasks, task, allocations, resources, property_id)
+                # pprint(f" .. and after function: {tasks}")
+                # if task has subtask retreive data from it too
+                if 'task' in task:
+                    for subtask in task.task:
+                        # pprint(f' Tasks list before function call: {tasks}')
+                        tasks = compose_tasks_list(tasks, subtask, allocations, resources, property_id)
+                        # pprint(f' .. and after: {tasks}')
+
+    else:
+        raise ValueError('There are no tasks in provided file. Nothing to do.')
+
+    # TODO Resolving GanttProject bug of duplication of resource allocation. 
+    # Better use standalone function in case they will fix this bug
+    
+    # TODO in new schema i don't have to pass staff - it can be obtained from DB anytime
+    return tasks #, staff
+
+
+def get_tg_un_from_resources(resource_id, resources, property_id):
+    ''' 
+    Find telegram username in dictionary of resources which corresponds provided id.
+    Return None if nothing found. Should be controlled on calling side.
+    '''
+
+    tg_username = None
+    print(f"Func called with id: {resource_id}")
+
+    for actioner in resources.resource:
+        # pprint(f"Actioner: {actioner}")
+        if resource_id == actioner['id']:
+            # tg_username = actioner['tg_username'] # NO such field there
+
             for property in actioner.custom_property:
                 if property['definition-id'] == property_id:
                     # If such property not filled then abort and tell user to do his job and make a proper file
@@ -113,45 +193,23 @@ def load_gan(fp):
                         raise ValueError(f"'{actioner['name']}' have no tg_username value")
                     else:
                         tg_username = property['value']
-
-            # Build list of actioners
-            staff.append({
-                'id' : int(actioner['id']),
-                'name' : actioner['name'],
-                'email' : actioner['contacts'],
-                'phone' : actioner['phone'],
-                'tg_username' : tg_username,
-                'tg_id' : ""
-            })
-    # If no custom property for tg_username found then inform developer
-    else:
-        raise AttributeError(f"Project file has invalid structure: no 'tg_username' field")
-    
-    return tasks, staff
-
-
-def get_tg_id_from_resources(resource_id, resources):
-    tg_username = None
-    for actioner in resources:
-        if resource_id == int(actioner['id']):
-            tg_username = actioner['tg_username']
     return tg_username
 
 
-def compose_tasks_list(tasks, task, allocations, resources):
+def compose_tasks_list(tasks, task, allocations, resources, property_id):
     ''' Function to append to list of tasks information of one task or subtask'''
 
     # Dictionary of id of actioners and their last reaction
     # Completeness of task assignments will be controlled in /status function
     # pprint(f"Function got these parameters:\n {list}\n{task['name']}\n{allocations}")
     actioners = [] 
+    pprint(f"Whats in resources? {resources}")
     for allocation in allocations:
         if task['id'] == allocation['task-id']:
             # Memo: GanntProject starts numeration of resources from 0, MS Project - from 1
-            tg_username = get_tg_id_from_resources(int(allocation['resource-id']), resources)
-            # pprint(resources)
+            tg_username = get_tg_un_from_resources(allocation['resource-id'], resources, property_id)
             if tg_username:
-                actioner_id = get_actioner_id_from_db(tg_username)
+                actioner_id = get_worker_id_from_db_by_tg_username(tg_username)
                 actioners.append({
                     'actioner_id': actioner_id, # Now this field stores id of document in staff collection
                     'nofeedback': False # Default. Will be changed to True if person didn't answer to bot
