@@ -26,12 +26,15 @@ def add_user_id_to_db(user: User):
 
     # Fill record with absent id with current one
     # For now I assume that users don't switch their usernames and such situation is force-major
-
-    record = DB.staff.find_one({"tg_username": user.username}, {"tg_id": 1, "_id": 0})
-    if not record:
-        result = DB.staff.update_one({"tg_username": user.username}, {"$set": {"tg_id": user.id}}).upserted_id
-        if not result:
-            logger.warning(f"Something went wrong while adding telegram id for telegram username {user.username}")
+    try:
+        record = DB.staff.find_one({"tg_username": user.username}, {"tg_id": 1, "_id": 0})
+    except Exception as e:
+        logger.error(f"There was error getting DB: {e}")
+    else:
+        if not record:
+            result = DB.staff.update_one({"tg_username": user.username}, {"$set": {"tg_id": user.id}}).upserted_id
+            if not result:
+                logger.warning(f"Something went wrong while adding telegram id for telegram username {user.username}")
 
     return result
 
@@ -45,17 +48,21 @@ def add_worker_to_staff(worker):
     worker_id = None
     DB = get_db()
 
-    # Check DB if worker already present via telegram id
-    if worker['tg_id']:
-        worker_id = get_worker_id_from_db_by_tg_id(worker['tg_id'])
-    # Othervise via telegram username
-    elif worker['tg_username']:
-        worker_id = get_worker_id_from_db_by_tg_username(worker['tg_username'])
+    if DB == None:
+        logger.error(f"There was error getting DB.")
     else:
-        raise ValueError(f"Not enough information about worker provided: neither tg_id nor tg_username. Provided dict:\n{worker}")
-    
-    if not worker_id:
-        worker_id = DB.staff.insert_one(worker).inserted_id
+
+        # Check DB if worker already present via telegram id
+        if worker['tg_id']:
+            worker_id = get_worker_id_from_db_by_tg_id(worker['tg_id'])
+        # Othervise via telegram username
+        elif worker['tg_username']:
+            worker_id = get_worker_id_from_db_by_tg_username(worker['tg_username'])
+        else:
+            raise ValueError(f"Not enough information about worker provided: neither tg_id nor tg_username. Provided dict:\n{worker}")
+        
+        if not worker_id:
+            worker_id = DB.staff.insert_one(worker).inserted_id
 
     return worker_id
 
@@ -69,11 +76,15 @@ def get_worker_id_from_db_by_tg_username(tg_username: str):
     worker_id = None
     DB = get_db()
   
-    result = DB.staff.find_one({'tg_username': tg_username})
-    if result:
-        # print(f"result of searching db for username: {result['_id']}")
-        worker_id = result['_id']
-        # print(type(worker_id))
+    try:
+        result = DB.staff.find_one({'tg_username': tg_username})
+    except Exception as e:
+        logger.error(f"There was error getting DB: {e}")
+    else:
+        if result:
+            # print(f"result of searching db for username: {result['_id']}")
+            worker_id = result['_id']
+            # print(type(worker_id))
 
     return worker_id
 
@@ -87,11 +98,15 @@ def get_worker_id_from_db_by_tg_id(tg_id):
     worker_id = None
     DB = get_db()
   
-    result = DB.staff.find_one({'tg_id': tg_id})
-    if result:
-        # print(f"result of searching db for username: {result['_id']}")
-        worker_id = result['_id']
-        # print(type(worker_id))
+    try:
+        result = DB.staff.find_one({'tg_id': tg_id})
+    except Exception as e:
+        logger.error(f"There was error getting DB: {e}")
+    else:
+        if result:
+            # print(f"result of searching db for username: {result['_id']}")
+            worker_id = result['_id']
+            # print(type(worker_id))
 
     return worker_id
 
@@ -162,7 +177,7 @@ def get_job_preset(job_id: str, context: ContextTypes.DEFAULT_TYPE):
         else:
             time_preset = f"{hour}:{minute}"
 
-        # TODO refactor because property enabled exist only in wrapper class
+        # Determine if job is on or off
         if job.next_run_time:
             state = 'ON'
         else:
@@ -176,10 +191,11 @@ def get_job_preset(job_id: str, context: ContextTypes.DEFAULT_TYPE):
 
 def save_json(project: dict, PROJECTJSON: str) -> None:
     ''' 
-    Saves project in JSON format and returns message about success of operation
+    Saves project in JSON format and returns 
     '''
 
     json_fh = open(PROJECTJSON, 'w', encoding='utf-8')
     bot_msg = json.dump(project, json_fh, ensure_ascii=False, indent=4)
+    json_fh.close()
 
     return bot_msg
