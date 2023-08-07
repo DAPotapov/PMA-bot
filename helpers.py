@@ -17,17 +17,47 @@ logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s
 logger = logging.getLogger(__name__)
 
 
-def add_user_id(user: User, staff: dict):
+def add_user_id_to_db(user: User):
     ''' 
-    Helper function to add telegram id of username provided to project json
+    Helper function to add telegram id of username provided to DB. Returns ObjectId on success
+    '''
+    result = None
+    DB = get_db()
+
+    # Fill record with absent id with current one
+    # For now I assume that users don't switch their usernames and such situation is force-major
+
+    record = DB.staff.find_one({"tg_username": user.username}, {"tg_id": 1, "_id": 0})
+    if not record:
+        result = DB.staff.update_one({"tg_username": user.username}, {"$set": {"tg_id": user.id}}).upserted_id
+        if not result:
+            logger.warning(f"Something went wrong while adding telegram id for telegram username {user.username}")
+
+    return result
+
+
+def add_worker_to_staff(worker):
+    ''' 
+    Calls functions to check whether such worker exist in staff collection. 
+    Adds given worker to staff collection if not exist already.
     '''
 
-    # Remember telegram user id
-    for actioner in staff:
-        if actioner['tg_username'] == user.username:
-            # This will overwrite existing id if present, but it should not be an issue
-            actioner['tg_id'] = user.id
-    return staff
+    worker_id = None
+    DB = get_db()
+
+    # Check DB if worker already present via telegram id
+    if worker['tg_id']:
+        worker_id = get_worker_id_from_db_by_tg_id(worker['tg_id'])
+    # Othervise via telegram username
+    elif worker['tg_username']:
+        worker_id = get_worker_id_from_db_by_tg_username(worker['tg_username'])
+    else:
+        raise ValueError(f"Not enough information about worker provided: neither tg_id nor tg_username. Provided dict:\n{worker}")
+    
+    if not worker_id:
+        worker_id = DB.staff.insert_one(worker).inserted_id
+
+    return worker_id
 
 
 def get_worker_id_from_db_by_tg_username(tg_username: str):
@@ -66,34 +96,13 @@ def get_worker_id_from_db_by_tg_id(tg_id):
     return worker_id
 
 
-def add_worker_to_staff(worker):
-    ''' 
-    Calls functions to check whether such worker exist in staff collection. 
-    Adds given worker to staff collection if not exist already.
-    '''
-
-    worker_id = None
-    DB = get_db()
-
-    # Check DB if worker already present via telegram id
-    if worker['tg_id']:
-        worker_id = get_worker_id_from_db_by_tg_id(worker['tg_id'])
-    # Othervise via telegram username
-    elif worker['tg_username']:
-        worker_id = get_worker_id_from_db_by_tg_username(worker['tg_username'])
-
-    else:
-        worker_id = DB.staff.insert_one(worker).inserted_id
-
-    return worker_id
-
-
 def get_assignees(task: dict, actioners: dict):
     '''
     Helper function for getting names and telegram usernames
     of person assigned to given task to insert in a bot message
     Returns string of the form: '@johntherevelator (John) and @judasofkerioth (Judas)'
     Also returns list of their telegram ids
+    # TODO refactor this to use DB
     '''
 
     people = ""

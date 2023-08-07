@@ -44,7 +44,7 @@ from telegram.ext import (
 from urllib.parse import quote_plus
 from ptbcontrib.ptb_jobstores import PTBMongoDBJobStore
 from helpers import (
-    add_user_id, 
+    add_user_id_to_db, 
     get_assignees,
     get_db, 
     get_job_preset, 
@@ -465,7 +465,7 @@ async def naming_project(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
     print(context.user_data['PM']['pm_id'])
     # if check_db_for_user(context.user_data['PM']['pm_id']):
     db_pm_id = DB.PMs.find_one({"pm_id": context.user_data['PM']['pm_id']})
-    print(db_pm_id)
+    # print(db_pm_id)
     if db_pm_id:
         prj_id = DB.PMs.find_one({"pm_id": context.user_data['PM']['pm_id'], "projects.title": project['title']})
         pprint(f"Results for looking this project name in DB: {prj_id}")
@@ -524,15 +524,16 @@ async def file_recieved(update: Update, context: ContextTypes.DEFAULT_TYPE) -> i
         fp = await gotfile.download_to_drive(os.path.join(tdp, update.message.document.file_name))
         
         # Call function which converts given file to dictionaries
-        tasks, staff = file_to_dict(fp)
-        if tasks and staff:
+        tasks = file_to_dict(fp)
+        if tasks:
             # Remember telegram user id
-            staff = add_user_id(update.message.from_user, staff)
+            # TODO refactor this
+            # staff = add_user_id(update.message.from_user, staff)
             bot_msg = "File parsed successfully"
 
             # Add tasks and staff to user data dictionary in context
             context.user_data['project']['tasks'] = tasks
-            context.user_data['project']['staff'] = staff
+            # context.user_data['project']['staff'] = staff
 
             # Save project to DB
             # At this point PM should be present in DB, so try to append project to it's project list
@@ -592,28 +593,28 @@ async def start_ended(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int
 def file_to_dict(fp):
     ''' Get file, return dictionaries '''
     tasks = []
-    staff = []
+    # staff = []
 
     # If file is known format: call appropriate function with this file as argument and expect project dictionary on return
     try:
         match fp.suffix:
             case '.gan':
-                tasks, staff = connectors.load_gan(fp)
+                tasks = connectors.load_gan(fp)
 
             case '.json':
-                tasks, staff = connectors.load_json(fp)
+                tasks = connectors.load_json(fp)
 
             case '.xml':
-                tasks, staff = connectors.load_xml(fp)
+                tasks = connectors.load_xml(fp)
 
         # else log what was tried to be loaded
             case _:
                 logger.warning(f"Someone tried to load '{fp.suffix}' file.")                
     except Exception as e:
-        logger.error(f'{e} \t {e.with_traceback}')
-        return None, None    
+        logger.error(f'{e}')
+        return None    
     else:
-        return tasks, staff
+        return tasks
 
 
 def schedule_jobs(user_id: str, project_title: str, context: ContextTypes.DEFAULT_TYPE):
@@ -627,9 +628,8 @@ def schedule_jobs(user_id: str, project_title: str, context: ContextTypes.DEFAUL
     # TODO create jobs in mongo in apsheduler collection
 
     job_id = str(user_id) + '_' + project_title + '_' + 'morning_update'
-    print(job_id)
     preset = get_job_preset(job_id, context)
-    print(preset)
+    print(f"Job '{job_id}' scheduled with preset: '{preset}'")
     if not preset:
 
         # Use default values from constants
@@ -1070,10 +1070,11 @@ async def upload(update: Update, context: CallbackContext) -> None:
             fp = await gotfile.download_to_drive(os.path.join(tdp, update.message.document.file_name))
             
             # Call function which converts given file to dictionaries
-            tasks, staff = file_to_dict(fp)
-            if tasks and staff:
+            tasks = file_to_dict(fp)
+            if tasks:
                 # Remember telegram user id
-                staff = add_user_id(update.message.from_user, staff)
+                # TODO refactor this
+                staff = add_user_id_to_db(update.message.from_user, staff)
 
                 # Call function to save project in JSON format and log exception
                 # TODO delete. this is temporariry until I make DB work

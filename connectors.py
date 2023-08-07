@@ -80,12 +80,6 @@ def load_gan(fp):
     # Parse the file
     obj = untangle.parse(str(fp))
 
-    # Store allocations
-    if 'allocation' in obj.project.allocations:
-        allocations = obj.project.allocations.allocation
-    else:
-        raise ValueError('There are no assignments made. Whom are you gonna manage?')
-
     # Store resources
     if 'resource' in obj.project.resources:
         resources = obj.project.resources
@@ -94,11 +88,18 @@ def load_gan(fp):
     
     # Check if special field for telegram id exist and store id of this field
     property_id = ''
-    for custom_property in obj.project.resources.custom_property_definition:
+    # for custom_property in obj.project.resources.custom_property_definition:
+    for custom_property in resources.custom_property_definition:
         if custom_property['name'] == 'tg_username':
             property_id = custom_property['id']
             # no need to continue looking through custom properties
             break
+
+    # Store allocations
+    if 'allocation' in obj.project.allocations:
+        allocations = obj.project.allocations.allocation
+    else:
+        raise ValueError('There are no assignments made. Whom are you gonna manage?')
 
     # Adding workers to DB - should be at first place, before proceeding allocations for tasks
     # Check if custom property for telegram was found
@@ -111,13 +112,12 @@ def load_gan(fp):
             tg_username = ''
             for property in actioner.custom_property:
                 if property['definition-id'] == property_id:
+                    tg_username = property['value']
 
-                    # If such property not filled then abort and tell user to do his job and make a proper file
-                    if not property['value']:
-                        raise ValueError(f"'{actioner['name']}' have no tg_username value")
-                    else:
-                        tg_username = property['value']
-
+            # Check if username was collected
+            if not tg_username:
+                raise ValueError(f"'{actioner['name']}' have no tg_username value")
+            
             # Make dict of actioner
             worker = {
                 'id' : int(actioner['id']),
@@ -129,18 +129,11 @@ def load_gan(fp):
             }
 
             # Add record to DB and see result
-            if not add_worker_to_staff(worker):
-                logger.warning("Something went wrong while adding worker to staff collection")
-
-            # Build list of actioners
-            # staff.append({
-            #     'id' : int(actioner['id']),
-            #     'name' : actioner['name'],
-            #     'email' : actioner['contacts'],
-            #     'phone' : actioner['phone'],
-            #     'tg_username' : tg_username,
-            #     'tg_id' : ""
-            # })
+            try:
+                if not add_worker_to_staff(worker):
+                    logger.warning("Something went wrong while adding worker to staff collection")
+            except ValueError as e:
+                logger.error(f"{e}")
 
     # If no custom property for tg_username found then inform developer
     else:
@@ -172,9 +165,9 @@ def load_gan(fp):
     return tasks #, staff
 
 
-def get_tg_un_from_resources(resource_id, resources, property_id):
+def get_tg_un_from_gan_resources(resource_id, resources, property_id):
     ''' 
-    Find telegram username in dictionary of resources which corresponds provided id.
+    Find telegram username in dictionary of resources (from .gan file) which corresponds provided id.
     Return None if nothing found. Should be controlled on calling side.
     '''
 
@@ -196,6 +189,29 @@ def get_tg_un_from_resources(resource_id, resources, property_id):
     return tg_username
 
 
+def get_tg_un_from_xml_resources(resource_id, resources, property_id):
+    ''' 
+    Find telegram username in dictionary of resources (from .xml file) which corresponds provided id.
+    Return None if nothing found. Should be controlled on calling side.
+    '''
+
+    tg_username = None
+    print(f"Func called with id: {resource_id}")
+
+    for actioner in resources.Resource:
+        if resource_id == actioner.UID.cdata:
+
+            for property in actioner.ExtendedAttribute:
+                if property.FieldID.cdata == property_id:
+
+                    # If such property not filled then abort and tell user to do his job and make a proper file
+                    if not property.Value.cdata:
+                        raise ValueError(f"'{actioner.Name.cdata}' have no tg_username value")
+                    else:
+                        tg_username = property.Value.cdata
+    return tg_username
+
+
 def compose_tasks_list(tasks, task, allocations, resources, property_id):
     ''' Function to append to list of tasks information of one task or subtask'''
 
@@ -207,13 +223,17 @@ def compose_tasks_list(tasks, task, allocations, resources, property_id):
     for allocation in allocations:
         if task['id'] == allocation['task-id']:
             # Memo: GanntProject starts numeration of resources from 0, MS Project - from 1
-            tg_username = get_tg_un_from_resources(allocation['resource-id'], resources, property_id)
+            tg_username = get_tg_un_from_gan_resources(allocation['resource-id'], resources, property_id)
             if tg_username:
                 actioner_id = get_worker_id_from_db_by_tg_username(tg_username)
-                actioners.append({
-                    'actioner_id': actioner_id, # Now this field stores id of document in staff collection
-                    'nofeedback': False # Default. Will be changed to True if person didn't answer to bot
-                    })
+                if actioner_id:
+                    actioners.append({
+                        'actioner_id': actioner_id, # Now this field stores id of document in staff collection
+                        'nofeedback': False # Default. Will be changed to True if person didn't answer to bot
+                        })
+                else:
+                    raise AttributeError(f"Couldn't get ObjectId from DB for '{tg_username} while processing task-id='{task['id']}'"
+                                        f"and resource-id='{allocation['resource-id']}' in resources section of provided file")
             else:
                 raise AttributeError(f"Telegram username not found for task-id='{task['id']}'" 
                                      f"and resource-id='{allocation['resource-id']}' in resources section of provided file"
@@ -317,15 +337,20 @@ def load_xml(fp):
 
     # List for staff
     tasks = []
-    staff = []
-    # Store XML inner ID for field where telegram username located
-    property_id = ''
+    # staff = []
 
     obj = untangle.parse(str(fp))
 
     #TODO consider adding version check if difficulties ocurr
 
+    # Store resources
+    if 'Resource' in obj.Project.Resources:
+        resources = obj.Project.Resources
+    else:
+        raise ValueError('Provided file does not contain information about staff')
+
     # Check for telegram username field in XML provided
+    property_id = ''
     if 'ExtendedAttribute' in obj.Project.ExtendedAttributes:
         for attr in obj.Project.ExtendedAttributes.ExtendedAttribute:
             if attr.Alias.cdata == 'tg_username':
@@ -336,32 +361,50 @@ def load_xml(fp):
     else:
         raise AttributeError("Project file has invalid structure: no 'tg_username' field")
 
-    # Add resources from XML to list of actioners
-    if 'Resource' in obj.Project.Resources:
-        for actioner in obj.Project.Resources.Resource:
-            # Because collection of resources must contain at least one resource (from docs) seems like MS Project adds one with id=0
-            # But it lacks some of the fields like ExtendedAttribute, so it's better to check if current resource has one
-            if 'ExtendedAttribute' in actioner:
-                # Get telegram username from XML for this actioner
-                tg_username = ''
-                for attr in actioner.ExtendedAttribute:
-                    if attr.FieldID.cdata == property_id:
-                        tg_username = attr.Value.cdata
-                if not tg_username:
-                    raise ValueError(f"'{actioner.Name.cdata}' have no tg_username value") 
-                staff.append({
-                    'id' : int(actioner.UID.cdata),
-                    'name' : actioner.Name.cdata,
-                    # Seems like XML not necessary contain email address field for resource
-                    'email' : actioner.EmailAddress.cdata if 'EmailAddress' in actioner else '',
-                    # Seems like MS Project does not know about phones :) 
-                    # Maybe I'll use ExtendedAttribute for this purpose later
-                    'phone' : '',
-                    'tg_username' : tg_username,
-                    'tg_id' : ""
-                })
+    # Store allocations
+    if 'Assignment' in obj.Project.Assignments:
+        allocations = obj.Project.Assignments.Assignment
     else:
-        raise ValueError(f'There are no actioners (resources) in provided file. Who gonna work?')
+        raise ValueError('There are no assignments made. Whom are you gonna manage?')
+
+    # Adding workers to DB - should be at first place, before proceeding allocations for tasks
+    for actioner in resources.Resource:
+        
+        # Because collection of resources must contain at least one resource (from docs) seems like MS Project adds one with id=0
+        # But it lacks some of the fields like ExtendedAttribute, so it's better to check if current resource has one
+        if 'ExtendedAttribute' in actioner:
+            
+            # Get telegram username from XML for this actioner
+            tg_username = ''
+            for property in actioner.ExtendedAttribute:
+                if property.FieldID.cdata == property_id:
+                    tg_username = property.Value.cdata
+            
+            # Check if username was collected
+            if not tg_username:
+                raise ValueError(f"'{actioner.Name.cdata}' have no tg_username value") 
+
+
+            # Make dict of actioner
+            worker = {
+                'id' : int(actioner.UID.cdata),
+                'name' : actioner.Name.cdata,
+                # Seems like XML not necessary contain email address field for resource
+                'email' : actioner.EmailAddress.cdata if 'EmailAddress' in actioner else '',
+                # Seems like MS Project does not know about phones :) 
+                # Maybe I'll use ExtendedAttribute for this purpose later
+                'phone' : '',
+                'tg_username' : tg_username,
+                'tg_id' : ""
+            }
+
+            # Add record to DB and see result
+            try:
+                if not add_worker_to_staff(worker):
+                    logger.warning("Something went wrong while adding worker to staff collection")
+            except ValueError as e:
+                logger.error(f"{e}")
+
 
     # Gathering tasks from XML
     if 'Task' in obj.Project.Tasks:
@@ -385,15 +428,27 @@ def load_xml(fp):
             # make actioners list for this task, skipping milestones
             # Completeness of task assignments will be controlled in /status function
             actioners = []
-            for assignment in obj.Project.Assignments.Assignment:
-                if task.UID.cdata == assignment.TaskUID.cdata and task.Milestone.cdata == '0':
+            for allocation in allocations:
+                if task.UID.cdata == allocation.TaskUID.cdata and task.Milestone.cdata == '0':
                     # MS Project store value '-65535' in case no resource assigned. I'll leave this list empty
-                    if int(assignment.ResourceUID.cdata) > 0:
-                        actioners.append({
-                            # Memo: GanntProject starts numeration of resources from 0, MS Project - from 1
-                            'actioner_id': int(assignment.ResourceUID.cdata),
-                            'nofeedback': False # Default. Will be changed to True if person didn't answer to bot
-                        })
+                    if int(allocation.ResourceUID.cdata) > 0:
+                        tg_username = get_tg_un_from_xml_resources(allocation.ResourceUID.cdata, resources, property_id)
+                        if tg_username:
+                            actioner_id = get_worker_id_from_db_by_tg_username(tg_username)
+                            if actioner_id:
+                                actioners.append({
+                                    # Memo: GanntProject starts numeration of resources from 0, MS Project - from 1
+                                    'actioner_id': actioner_id,
+                                    'nofeedback': False # Default. Will be changed to True if person didn't answer to bot
+                                })
+                            else:
+                                raise AttributeError(f"Couldn't get ObjectId from DB for '{tg_username} while processing task-id='{task.UID.cdata}'"
+                                                    f"and resource-id='{allocation.ResourceUID.cdata}' in resources section of provided file"
+                                                    )
+                        else:
+                            raise AttributeError(f"Telegram username not found for task-id='{task.UID.cdata}'" 
+                                                f"and resource-id='{allocation.ResourceUID.cdata}' in resources section of provided file"
+                                                )
 
             # Besides successors will store predecessors for backward compatibility with MS Project
             predecessors = []
@@ -413,14 +468,14 @@ def load_xml(fp):
                 'enddate': xml_date_conversion(task.Finish.cdata),
                 'duration': duration,
                 'predecessors': predecessors,
-                'successors': [], # # need to be calculated from PredecessorLink
+                'successors': [], # will be calculated below from PredecessorLink 
                 'milestone': True if task.Milestone.cdata == '1' else False, 
                 'complete': int(task.PercentComplete.cdata),
                 'curator': '', # not using for now, but it may become usefull later
                 'basicplan_startdate': xml_date_conversion(task.Start.cdata), # equal to start date on a start of the project
-                'basicplan_enddate': xml_date_conversion(task.Finish.cdata), # date need to be converted # equal to end date on a start of the project
-                'include': [],  # need to be calculated from WBS and OutlineLevel
-                'actioners': actioners # will be calculated separately
+                'basicplan_enddate': xml_date_conversion(task.Finish.cdata), # equal to end date on a start of the project
+                'include': [],  # will be calculated later from WBS and OutlineLevel
+                'actioners': actioners
             })
             # pprint(tasks[i-1])
 
@@ -455,13 +510,10 @@ def load_xml(fp):
                     # Find in gathered tasks list task with such WBS and add UID of task to 'include' sublist
                     if record['WBS'] == parentWBS:
                         record['include'].append(int(task.UID.cdata))
-
-            record['successors'] = successors
-     
+            record['successors'] = successors     
     else:        
         raise ValueError(f'There are no tasks in provided file. Nothing to do.')
-
-    return tasks, staff
+    return tasks
 
 
 def xml_date_conversion(datestring):
