@@ -84,7 +84,7 @@ def load_gan(fp):
     if 'resource' in obj.project.resources:
         resources = obj.project.resources
     else:
-        raise ValueError('Provided file does not contain information about staff')
+        raise AttributeError('Provided file does not contain information about staff')
     
     # Check if special field for telegram id exist and store id of this field
     property_id = ''
@@ -99,7 +99,7 @@ def load_gan(fp):
     if 'allocation' in obj.project.allocations:
         allocations = obj.project.allocations.allocation
     else:
-        raise ValueError('There are no assignments made. Whom are you gonna manage?')
+        raise AttributeError('There are no assignments made. Whom are you gonna manage?')
 
     # Adding workers to DB - should be at first place, before proceeding allocations for tasks
     # Check if custom property for telegram was found
@@ -156,7 +156,7 @@ def load_gan(fp):
                         # pprint(f' .. and after: {tasks}')
 
     else:
-        raise ValueError('There are no tasks in provided file. Nothing to do.')
+        raise AttributeError('There are no tasks in provided file. Nothing to do.')
 
     # TODO Resolving GanttProject bug of duplication of resource allocation. 
     # Better use standalone function in case they will fix this bug
@@ -347,7 +347,7 @@ def load_xml(fp):
     if 'Resource' in obj.Project.Resources:
         resources = obj.Project.Resources
     else:
-        raise ValueError('Provided file does not contain information about staff')
+        raise AttributeError('Provided file does not contain information about staff')
 
     # Check for telegram username field in XML provided
     property_id = ''
@@ -365,7 +365,7 @@ def load_xml(fp):
     if 'Assignment' in obj.Project.Assignments:
         allocations = obj.Project.Assignments.Assignment
     else:
-        raise ValueError('There are no assignments made. Whom are you gonna manage?')
+        raise AttributeError('There are no assignments made. Whom are you gonna manage?')
 
     # Adding workers to DB - should be at first place, before proceeding allocations for tasks
     for actioner in resources.Resource:
@@ -512,7 +512,7 @@ def load_xml(fp):
                         record['include'].append(int(task.UID.cdata))
             record['successors'] = successors     
     else:        
-        raise ValueError(f'There are no tasks in provided file. Nothing to do.')
+        raise AttributeError(f'There are no tasks in provided file. Nothing to do.')
     return tasks
 
 
