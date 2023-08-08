@@ -8,6 +8,7 @@ import pymongo
 import os
 
 from dotenv import load_dotenv
+from pprint import pprint
 from telegram import User
 from telegram.ext import ContextTypes
 from urllib.parse import quote_plus
@@ -69,6 +70,95 @@ def add_worker_to_staff(worker):
             worker_id = DB.staff.insert_one(worker).inserted_id
 
     return worker_id
+
+
+def get_assignees(task: dict):
+    '''
+    Helper function for getting names and telegram usernames
+    of person assigned to given task to insert in a bot message
+    Returns string of the form: '@johntherevelator (John) and @judasofkerioth (Judas)'
+    Also returns list of their telegram ids for bot to be able to send direct messages
+    '''
+
+    people = ""
+    user_ids = []
+    DB = get_db()
+
+    try:
+        staff = DB.staff.find()
+    except Exception as e:
+        logger.error(f"There was error getting DB: {e}")
+    else:
+        pprint(f"Staff dict: {staff}")
+        if staff:
+            for doer in task['actioners']:
+                for member in staff:
+                    print(f"Doer: {type(doer['actioner_id'])} \t {type(member['_id'])}")
+                    if doer['actioner_id'] == member['_id']:                                                    
+                        if member['tg_id']:
+                            user_ids.append(member['tg_id'])              
+                        if len(people) > 0:
+                            people = people + "and @" + member['tg_username'] + " (" + member['name'] + ")"
+                        else:
+                            people = f"{people}@{member['tg_username']} ({member['name']})"
+        else:
+            raise ValueError(f"While proceding task {task} has found out that staff collection is empty.")
+
+    return people, user_ids
+
+
+def get_db():
+    load_dotenv()
+    BOT_NAME = os.environ.get('BOT_NAME')
+    BOT_PASS = os.environ.get('BOT_PASS')
+
+    # link to database
+    # DB_URI = f"mongodb://{BOT_NAME}:{BOT_PASS}@localhost:27017/admin?retryWrites=true&w=majority"
+    DB_NAME = os.environ.get("DB_NAME", "database")
+    host = '127.0.0.1:27017'
+    DB = None
+    try:
+        uri = "mongodb://%s:%s@%s" % (quote_plus(BOT_NAME), quote_plus(BOT_PASS), host)
+        # client = pymongo.MongoClient(f"mongodb://{BOT_NAME}:{BOT_PASS}@localhost:27017/admin?retryWrites=true&w=majority")
+        client = pymongo.MongoClient(uri)    
+        DB = client[DB_NAME]
+    except ConnectionError as e:
+        logger.error(f"There is problem with connecting to db '{DB_NAME}': {e}")   
+    except Exception as e:
+        logger.error(f"Error occurred: {e}")
+    return DB
+
+
+def get_job_preset(job_id: str, context: ContextTypes.DEFAULT_TYPE):
+    '''
+    Helper function that returns current reminder preset for given job id
+    Return None if nothing is found or error occured
+    '''  
+    preset = None
+
+    job = context.job_queue.scheduler.get_job(job_id)
+    # print(f"Got the job: {job}")
+    try:
+        hour = job.trigger.fields[job.trigger.FIELD_NAMES.index('hour')]
+        minute = f"{job.trigger.fields[job.trigger.FIELD_NAMES.index('minute')]}"
+    except:
+        preset = None        
+    else:
+        if int(minute) < 10:
+            time_preset = f"{hour}:0{minute}"
+        else:
+            time_preset = f"{hour}:{minute}"
+
+        # Determine if job is on or off
+        if job.next_run_time:
+            state = 'ON'
+        else:
+            state = 'OFF'
+        
+        days_preset = job.trigger.fields[job.trigger.FIELD_NAMES.index('day_of_week')]
+        preset = f"{state} {time_preset}, {days_preset}"
+        # pprint(preset)        
+    return preset
 
 
 def get_worker_id_from_db_by_tg_username(tg_username: str):
@@ -135,84 +225,6 @@ def get_worker_tg_id_from_db_by_tg_username(tg_username: str):
             # print(type(worker_id))
 
     return tg_id
-
-
-def get_assignees(task: dict, actioners: dict):
-    '''
-    Helper function for getting names and telegram usernames
-    of person assigned to given task to insert in a bot message
-    Returns string of the form: '@johntherevelator (John) and @judasofkerioth (Judas)'
-    Also returns list of their telegram ids
-    # TODO refactor this to use DB
-    '''
-
-    people = ""
-    user_ids = []
-    for doer in task['actioners']:
-        for member in actioners:
-            # print(f"Doer: {type(doer['actioner_id'])} \t {type(member['id'])}")
-            if doer['actioner_id'] == member['id']:                                                    
-                if member['tg_id']:
-                    user_ids.append(member['tg_id'])              
-                if len(people) > 0:
-                    people = people + "and @" + member['tg_username'] + " (" + member['name'] + ")"
-                else:
-                    people = f"{people}@{member['tg_username']} ({member['name']})"
-    return people, user_ids
-
-
-def get_db():
-    load_dotenv()
-    BOT_NAME = os.environ.get('BOT_NAME')
-    BOT_PASS = os.environ.get('BOT_PASS')
-
-    # link to database
-    # DB_URI = f"mongodb://{BOT_NAME}:{BOT_PASS}@localhost:27017/admin?retryWrites=true&w=majority"
-    DB_NAME = os.environ.get("DB_NAME", "database")
-    host = '127.0.0.1:27017'
-    DB = None
-    try:
-        uri = "mongodb://%s:%s@%s" % (quote_plus(BOT_NAME), quote_plus(BOT_PASS), host)
-        # client = pymongo.MongoClient(f"mongodb://{BOT_NAME}:{BOT_PASS}@localhost:27017/admin?retryWrites=true&w=majority")
-        client = pymongo.MongoClient(uri)    
-        DB = client[DB_NAME]
-    except ConnectionError as e:
-        logger.error(f"There is problem with connecting to db '{DB_NAME}': {e}")   
-    except Exception as e:
-        logger.error(f"Error occurred: {e}")
-    return DB
-
-
-def get_job_preset(job_id: str, context: ContextTypes.DEFAULT_TYPE):
-    '''
-    Helper function that returns current reminder preset for given job id
-    Return None if nothing is found or error occured
-    '''  
-    preset = None
-
-    job = context.job_queue.scheduler.get_job(job_id)
-    # print(f"Got the job: {job}")
-    try:
-        hour = job.trigger.fields[job.trigger.FIELD_NAMES.index('hour')]
-        minute = f"{job.trigger.fields[job.trigger.FIELD_NAMES.index('minute')]}"
-    except:
-        preset = None        
-    else:
-        if int(minute) < 10:
-            time_preset = f"{hour}:0{minute}"
-        else:
-            time_preset = f"{hour}:{minute}"
-
-        # Determine if job is on or off
-        if job.next_run_time:
-            state = 'ON'
-        else:
-            state = 'OFF'
-        
-        days_preset = job.trigger.fields[job.trigger.FIELD_NAMES.index('day_of_week')]
-        preset = f"{state} {time_preset}, {days_preset}"
-        # pprint(preset)        
-    return preset
 
 
 def save_json(project: dict, PROJECTJSON: str) -> None:

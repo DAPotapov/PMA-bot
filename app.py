@@ -168,7 +168,7 @@ async def day_before_update(context: ContextTypes.DEFAULT_TYPE) -> None:
                 project = connectors.load_json(fp)
             except Exception as e:
                 bot_msg = f"ERROR ({e}): Unable to load"
-                logger.error(f'{e} \t {e.with_traceback}')                  
+                logger.error(f'{e}')                  
             else:
 
                 # Loop through actioners to inform them about actual tasks
@@ -279,7 +279,7 @@ async def file_update(context: ContextTypes.DEFAULT_TYPE) -> None:
             try:
                 project = connectors.load_json(fp)
             except Exception as e:
-                logger.error(f'{e} \t {e.with_traceback}')                  
+                logger.error(f'{e}')                  
             else:
 
                 # Loop through actioners to inform them about actual tasks
@@ -338,7 +338,7 @@ async def morning_update(context: ContextTypes.DEFAULT_TYPE) -> None:
                 project = connectors.load_json(fp)
             except Exception as e:
                 bot_msg = f"ERROR ({e}): Unable to load"
-                logger.error(f'{e} \t {e.with_traceback}')                  
+                logger.error(f'{e}')                  
             else:
 
                 # Loop through actioners to inform them about actual tasks
@@ -638,7 +638,7 @@ def schedule_jobs(user_id: str, project_title: str, context: ContextTypes.DEFAUL
             hour, minute = map(int, MORNING.split(":"))                    
             time2check = time(hour, minute, tzinfo=datetime.now().astimezone().tzinfo)
         except ValueError as e:
-            logger.error(f'Error while parsing time: {e} \t {e.with_traceback}')
+            logger.error(f'Error while parsing time: {e}')
 
         # Set job schedule 
         else:
@@ -661,7 +661,7 @@ def schedule_jobs(user_id: str, project_title: str, context: ContextTypes.DEFAUL
             hour, minute = map(int, ONTHEEVE.split(":"))                    
             time2check = time(hour, minute, tzinfo=datetime.now().astimezone().tzinfo)
         except ValueError as e:
-            logger.error(f'Error while parsing time: {e} \t {e.with_traceback}')
+            logger.error(f'Error while parsing time: {e}')
         
         # Add job to queue and enable it
         else:                            
@@ -678,7 +678,7 @@ def schedule_jobs(user_id: str, project_title: str, context: ContextTypes.DEFAUL
             hour, minute = map(int, FRIDAY.split(":"))                    
             time2check = time(hour, minute, tzinfo=datetime.now().astimezone().tzinfo)
         except ValueError as e:
-            logger.error(f'Error while parsing time: {e} \t {e.with_traceback}')
+            logger.error(f'Error while parsing time: {e}')
         
         # Add job to queue and enable it
         else:
@@ -715,28 +715,33 @@ async def status(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         result = DB.PMs.find_one({"pm_id": user_id})
     except Exception as e:
         logger.error(f"There was error getting DB: {e}")
-        bot_msg = (bot_msg + f"There is a problem with database connection. Contact developer or try later.")
+        bot_msg = f"There is a problem with database connection. Contact developer or try later."
         await update.message.reply_text(bot_msg)
     else:     
         if not result:
+
             # Then by his username
             result = DB.PMs.find_one({"pm_username": user_name})
         if result:
+
             # Go on and update PM telegram id
             # TODO - old function isn't useful here
             # TODO also update username if changed ???
             # Then read settings 
             INFORM_OF_ALL_PROJECTS = result['settings']['INFORM_OF_ALL_PROJECTS']
+            print(f"INFORM_OF_ALL_PROJECTS = {INFORM_OF_ALL_PROJECTS}")
             for project in result['projects']:
                 text_accumulator = ''
                 user_ids = []
-                print(f"We are in this project: {project}") # What if None?
+                print(f"We are in this project: {project['title']}") # What if None?
                 ALLOW_POST_STATUS_TO_GROUP = project['settings']['ALLOW_POST_STATUS_TO_GROUP']
                 INFORM_ACTIONERS_OF_MILESTONES = project['settings']['INFORM_ACTIONERS_OF_MILESTONES']
+
                 # Proceed only if this project is active or PM want to be informed about all projects
                 if INFORM_OF_ALL_PROJECTS or project['active']:
-                    bot_msg = f"Status of events for project {project['title']}:"
+                    bot_msg = f"Status of events for project '{project['title']}':"
                     for task in project['tasks']:
+
                         # Bot will inform user only of tasks with important dates
 
                         # Check if task not completed
@@ -757,75 +762,89 @@ async def status(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
                             else:
 
                                 # Inform about milestone
+                                # TODO what about informing actioners about milestones? Should I have separate message collectors for PM and for others?
                                 if task['milestone'] == True:
                                     if delta_end.days < 0:
 
                                         # If milestone in future inform user
                                         text_accumulator = text_accumulator + f"\nMilestone '{task['name']}' is near ({task['enddate']})!"
                                     else:
+
                                         # if milestone in past do nothing
                                         pass
                                 else:
+
                                     # TODO should refactor this
-                                    actioners = project['staff']
+                                    # actioners = project['staff']
+                                    pprint(f"Current task is: '{task}'")
+                                    # Collect starting events
                                     if delta_start.days == 0:
                                         try:
-                                            people, user_ids = get_assignees(task, actioners)
+                                            people, user_ids = get_assignees(task)
                                         except Exception as e:
-                                            text_accumulator = text_accumulator + f"\nError occured while processing assigned actioners to task {task['id']} '{task['name']}' starting today"
-                                            logger.error(f'{e} \t {e.with_traceback}')
+                                            text_accumulator = text_accumulator + f"\nError occured while processing assigned actioners to task {task['id']} '{task['name']}'"
+                                            logger.error(f'{e}')
                                         else:
                                             text_accumulator = text_accumulator + f"\nTask {task['id']} '{task['name']}' starts today. Assigned to: {people}"
+                                    
+                                    # Collect events which should be in work
                                     elif delta_start.days > 0  and delta_end.days < 0:
                                         try:
-                                            people, user_ids = get_assignees(task, actioners)
+                                            people, user_ids = get_assignees(task)
                                         except Exception as e:
                                             text_accumulator = text_accumulator + f"\nError occured while processing assigned actioners to task {task['id']} {task['name']}"
-                                            logger.error(f'{e} \t {e.with_traceback}')
+                                            logger.error(f'{e}')
                                         else:
                                             text_accumulator = text_accumulator + f"\nTask {task['id']} '{task['name']}' is intermidiate. Due date is {task['enddate']}. Assigned to: {people}"
+                                    
+                                    # Collect events on a deadline
                                     elif delta_end.days == 0:
                                         try:
-                                            people, user_ids = get_assignees(task, actioners)
+                                            people, user_ids = get_assignees(task)
                                         except Exception as e:
                                             text_accumulator = text_accumulator + f"\nError occured while processing assigned actioners to task {task['id']} {task['name']}"
-                                            logger.error(f'{e} \t {e.with_traceback}')
+                                            logger.error(f'{e}')
                                         else:                                        
                                             text_accumulator = text_accumulator + f"\nTask {task['id']}  '{task['name']}' must be completed today! Assigned to: {people}"
+                                    
+                                    # Collect overdue events
                                     elif delta_start.days > 0 and delta_end.days > 0:
                                         try:
-                                            people, user_ids = get_assignees(task, actioners)
+                                            people, user_ids = get_assignees(task)
                                         except Exception as e:
                                             text_accumulator = text_accumulator + f"\nError occured while processing assigned actioners to task {task['id']} {task['name']}"
-                                            logger.error(f'{e} \t {e.with_traceback}')
+                                            logger.error(f'{e}')
                                         else:                                         
                                             text_accumulator = text_accumulator + f"\nTask {task['id']} '{task['name']}' is overdue! (had to be completed on {task['enddate']}). Assigned to: {people}"
+                                    
+                                    # Here goes tasks which not started yet
                                     else:
                                         logger.info(f"Loop through future task '{task['id']}' '{task['name']}'")
 
-                # Check if there is something to report to user
-                if not text_accumulator:
-                    bot_msg = f"{bot_msg}\nSeems like there are no events worth mention"
-                
-                bot_msg = f"{bot_msg}\n{text_accumulator}"
+                    # Check if there is something to report to user
+                    if not text_accumulator:
+                        bot_msg = f"{bot_msg}\nSeems like there are no events worth mention"
+                    
+                    bot_msg = f"{bot_msg}\n{text_accumulator}"
 
-                # Send reply to PM in group chat if allowed
-                if ALLOW_POST_STATUS_TO_GROUP == True:
-                    await update.message.reply_text(bot_msg)
-                else:
+                    # Send reply to PM in group chat if allowed
+                    if ALLOW_POST_STATUS_TO_GROUP == True:
+                        await update.message.reply_text(bot_msg)
+                    else:
 
-                    # Or in private chat
-                    await context.bot.send_message(user_id, bot_msg)
+                        # Or in private chat
+                        await context.bot.send_message(user_id, bot_msg)
 
-                # And send msg to actioner (if it is not a PM)
-                # user_ids should be empty if no events worth mention
-                for id in user_ids:
-                    # print(id)
-                    if id != user_id: 
-                        await context.bot.send_message(
-                            id,
-                            text=bot_msg,
-                            parse_mode=ParseMode.HTML)
+                    # And send msg to actioner (if it is not a PM)
+                    # user_ids should be empty if no events worth mention
+                    # TODO refactor this: user should be informed only about his tasks (use some dict)
+                    for id in user_ids:
+                        print(f"Participator id: {id}")
+                        if id != user_id: 
+                            await context.bot.send_message(
+                                id,
+                                text=bot_msg,
+                                parse_mode=ParseMode.HTML)
 
         else:
             #TODO
@@ -853,7 +872,7 @@ async def status(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         #             project = connectors.load_json(fp)
         #         except Exception as e:
         #             bot_msg = f"ERROR ({e}): Unable to load"
-        #             logger.info(f'{e} \t {e.with_traceback}')                  
+        #             logger.info(f'{e}')                  
         #         else:
         #             # print(f"For testing purposes list jobs: {context.job_queue.jobs()}")
         #             # for job in context.job_queue.jobs():
@@ -871,10 +890,10 @@ async def status(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         #             try:
         #                 save_json(project, PROJECTJSON)
         #             except FileNotFoundError as e:
-        #                 logger.error(f'{e} \t {e.with_traceback}')
+        #                 logger.error(f'{e}')
         #                 # TODO better inform PM that there are problems with writing project
         #             except Exception as e:
-        #                 logger.error(f'{e} \t {e.with_traceback}')
+        #                 logger.error(f'{e}')
 
         #             # Check Who calls? If PM then proceed all tasks
         #             if username == PM:
@@ -916,7 +935,7 @@ async def status(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         #                                         people, user_ids = get_assignees(task, actioners)
         #                                     except Exception as e:
         #                                         bot_msg = "Error occured while processing assigned actioners to task task['id']} '{task['name']}' starting today"
-        #                                         logger.error(f'{e} \t {e.with_traceback}')
+        #                                         logger.error(f'{e}')
         #                                     else:
         #                                         bot_msg = f"task {task['id']} '{task['name']}' starts today. Assigned to: {people}"
         #                                 elif delta_start.days > 0  and delta_end.days < 0:
@@ -924,7 +943,7 @@ async def status(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         #                                         people, user_ids = get_assignees(task, actioners)
         #                                     except Exception as e:
         #                                         bot_msg = f"Error occured while processing assigned actioners to task {task['id']} {task['name']}"
-        #                                         logger.error(f'{e} \t {e.with_traceback}')
+        #                                         logger.error(f'{e}')
         #                                     else:
         #                                         bot_msg = f"task {task['id']} '{task['name']}' is intermidiate. Due date is {task['enddate']}. Assigned to: {people}"
         #                                 elif delta_end.days == 0:
@@ -932,7 +951,7 @@ async def status(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         #                                         people, user_ids = get_assignees(task, actioners)
         #                                     except Exception as e:
         #                                         bot_msg = f"Error occured while processing assigned actioners to task {task['id']} {task['name']}"
-        #                                         logger.error(f'{e} \t {e.with_traceback}')
+        #                                         logger.error(f'{e}')
         #                                     else:                                        
         #                                         bot_msg = f"task {task['id']}  '{task['name']}' must be completed today! Assigned to: {people}"
         #                                 elif delta_start.days > 0 and delta_end.days > 0:
@@ -940,7 +959,7 @@ async def status(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         #                                         people, user_ids = get_assignees(task, actioners)
         #                                     except Exception as e:
         #                                         bot_msg = f"Error occured while processing assigned actioners to task {task['id']} {task['name']}"
-        #                                         logger.error(f'{e} \t {e.with_traceback}')
+        #                                         logger.error(f'{e}')
         #                                     else:                                         
         #                                         bot_msg = f"task {task['id']} '{task['name']}' is overdue! (had to be completed on {task['enddate']}). Assigned to: {people}"
         #                                 else:
@@ -1094,11 +1113,11 @@ async def upload(update: Update, context: CallbackContext) -> None:
                 try:
                     save_json(project, PROJECTJSON)
                 except FileNotFoundError as e:
-                    logger.error(f'{e} \t {e.with_traceback}')
+                    logger.error(f'{e}')
                     # TODO better inform PM that there are problems with writing project
                     bot_msg = "Seems like path to save project does not exist"
                 except Exception as e:
-                    logger.error(f'{e} \t {e.with_traceback}')
+                    logger.error(f'{e}')
                     bot_msg = "Error saving project"
                 else:
                     bot_msg = "Project file saved successfully"
@@ -1529,7 +1548,7 @@ async def reminder_time_setter(update: Update, context: ContextTypes.DEFAULT_TYP
             job.reschedule(trigger='cron', hour=hour, minute=minute, day_of_week=day_of_week, timezone=tz)
         except Exception as e:
             bot_msg = (f"Unable to reschedule the reminder")
-            logger.info(f'{e} \t {e.with_traceback}')
+            logger.info(f'{e}')
         bot_msg = (f"Time updated. Next time: "
                     f"{job.next_run_time}"
                     )       
@@ -1609,7 +1628,7 @@ async def reminder_days_setter(update: Update, context: ContextTypes.DEFAULT_TYP
                 job.reschedule(trigger='cron', hour=hour, minute=minute, day_of_week=','.join(new_days), timezone=tz)
             except Exception as e:
                 bot_msg = (f"Unable to reschedule the reminder")
-                logger.error(f'{e} \t {e.with_traceback}')
+                logger.error(f'{e}')
             bot_msg = (f"Time updated. Next time: \n"
                         f"{job.next_run_time}"
                         ) 
