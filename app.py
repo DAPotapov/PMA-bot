@@ -48,7 +48,8 @@ from helpers import (
     get_assignees,
     get_db, 
     get_job_preset,
-    get_worker_id_from_db_by_tg_username, 
+    get_worker_oid_from_db_by_tg_id,
+    get_worker_oid_from_db_by_tg_username, 
     save_json)
 # For testing purposes
 from pprint import pprint
@@ -395,6 +396,7 @@ async def morning_update(context: ContextTypes.DEFAULT_TYPE) -> None:
                                                 text=bot_msg,
                                                 parse_mode=ParseMode.HTML)
 
+
 ######### START section ########################
 async def start(update: Update, context: CallbackContext) -> int:
     '''
@@ -729,11 +731,11 @@ async def status(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
             # TODO also update username if changed ???
             # Then read settings 
             INFORM_OF_ALL_PROJECTS = result['settings']['INFORM_OF_ALL_PROJECTS']
-            print(f"INFORM_OF_ALL_PROJECTS = {INFORM_OF_ALL_PROJECTS}")
+            # print(f"INFORM_OF_ALL_PROJECTS = {INFORM_OF_ALL_PROJECTS}")
             for project in result['projects']:
                 text_accumulator = ''
                 user_ids = []
-                print(f"We are in this project: {project['title']}") # What if None?
+                # print(f"We are in this project: {project['title']}") # What if None?
                 ALLOW_POST_STATUS_TO_GROUP = project['settings']['ALLOW_POST_STATUS_TO_GROUP']
                 INFORM_ACTIONERS_OF_MILESTONES = project['settings']['INFORM_ACTIONERS_OF_MILESTONES']
 
@@ -774,9 +776,9 @@ async def status(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
                                         pass
                                 else:
 
-                                    # TODO should refactor this
-                                    # actioners = project['staff']
-                                    pprint(f"Current task is: '{task}'")
+                                    # Message to actioner(s) will be send after each task
+                                    actioner_msg = f"You have assigned task in project '{project['title']}' (project manager: @{user_name})"
+                                    
                                     # Collect starting events
                                     if delta_start.days == 0:
                                         try:
@@ -786,6 +788,7 @@ async def status(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
                                             logger.error(f'{e}')
                                         else:
                                             text_accumulator = text_accumulator + f"\nTask {task['id']} '{task['name']}' starts today. Assigned to: {people}"
+                                            actioner_msg = (actioner_msg + f"\nTask: '{task['name']}' starts today.")
                                     
                                     # Collect events which should be in work
                                     elif delta_start.days > 0  and delta_end.days < 0:
@@ -795,8 +798,10 @@ async def status(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
                                             text_accumulator = text_accumulator + f"\nError occured while processing assigned actioners to task {task['id']} {task['name']}"
                                             logger.error(f'{e}')
                                         else:
-                                            text_accumulator = text_accumulator + f"\nTask {task['id']} '{task['name']}' is intermidiate. Due date is {task['enddate']}. Assigned to: {people}"
+                                            text_accumulator = text_accumulator + f"\nTask {task['id']} '{task['name']}' is intermediate. Due date is {task['enddate']}. Assigned to: {people}"
+                                            actioner_msg = (actioner_msg + f"\nTask: '{task['name']}' should be in progress, due date is {task['enddate']}.")
                                     
+
                                     # Collect events on a deadline
                                     elif delta_end.days == 0:
                                         try:
@@ -806,6 +811,7 @@ async def status(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
                                             logger.error(f'{e}')
                                         else:                                        
                                             text_accumulator = text_accumulator + f"\nTask {task['id']}  '{task['name']}' must be completed today! Assigned to: {people}"
+                                            actioner_msg = (actioner_msg + f"\nTask: '{task['name']}' should be completed today.")
                                     
                                     # Collect overdue events
                                     elif delta_start.days > 0 and delta_end.days > 0:
@@ -816,10 +822,20 @@ async def status(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
                                             logger.error(f'{e}')
                                         else:                                         
                                             text_accumulator = text_accumulator + f"\nTask {task['id']} '{task['name']}' is overdue! (had to be completed on {task['enddate']}). Assigned to: {people}"
+                                            actioner_msg = (actioner_msg + f"\nTask: '{task['name']}' is overdue, had to be completed on {task['enddate']}")
                                     
                                     # Here goes tasks which not started yet
                                     else:
                                         logger.info(f"Loop through future task '{task['id']}' '{task['name']}'")
+
+                                    # Send message to actioners immediately (if it is not a PM)
+                                    for id in user_ids:
+                                        # print(f"Participator id: {id}")
+                                        if id != user_id: 
+                                            await context.bot.send_message(
+                                                id,
+                                                text=actioner_msg,
+                                                parse_mode=ParseMode.HTML)
 
                     # Check if there is something to report to user
                     if not text_accumulator:
@@ -835,34 +851,95 @@ async def status(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
                         # Or in private chat
                         await context.bot.send_message(user_id, bot_msg)
 
-                    # And send msg to actioner (if it is not a PM)
-                    # user_ids should be empty if no events worth mention
-                    # TODO refactor this: user should be informed only about his tasks (use some dict)
-                    for id in user_ids:
-                        print(f"Participator id: {id}")
-                        if id != user_id: 
-                            await context.bot.send_message(
-                                id,
-                                text=bot_msg,
-                                parse_mode=ParseMode.HTML)
-
         else:
             #TODO
             # If current user not found in project managers 
-            # then just search him in all records and inform about events
+            # then just search him by his ObjectId in all records and inform about events
             # if nothing found - Suggest him to start a project
-            
-            pass
-        # Пишем название проекта и далее ключевые события
-        # TODO(тут можно добавить настройку: уведомлять о всех проектах или только об активном)
-        # если юзера нет среди РП, то:
-            # отбираем записи, где юзер - исполнитель 
-                # TODO(возможно потребуется пересмотреть схему: записи из staff перенести непосредственно в исполнителей таска
-                # !!! Предварительно надо выяснить как будет вести себя updateMany при обновлении tg_id для заданного юзернейма
-                    # если возможно обновить все таски с её помощью, то ок
-                    # если нет, то справочник staff придется оставить (или сделать его отдельной коллекцией?)
-            # для таких записей: выводим название проекта, имя РП и далее события, относящиеся к юзеру
+            user_oid = get_worker_oid_from_db_by_tg_id(user_id)
+            # print(f"Looking object id by tg_id: {user_oid}")
+            if not user_oid:
+                user_oid = get_worker_oid_from_db_by_tg_username(user_name)
+                # print(f"Looking object id by tg_username: {user_oid}")
+            if not user_oid:
+                bot_msg = ("No information found about you in database.\n"
+                            "If you think it's a mistake contact your project manager.\n"
+                            "Or consider to /start a new project by yourself."
+                )            
+                await context.bot.send_message(user_id, bot_msg)
+            else:
+                # print(f"Here we should have an object id: {user_oid}")
+                # Get all documents where user mentioned
+                records = DB.PMs.find({"projects.tasks.actioners":{"$elemMatch":{"actioner_id": user_oid}}}, 
+                                         {"pm_username":1, "projects.title":1, 
+                                          "projects.tasks.id":1, "projects.tasks.name":1, 
+                                          "projects.tasks.enddate":1, "projects.tasks.startdate":1, 
+                                          "projects.tasks.milestone":1, "projects.tasks.complete":1, 
+                                          "projects.tasks.actioners":1, "projects.tasks.include":1,
+                                          "_id":0}
+                                        )
+                
+                # If documents was found where user mentioned then loop them and collect status update for user
+                if records:
+                    for pm in records:
+                        for project in pm['projects']:
+                            bot_msg = f"Status of events for project '{project['title']}' (PM: @{pm['pm_username']}):"
+                            for task in project['tasks']:
+                                for actioner in task['actioners']:
 
+                                    # print(f"User oid = {user_oid}, task actioner: {actioner['actioner_id']}")
+                                    # print(f"Their types are: {type(user_oid)}", {type(actioner['actioner_id'])})
+                                # Check if user is an actioner for this task
+                                    if user_oid == actioner['actioner_id']:
+
+                                        # Check if task not completed
+                                        if task['complete'] < 100:
+
+                                            # If delta_start <0 task not started, otherwise already started
+                                            delta_start = date.today() - date.fromisoformat(task['startdate'])
+
+                                            # If delta_end >0 task overdue, if <0 task in progress
+                                            delta_end = date.today() - date.fromisoformat(task['enddate'])
+                                            
+                                            # Deal with common task
+                                            if task['include']:
+
+                                                # For now focus only on subtasks, which can be actually done
+                                                # I'll decide what to do with such tasks after gathering user experience
+                                                pass
+                                            else:
+
+                                                # Skip milestones
+                                                if task['milestone'] == True:
+                                                    pass
+                                                else:
+
+                                                    # Starting tasks
+                                                    if delta_start.days == 0:
+                                                        bot_msg = (bot_msg + f"\nTask {task['id']} '{task['name']}' starts today")
+                                                    
+                                                    # Intermidiate tasks
+                                                    elif delta_start.days > 0  and delta_end.days < 0:
+                                                        bot_msg = (bot_msg + f"\nTask {task['id']} '{task['name']}' is intermediate. Due date is {task['enddate']}.")
+                                                    
+                                                    # Tasks on a deadline
+                                                    elif delta_end.days == 0:
+                                                        bot_msg = (bot_msg + f"\nTask {task['id']}  '{task['name']}' must be completed today!")
+
+                                                    # Overdue tasks
+                                                    elif delta_start.days > 0 and delta_end.days > 0:
+                                                        bot_msg = (bot_msg + f"\nTask {task['id']} '{task['name']}' is overdue! (had to be completed on {task['enddate']}).")
+                            
+                            # Send messege about a project
+                            await context.bot.send_message(user_id, bot_msg)
+
+                # Inform user if he is in staff, but not in any project participants
+                else:
+                    bot_msg = (f"Seems like you don't participate in any project.\n"
+                                "If you think it's a mistake contact your project manager.\n"
+                                "Or consider to /start a new project by yourself."
+                    )            
+                    await context.bot.send_message(user_id, bot_msg)
 
         # Because /status command could be called anytime, we can't pass project stored in memory to it
         # so it will be loaded from disk

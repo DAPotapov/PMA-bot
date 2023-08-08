@@ -4,7 +4,7 @@ import re
 import untangle
 import json
 
-from helpers import add_worker_to_staff, get_worker_id_from_db_by_tg_username
+from helpers import add_worker_to_staff, get_worker_oid_from_db_by_tg_username
 from numpy import busday_offset, busday_count, floor, datetime64
 # For testing purposes
 from pprint import pprint
@@ -13,6 +13,9 @@ from pprint import pprint
 logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s', level=logging.INFO)
 logger = logging.getLogger(__name__)
 
+
+# TODO below checks should be only for information only during file uploads (in start and while /upload)
+# They should not raise any errors. Just make PM aware that he may face troubles when contacting someone
 def email_validation(email):
     '''
     Function to validate an email address and gently inform user if smth not right, like:
@@ -50,19 +53,6 @@ def main():
     '''
     
     return
-
-# def add_staff(staff):
-#     ''' 
-#     Write to staff collection in DB records from given list of personell
-#     Return True if succeed w/o errors
-#     TODO log records that was not added?
-#     '''
-
-
-
-#     result = False
-
-#     return result
 
 
 def load_gan(fp):
@@ -225,7 +215,7 @@ def compose_tasks_list(tasks, task, allocations, resources, property_id):
             # Memo: GanntProject starts numeration of resources from 0, MS Project - from 1
             tg_username = get_tg_un_from_gan_resources(allocation['resource-id'], resources, property_id)
             if tg_username:
-                actioner_id = get_worker_id_from_db_by_tg_username(tg_username)
+                actioner_id = get_worker_oid_from_db_by_tg_username(tg_username)
                 if actioner_id:
                     actioners.append({
                         'actioner_id': actioner_id, # Now this field stores id of document in staff collection
@@ -324,7 +314,7 @@ def load_json(fp):
     staff = []
     # TODO check if it seems like project. Look for inner format structure
     # TODO parse project to corresponding lists
-    return tasks, staff
+    return tasks
 
 
 def load_xml(fp):
@@ -434,7 +424,7 @@ def load_xml(fp):
                     if int(allocation.ResourceUID.cdata) > 0:
                         tg_username = get_tg_un_from_xml_resources(allocation.ResourceUID.cdata, resources, property_id)
                         if tg_username:
-                            actioner_id = get_worker_id_from_db_by_tg_username(tg_username)
+                            actioner_id = get_worker_oid_from_db_by_tg_username(tg_username)
                             if actioner_id:
                                 actioners.append({
                                     # Memo: GanntProject starts numeration of resources from 0, MS Project - from 1

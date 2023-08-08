@@ -59,10 +59,10 @@ def add_worker_to_staff(worker):
 
         # Check DB if worker already present via telegram id
         if worker['tg_id']:
-            worker_id = get_worker_id_from_db_by_tg_id(worker['tg_id'])
+            worker_id = get_worker_oid_from_db_by_tg_id(worker['tg_id'])
         # Othervise via telegram username
         elif worker['tg_username']:
-            worker_id = get_worker_id_from_db_by_tg_username(worker['tg_username'])
+            worker_id = get_worker_oid_from_db_by_tg_username(worker['tg_username'])
         else:
             raise ValueError(f"Not enough information about worker provided: neither tg_id nor tg_username. Provided dict:\n{worker}")
         
@@ -89,7 +89,7 @@ def get_assignees(task: dict):
     except Exception as e:
         logger.error(f"There was error getting DB: {e}")
     else:
-        pprint(f"Staff dict: {staff}")
+        # pprint(f"Staff dict: {staff}")
         if staff:
             for doer in task['actioners']:
                 for member in staff:
@@ -161,7 +161,7 @@ def get_job_preset(job_id: str, context: ContextTypes.DEFAULT_TYPE):
     return preset
 
 
-def get_worker_id_from_db_by_tg_username(tg_username: str):
+def get_worker_oid_from_db_by_tg_username(tg_username: str):
     '''
     Search staff collection in DB for given telegram username and return DB-id.
     If something went wrong return None (should be checked on calling side)
@@ -183,7 +183,7 @@ def get_worker_id_from_db_by_tg_username(tg_username: str):
     return worker_id
 
 
-def get_worker_id_from_db_by_tg_id(tg_id):
+def get_worker_oid_from_db_by_tg_id(tg_id):
     '''
     Search staff collection in DB for given telegram id and return DB-id.
     If something went wrong return None (should be checked on calling side)
