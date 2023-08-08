@@ -20,19 +20,23 @@ logger = logging.getLogger(__name__)
 def add_user_id_to_db(user: User):
     ''' 
     Helper function to add telegram id of username provided to DB. Returns ObjectId on success
+    TODO try to fill other fields as well
     '''
     result = None
     DB = get_db()
-
+    print(f"user is {user}")
     # Fill record with absent id with current one
     # For now I assume that users don't switch their usernames and such situation is force-major
     try:
         record = DB.staff.find_one({"tg_username": user.username}, {"tg_id": 1, "_id": 0})
+        print(f"record is {record}")
     except Exception as e:
         logger.error(f"There was error getting DB: {e}")
     else:
-        if not record:
-            result = DB.staff.update_one({"tg_username": user.username}, {"$set": {"tg_id": user.id}}).upserted_id
+        # TODO refactor this (and in other places) because if no record returned this line will cause exception
+        if not record["tg_id"]:
+            result = DB.staff.update_one({"tg_username": user.username}, {"$set": {"tg_id": user.id}})
+            print(result)
             if not result:
                 logger.warning(f"Something went wrong while adding telegram id for telegram username {user.username}")
 
@@ -109,6 +113,28 @@ def get_worker_id_from_db_by_tg_id(tg_id):
             # print(type(worker_id))
 
     return worker_id
+
+
+def get_worker_tg_id_from_db_by_tg_username(tg_username: str):
+    '''
+    Search staff collection in DB for given telegram username and return DB-id.
+    If something went wrong return None (should be checked on calling side)
+    '''
+
+    tg_id = None
+    DB = get_db()
+  
+    try:
+        result = DB.staff.find_one({'tg_username': tg_username})
+    except Exception as e:
+        logger.error(f"There was error getting DB: {e}")
+    else:
+        if result:
+            # print(f"result of searching db for username: {result['_id']}")
+            tg_id = result['tg_id']
+            # print(type(worker_id))
+
+    return tg_id
 
 
 def get_assignees(task: dict, actioners: dict):

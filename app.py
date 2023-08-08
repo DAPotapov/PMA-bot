@@ -47,7 +47,8 @@ from helpers import (
     add_user_id_to_db, 
     get_assignees,
     get_db, 
-    get_job_preset, 
+    get_job_preset,
+    get_worker_id_from_db_by_tg_username, 
     save_json)
 # For testing purposes
 from pprint import pprint
@@ -221,21 +222,22 @@ async def day_before_update(context: ContextTypes.DEFAULT_TYPE) -> None:
                                                 parse_mode=ParseMode.HTML)
 
 
-# TURNED OFF
+# TURNED ON
 async def echo(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """
     This function would be added to the application as a handler for messages coming from the Bot API
     """
 
-    # Print to console
-    # user = update.effective_user
     user = update.message.from_user
-    # username = update.message.from_user.username
-    # firstname = update.message.from_user.first_name
     text = str(update.message.text)
     logger.info(f'{user.id} ({user.username}): {text}')
 
     # TODO I can use it to gather id from chat members and add them to project
+    result = add_user_id_to_db(user)
+    pprint(result)
+    if not result:
+        logger.warning(f"User id ({user.id}) of {user.username} was not added to DB (maybe already present).")
+
     # global KNOWN_USERS
     # KNOWN_USERS.update({
     #     user.username: user.id
@@ -1732,7 +1734,7 @@ def main() -> None:
     # application.add_handler(CallbackQueryHandler(buttons))    
 
     # Echo any message that is text and not a command
-    # application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, echo))
+    application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, echo))
 
     # Register handler for recieving new project file
     # It's conflicting with /start conversation, better place it in conversation as well
