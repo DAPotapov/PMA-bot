@@ -439,18 +439,19 @@ async def start(update: Update, context: CallbackContext) -> int:
     # inform user what to do with this bot
     # Call function to upload project file
     # Call function to make jobs
-    PM = {
-        'pm_id': update.effective_user.id,
-        'pm_username': update.effective_user.username,
-        'pm_firstname': update.effective_user.first_name,
+    pm = {
+        'tg_id': update.effective_user.id,
+        'tg_username': update.effective_user.username,
+        'name': update.effective_user.first_name,
         'account_type': 'free',
         'settings': {
             'INFORM_OF_ALL_PROJECTS': False,         
         },
-        'projects': [],
+        # 'projects': [],
     }
+
     # Store information about PM in context
-    context.user_data['PM'] = PM
+    context.user_data['PM'] = pm
 
     bot_msg = (f"Hello, {update.effective_user.first_name}!\n"
                f"You are starting a new project.\n"
@@ -470,6 +471,7 @@ async def naming_project(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
     project = {
         'title': PROJECTTITLE,
         'active': True,
+        'pm_tg_id': context.user_data['PM']['tg_id'],
         'tg_chat_id': '', # TODO store here group chat where project members discuss project
         'settings': {
             # TODO decide after user testing whether these settings should be stored in here or in PM's settings
@@ -488,54 +490,31 @@ async def naming_project(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
     # Check DB for such name for this user, (TODO standalone?)
     # print(context.user_data['PM']['pm_id'])
     # if check_db_for_user(context.user_data['PM']['pm_id']):
+
+    # Check and add PM to staff
+
     try:
-        db_pm_id = DB.PMs.find_one({"pm_id": context.user_data['PM']['pm_id']})
+        pm_oid = DB.staff.find_one({"tg_id": context.user_data['PM']['tg_id']}, {"_id":1})
     except Exception as e:
         logger.error(f"There was error getting DB: {e}")
         bot_msg = "There is a problem with database connection. Contact developer or try later."
         await update.message.reply_text(bot_msg)
         return ConversationHandler.END   
     else:
-        # print(db_pm_id)
-        if db_pm_id:
-            prj_id = DB.PMs.find_one({"pm_id": context.user_data['PM']['pm_id'], "projects.title": project['title']})
-            # pprint(f"Results for looking this project name in DB: {prj_id}")
-            if prj_id:
-                bot_msg = f"You already started project with name {project['title']}. Try another one."
-                await update.message.reply_text(bot_msg)
-                return FIRST_LVL
-            else:
-                # projects_list = DB.PMs.find_one({"pm_id": context.user_data['PM']['pm_id']}, {"projects": 1, "_id": 0})
-                # new_projects_list = projects_list.append(project)
-                # DB.PMs.update_one({"pm_id": context.user_data['PM']['pm_id']}, {"$set": {"projects": new_projects_list}})
-                # TODO above lines will be done on next step
-                bot_msg = f"Got it. Now you can upload your project file. Supported formats are: .gan (GanttProject), .json, .xml (MS Project)"
-                await update.message.reply_text(bot_msg)
-                return SECOND_LVL
+        if not pm_oid:
+            pm_oid = DB.staff.insert_one(context.user_data['PM'])
+        prj_id = DB.projects.find_one({"title": project['title'], "pm_tg_id": context.user_data['PM']['pm_id']}, {"_id":1})
+        print(f"Search for project title returned this: {prj_id}")
+        # prj_id = DB.PMs.find_one({"pm_id": context.user_data['PM']['pm_id'], "projects.title": project['title']})
+        if prj_id:
+            bot_msg = f"You've already started project with name {project['title']}. Try another one."
+            await update.message.reply_text(bot_msg)
+            return FIRST_LVL
         else:
-            DB.PMs.insert_one(context.user_data['PM'])
-            # bot_msg = f"Record {} added to DB"
-            bot_msg = f"Got it. Now you can upload your project file. Supported formats are:\n.gan (GanttProject), .json, .xml (MS Project)"
+            bot_msg = f"Got it. Now you can upload your project file. Supported formats are: .gan (GanttProject), .json, .xml (MS Project)"
             await update.message.reply_text(bot_msg)
             return SECOND_LVL
 
-# TODO DELETE
-    # try:
-    #     # If PM does not present in DB then add him with a project
-    #     # Otherwise add this project to list of projects of this PM
-    #     # If PM already has such project ask user to provide new name
-    #     # TODO: there is no need here to write to DB
-    #     #       Just collect data
-    #     #       Check if project exist to suggest a new name
-    #     #       Но тогда на следующем шаге опять потребуется делать все эти проверки
-    #     #       Если РП нет в БД, то можно на следующем шаге всё сразу записать
-    #     #       Если есть, и имя проекта новое, то обновленный список проектов можно записать на следующем шаге
-        
-    # except Exception as e:
-    #     logger.error(f"Problems with database: {e}")
-    # else:
-    #     await update.message.reply_text(bot_msg)
-    #     return SECOND_LVL
 
 ### DELETE? seems that this standalone function doesn't give any advantages
 # def check_db_for_user(pm_id) -> bool:
@@ -549,7 +528,7 @@ async def naming_project(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
 async def file_recieved(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     ''' Function to proceed uploaded file and saving to DB'''
 
-    # TODO reconsider to make this part as standalone function because it's same as in /upload
+    # TODO consider to make this part as standalone function because it's same as in /upload
     # Call function to recieve file and call converters
     with tempfile.TemporaryDirectory() as tdp:
         gotfile = await context.bot.get_file(update.message.document)
@@ -563,52 +542,38 @@ async def file_recieved(update: Update, context: ContextTypes.DEFAULT_TYPE) -> i
 
             # Add tasks to user data dictionary in context
             context.user_data['project']['tasks'] = tasks
-            # context.user_data['project']['staff'] = staff
-
-            # Remember telegram user id if PM is in staff
-            pm_oid = add_user_id_to_db(update.message.from_user)
-            if not pm_oid:
-                pass
 
             # Save project to DB
-            # At this point PM should be present in DB, so try to append project to it's project list
             try:
-                projects_list = DB.PMs.find_one({"pm_id": context.user_data['PM']['pm_id']}, {"projects": 1, "_id": 0})
+                prj_oid = DB.projects.insert_one(context.user_data['project'])
+                # projects_list = DB.PMs.find_one({"pm_id": context.user_data['PM']['pm_id']}, {"projects": 1, "_id": 0})
             except Exception as e:
                 logger.error(f"There was error getting DB: {e}")
                 bot_msg = (bot_msg + f"There is a problem with database connection. Contact developer or try later.")
                 await update.message.reply_text(bot_msg)
                 return ConversationHandler.END
             else:
-                # print(f"Projects dict returned: {projects_list['projects']}, it has type: {type(projects_list['projects'])}")
-                # Check if there are projects
-                if projects_list['projects']:
-                    # Make other projects not active
-                    for item in projects_list['projects']:
-                        item['active'] = False
-                    new_projects_list = projects_list['projects'].copy()
-                else:
-                    new_projects_list = []
-                new_projects_list.append(context.user_data['project'])
-                # pprint(f"What is in context? {context.user_data['project']}")
-                # pprint(f"NEW Project list returned: {new_projects_list}, it has type: {type(new_projects_list)}")
-                DB.PMs.update_one({"pm_id": context.user_data['PM']['pm_id']}, {"$set": {"projects": new_projects_list}})
-
                 # If succeed call function to create Jobs
-                project_title = context.user_data['project']['title']
-                # pprint(f"Project title: {project_title}")
-                if schedule_jobs(str(update.effective_user.id), project_title, context):
-                    bot_msg = (bot_msg + "\nReminders were created: on the day before event, in the morning of event and reminder for friday file update. "
-                                "You can change them or turn off in /settings."
-                                "\nProject initialization complete."
-                    )
+                if prj_oid:
+                    bot_msg = (bot_msg + f"\nProject added to database.")
                     # Since new project added successfully and it's active, lets make other projects inactive
-                else:
-                    bot_msg = (bot_msg + "\nSomething went wrong while scheduling reminders."
-                                "\nPlease, contact bot developer to check the logs.")
+                    result = DB.projects.update_many({"pm_tg_id": context.user_data['PM']['pm_id'], 
+                                                      "title": {"$ne": context.user_data['project']['title']}}, 
+                                                     {"$set": {"active": False}})
+                    if not result.acknowledged:
+                        raise errors.InvalidOperation("Attempt to update database was unsuccessful. Records maybe corrupted. Contact developer.")
+                    if schedule_jobs(str(update.effective_user.id), context.user_data['project']['title'], context):
+                        bot_msg = (bot_msg + "\nReminders were created: on the day before event,"
+                                             " in the morning of event and reminder for friday file update. "
+                                             "You can change them or turn off in /settings."
+                                             "\nProject initialization complete."
+                        )
+                    else:
+                        bot_msg = (bot_msg + "\nSomething went wrong while scheduling reminders."
+                                            "\nPlease, contact bot developer to check the logs.")
             finally:
                 await update.message.reply_text(bot_msg)
-                return ConversationHandler.END                                  
+                return ConversationHandler.END       
         else:
             bot_msg = (f"Couldn't process given file.\n"
                         f"Supported formats are: .gan (GanttProject), .json, .xml (MS Project)\n"
@@ -622,6 +587,7 @@ async def file_recieved(update: Update, context: ContextTypes.DEFAULT_TYPE) -> i
 
 async def start_ended(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     ''' Finish function of start routine'''
+    # TODO change this message to more meaningful
     bot_msg = "This is fallback function. How we get here? When something unexpected happens in conversation. Text message instead of file upload, for example"
     logger.warning(f"User: {update.message.from_user.username} ({update.message.from_user.id}) wrote: {update.message.text}")
     await update.message.reply_text(bot_msg)
