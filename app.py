@@ -101,58 +101,84 @@ FIRST_LVL, SECOND_LVL, THIRD_LVL, FOURTH_LVL, FIFTH_LVL = range(5)
 ONE, TWO, THREE, FOUR, FIVE = range(5)
 
 
-def get_keybord_and_msg(level: int, info: str = None, user_id: int = None):
+def get_keybord_and_msg(level: int, user_id: int, info: str = None):
     '''
     Helper function to provide specific keyboard on different levels of settings menu
     '''
 
     keyboard = None
     msg = None
-    match level:
-        case 0:
-            # First level menu keyboard
-            msg = (f"Current settings for project: ")
-            keyboard = [        
-                [InlineKeyboardButton(f"Allow status update in group chat: {'On' if ALLOW_POST_STATUS_TO_GROUP == True else 'Off'}", callback_data=str(ONE))],
-                [InlineKeyboardButton(f"Users get anounces about milestones {'On' if INFORM_ACTIONERS_OF_MILESTONES == True else 'Off'}", callback_data=str(TWO))],
-                [InlineKeyboardButton("Reminders settings", callback_data=str(THREE))],
-                [InlineKeyboardButton("Finish settings", callback_data=str(FOUR))],        
-            ]
-        case 1:
-            # TODO: Here I could construct keyboard out of jobs registered for current user
-            msg = (f"You can customize reminders here.")
-            # Second level menu keyboard
-            keyboard = [        
-                [InlineKeyboardButton("Reminder on day before", callback_data=str(ONE))],
-                [InlineKeyboardButton("Everyday morning reminder", callback_data=str(TWO))],
-                [InlineKeyboardButton("Friday reminder of project files update", callback_data=str(THREE))],
-                [InlineKeyboardButton("Back", callback_data=str(FOUR))],        
-                [InlineKeyboardButton("Finish settings", callback_data=str(FIVE))],        
-            ]
-        case 2:
-             # Message contents depend on a branch of menu, return None if nonsense given
-            match info:
-                case 'morning_update':                    
-                    msg = (f"Daily morning reminder has to be set here.\n"
-                            )
-                case 'day_before_update':
-                    msg = (f"The day before reminder has to be set here. \n"
-                            )
-                case 'file_update':
-                    msg = (f"Reminder for file updates on friday has to be set here. \n"
-                            )
-                case _:
-                    msg = None
-            # Third level menu keyboard
-            keyboard = [        
-                [InlineKeyboardButton("Turn on/off", callback_data=str(ONE))],
-                [InlineKeyboardButton("Set time", callback_data=str(TWO))],
-                [InlineKeyboardButton("Set days of week", callback_data=str(THREE))],
-                [InlineKeyboardButton("Back", callback_data=str(FOUR))],        
-                [InlineKeyboardButton("Finish settings", callback_data=str(FIVE))],        
-            ]
-        case _:
-            keyboard = None
+    DB = get_db()
+
+    # Retrieve from DB information about active project and it's settings
+    try:
+        record = DB.PMs.find_one({"pm_id": user_id})
+    except Exception as e:
+        logger.error(f"There was error getting DB: {e}")
+    else:
+        if record:
+            for project in record['projects']:
+                if project['active']:
+
+                    # Read settings
+                    ALLOW_POST_STATUS_TO_GROUP = project['settings']['ALLOW_POST_STATUS_TO_GROUP']
+                    INFORM_ACTIONERS_OF_MILESTONES = project['settings']['INFORM_ACTIONERS_OF_MILESTONES']
+                    
+                    # Configure keyboard and construct message depending of menu level
+                    match level:
+
+                        # First level of menu 
+                        case 0:
+                            msg = (f"Current settings for project: '{project['title']}'")
+                            keyboard = [        
+                                [InlineKeyboardButton(f"Allow status update in group chat: {'On' if ALLOW_POST_STATUS_TO_GROUP == True else 'Off'}", callback_data=str(ONE))],
+                                [InlineKeyboardButton(f"Users get anounces about milestones {'On' if INFORM_ACTIONERS_OF_MILESTONES == True else 'Off'}", callback_data=str(TWO))],
+                                [InlineKeyboardButton("Reminders settings", callback_data=str(THREE))],
+                                [InlineKeyboardButton("Finish settings", callback_data=str(FOUR))],        
+                            ]
+
+                        # Second level of menu
+                        case 1:
+                            # TODO: Here I could construct keyboard out of jobs registered for current user
+                            msg = (f"You can customize reminders here.")
+                            keyboard = [        
+                                [InlineKeyboardButton("Reminder on day before", callback_data=str(ONE))],
+                                [InlineKeyboardButton("Everyday morning reminder", callback_data=str(TWO))],
+                                [InlineKeyboardButton("Friday reminder of project files update", callback_data=str(THREE))],
+                                [InlineKeyboardButton("Back", callback_data=str(FOUR))],        
+                                [InlineKeyboardButton("Finish settings", callback_data=str(FIVE))],        
+                            ]
+
+                        # Third menu level
+                        case 2:
+
+                            # Message contents depend on a branch of menu, return None if nonsense given
+                            match info:
+                                case 'morning_update':                    
+                                    msg = (f"Daily morning reminder has to be set here.\n"
+                                            )
+                                case 'day_before_update':
+                                    msg = (f"The day before reminder has to be set here. \n"
+                                            )
+                                case 'file_update':
+                                    msg = (f"Reminder for file updates on friday has to be set here. \n"
+                                            )
+                                case _:
+                                    msg = None
+
+                            # Keyboard is the same for different branches (reminders)
+                            keyboard = [        
+                                [InlineKeyboardButton("Turn on/off", callback_data=str(ONE))],
+                                [InlineKeyboardButton("Set time", callback_data=str(TWO))],
+                                [InlineKeyboardButton("Set days of week", callback_data=str(THREE))],
+                                [InlineKeyboardButton("Back", callback_data=str(FOUR))],        
+                                [InlineKeyboardButton("Finish settings", callback_data=str(FIVE))],        
+                            ]
+                        case _:
+                            keyboard = None
+
+                    # If active project found no need to look through others
+                    break
 
     return keyboard, msg
 
@@ -333,6 +359,11 @@ async def morning_update(context: ContextTypes.DEFAULT_TYPE) -> None:
     # TODO how to make observation of project a standalone function to be called elsewhere?
     # because every reminder function load project from file and looks through it
 
+    # При создании задания сохраняется user_id и data (название проекта), как к ним получить доступ? Передавать как параметры при создании?
+
+    print(f"Contents of user_data: {context.user_data}")
+    print(f"Job data: {context.job.data}")
+
     if os.path.exists(PROJECTJSON):
         with open(PROJECTJSON, 'r') as fp:
             try:
@@ -446,15 +477,16 @@ async def naming_project(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
             'INFORM_ACTIONERS_OF_MILESTONES': False,
             },
         'tasks': [],
-        'staff': []
+        # 'staff': []
     }
+
     # Add project data to dictionary in user_data. 
     # One start = one project. But better keep PM and project separated, 
     # because they could be written to DB separately
     context.user_data['project'] = project
 
     # Check DB for such name for this user, (TODO standalone?)
-    print(context.user_data['PM']['pm_id'])
+    # print(context.user_data['PM']['pm_id'])
     # if check_db_for_user(context.user_data['PM']['pm_id']):
     try:
         db_pm_id = DB.PMs.find_one({"pm_id": context.user_data['PM']['pm_id']})
@@ -467,7 +499,7 @@ async def naming_project(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
         # print(db_pm_id)
         if db_pm_id:
             prj_id = DB.PMs.find_one({"pm_id": context.user_data['PM']['pm_id'], "projects.title": project['title']})
-            pprint(f"Results for looking this project name in DB: {prj_id}")
+            # pprint(f"Results for looking this project name in DB: {prj_id}")
             if prj_id:
                 bot_msg = f"You already started project with name {project['title']}. Try another one."
                 await update.message.reply_text(bot_msg)
@@ -516,23 +548,27 @@ async def naming_project(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
 
 async def file_recieved(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     ''' Function to proceed uploaded file and saving to DB'''
+
     # TODO reconsider to make this part as standalone function because it's same as in /upload
     # Call function to recieve file and call converters
     with tempfile.TemporaryDirectory() as tdp:
         gotfile = await context.bot.get_file(update.message.document)
         fp = await gotfile.download_to_drive(os.path.join(tdp, update.message.document.file_name))
         
-        # Call function which converts given file to dictionaries
+        # Call function which converts given file to dictionary and add actioners to staff collection
         tasks = file_to_dict(fp)
         if tasks:
-            # Remember telegram user id
-            # TODO refactor this
-            # staff = add_user_id(update.message.from_user, staff)
+
             bot_msg = "File parsed successfully"
 
-            # Add tasks and staff to user data dictionary in context
+            # Add tasks to user data dictionary in context
             context.user_data['project']['tasks'] = tasks
             # context.user_data['project']['staff'] = staff
+
+            # Remember telegram user id if PM is in staff
+            pm_oid = add_user_id_to_db(update.message.from_user)
+            if not pm_oid:
+                pass
 
             # Save project to DB
             # At this point PM should be present in DB, so try to append project to it's project list
@@ -560,7 +596,7 @@ async def file_recieved(update: Update, context: ContextTypes.DEFAULT_TYPE) -> i
 
                 # If succeed call function to create Jobs
                 project_title = context.user_data['project']['title']
-                pprint(f"Project title: {project_title}")
+                # pprint(f"Project title: {project_title}")
                 if schedule_jobs(str(update.effective_user.id), project_title, context):
                     bot_msg = (bot_msg + "\nReminders were created: on the day before event, in the morning of event and reminder for friday file update. "
                                 "You can change them or turn off in /settings."
@@ -594,8 +630,11 @@ async def start_ended(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int
 
 ### HELPERS:
 def file_to_dict(fp):
-    ''' Get file, return dictionaries '''
-    tasks = []
+    ''' 
+    Get file with project, determine supported type, call dedicated function to convert to dictionary, return it to caller
+    '''
+
+    tasks = None
     # staff = []
 
     # If file is known format: call appropriate function with this file as argument and expect project dictionary on return
@@ -628,11 +667,13 @@ def schedule_jobs(user_id: str, project_title: str, context: ContextTypes.DEFAUL
     
     morning_update_job, day_before_update_job, file_update_job = None, None, None
 
-    # TODO create jobs in mongo in apsheduler collection
-
+    # Create jobs in mongdb in apsheduler collection
+    # Configure id for job from PM id, project title and type of reminder
     job_id = str(user_id) + '_' + project_title + '_' + 'morning_update'
+
+    # Check if already present
     preset = get_job_preset(job_id, context)
-    print(f"Job '{job_id}' scheduled with preset: '{preset}'")
+    print(f"Job '{job_id}' scheduled with preset: '{preset}'")    
     if not preset:
 
         # Use default values from constants
@@ -1179,13 +1220,13 @@ async def upload(update: Update, context: CallbackContext) -> None:
             if tasks:
                 # Remember telegram user id
                 # TODO refactor this
-                staff = add_user_id_to_db(update.message.from_user, staff)
+                user_oid = add_user_id_to_db(update.message.from_user)
 
                 # Call function to save project in JSON format and log exception
                 # TODO delete. this is temporary until I make DB work
                 project = {
                     'tasks': tasks,
-                    'staff': staff
+                    # 'staff': staff
                 }
                 try:
                     save_json(project, PROJECTJSON)
@@ -1248,13 +1289,17 @@ async def settings(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     # For this purpose I will need ConversationHandler
     # + Time of daily update of starting and deadline tasks, and days too
 
-    keyboard, bot_msg = get_keybord_and_msg(FIRST_LVL)
+    keyboard, bot_msg = get_keybord_and_msg(FIRST_LVL, update.message.from_user.id)
     if keyboard == None or bot_msg == None:
         bot_msg = "Some error happened. Unable to show a menu."
         await update.message.reply_text(bot_msg)
     else:
+
         # Let's control which level of settings we are at any given moment
         context.user_data['level'] = FIRST_LVL
+
+        #TODO Need to pass user_id, because 
+
         reply_markup = InlineKeyboardMarkup(keyboard)
         # print(update.message)
         await update.message.reply_text(bot_msg, reply_markup=reply_markup)
@@ -1285,7 +1330,7 @@ async def allow_status_to_group(update: Update, context: ContextTypes.DEFAULT_TY
     ALLOW_POST_STATUS_TO_GROUP = False if ALLOW_POST_STATUS_TO_GROUP else True
 
     # Call function which create keyboard and generate message to send to user. End conversation if that was unsuccessful.
-    keyboard, bot_msg = get_keybord_and_msg(FIRST_LVL)
+    keyboard, bot_msg = get_keybord_and_msg(FIRST_LVL, update.effective_user.id)
     if keyboard == None or bot_msg == None:
         bot_msg = "Some error happened. Unable to show a menu."
         await update.message.reply_text(bot_msg)
@@ -1308,7 +1353,7 @@ async def milestones_anounce(update: Update, context: ContextTypes.DEFAULT_TYPE)
     INFORM_ACTIONERS_OF_MILESTONES = False if INFORM_ACTIONERS_OF_MILESTONES else True
 
     # Call function which create keyboard and generate message to send to user. End conversation if that was unsuccessful.
-    keyboard, bot_msg = get_keybord_and_msg(FIRST_LVL)
+    keyboard, bot_msg = get_keybord_and_msg(FIRST_LVL, update.effective_user.id)
     if keyboard == None or bot_msg == None:
         bot_msg = "Some error happened. Unable to show a menu."
         await update.message.reply_text(bot_msg)
@@ -1331,7 +1376,7 @@ async def reminders(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     context.user_data['level'] = SECOND_LVL
 
     # Call function which create keyboard and generate message to send to user. End conversation if that was unsuccessful.
-    keyboard, bot_msg = get_keybord_and_msg(SECOND_LVL)
+    keyboard, bot_msg = get_keybord_and_msg(SECOND_LVL, update.effective_user.id)
     if keyboard == None or bot_msg == None:
         bot_msg = "Some error happened. Unable to show a menu."
         await update.message.reply_text(bot_msg)
@@ -1356,7 +1401,7 @@ async def settings_back(update: Update, context: ContextTypes.DEFAULT_TYPE) -> i
         context.user_data['level'] = context.user_data['level'] - 1  
 
     # Make keyboard appropriate to a level we are returning to
-    keyboard, bot_msg = get_keybord_and_msg(context.user_data['level'])
+    keyboard, bot_msg = get_keybord_and_msg(context.user_data['level'], update.effective_user.id)
 
     # Call function which create keyboard and generate message to send to user. End conversation if that was unsuccessful.
     if keyboard == None or bot_msg == None:
@@ -1390,7 +1435,7 @@ async def day_before_update_item(update: Update, context: ContextTypes.DEFAULT_T
     # Call function which create keyboard and generate message to send to user. 
     # Call function which get current preset of reminder, to inform user.
     # End conversation if that was unsuccessful. 
-    keyboard, bot_msg = get_keybord_and_msg(THIRD_LVL, context.user_data['last_position'])
+    keyboard, bot_msg = get_keybord_and_msg(THIRD_LVL, update.effective_user.id, context.user_data['last_position'])
     job_id = str(update.effective_user.id) + '_' + PROJECTTITLE + '_' + str(context.user_data['last_position'])
     preset = get_job_preset(job_id, context)
     
@@ -1422,7 +1467,7 @@ async def morning_update_item(update: Update, context: ContextTypes.DEFAULT_TYPE
     # Call function which create keyboard and generate message to send to user. 
     # Call function which get current preset of reminder, to inform user.
     # End conversation if that was unsuccessful. 
-    keyboard, bot_msg = get_keybord_and_msg(THIRD_LVL, context.user_data['last_position'])
+    keyboard, bot_msg = get_keybord_and_msg(THIRD_LVL, update.effective_user.id, context.user_data['last_position'])
     job_id = str(update.effective_user.id) + '_' + PROJECTTITLE + '_' + str(context.user_data['last_position'])
     preset = get_job_preset(job_id, context)
     # preset = get_job_preset(context.user_data['last_position'], update.effective_user.id, PROJECTTITLE, context)
@@ -1453,7 +1498,7 @@ async def file_update_item(update: Update, context: ContextTypes.DEFAULT_TYPE) -
     # Call function which create keyboard and generate message to send to user. 
     # Call function which get current preset of reminder, to inform user.
     # End conversation if that was unsuccessful. 
-    keyboard, bot_msg = get_keybord_and_msg(THIRD_LVL, context.user_data['last_position'])
+    keyboard, bot_msg = get_keybord_and_msg(THIRD_LVL, update.effective_user.id, context.user_data['last_position'])
     job_id = str(update.effective_user.id) + '_' + PROJECTTITLE + '_' + str(context.user_data['last_position'])
     preset = get_job_preset(job_id, context)
     # preset = get_job_preset(context.user_data['last_position'], update.effective_user.id, PROJECTTITLE, context)
@@ -1493,7 +1538,7 @@ async def reminder_switcher(update: Update, context: ContextTypes.DEFAULT_TYPE) 
     # Call function which create keyboard and generate message to send to user. 
     # Call function which get current preset of reminder, to inform user.
     # End conversation if that was unsuccessful. 
-    keyboard, bot_msg = get_keybord_and_msg(THIRD_LVL, reminder)
+    keyboard, bot_msg = get_keybord_and_msg(THIRD_LVL, update.effective_user.id, reminder)
     preset = get_job_preset(job_id, context)
     # preset = get_job_preset(context.user_data['last_position'], update.effective_user.id, PROJECTTITLE, context)
     if keyboard == None or bot_msg == None:
@@ -1527,7 +1572,7 @@ async def reminder_time_pressed(update: Update, context: ContextTypes.DEFAULT_TY
         text = (f"Seems that reminder doesn't set")
 
         # Call function which create keyboard and generate message to send to user. End conversation if that was unsuccessful.
-        keyboard, bot_msg = get_keybord_and_msg(THIRD_LVL, reminder)
+        keyboard, bot_msg = get_keybord_and_msg(THIRD_LVL, update.effective_user.id, reminder)
         if keyboard == None or bot_msg == None:
             bot_msg = f"{text}\nSome error happened. Unable to show a menu."
             await query.edit_message_text(bot_msg)
@@ -1570,7 +1615,7 @@ async def reminder_days_pressed(update: Update, context: ContextTypes.DEFAULT_TY
         text = (f"Seems that reminder doesn't set")
 
         # Call function which create keyboard and generate message to send to user. End conversation if that was unsuccessful.
-        keyboard, bot_msg = get_keybord_and_msg(THIRD_LVL, reminder)
+        keyboard, bot_msg = get_keybord_and_msg(THIRD_LVL, update.effective_user.id, reminder)
         if keyboard == None or bot_msg == None:
             bot_msg = f"{text}\nSome error happened. Unable to show a menu."
             await query.edit_message_text(bot_msg)
@@ -1634,7 +1679,7 @@ async def reminder_time_setter(update: Update, context: ContextTypes.DEFAULT_TYP
     await update.message.reply_text(bot_msg)
 
     # Provide keyboard of level 3 menu 
-    keyboard, bot_msg = get_keybord_and_msg(THIRD_LVL, reminder)
+    keyboard, bot_msg = get_keybord_and_msg(THIRD_LVL, update.effective_user.id, reminder)
 
     # And get current (updated) preset
     job_id = str(update.effective_user.id) + '_' + PROJECTTITLE + '_' + reminder
@@ -1718,7 +1763,7 @@ async def reminder_days_setter(update: Update, context: ContextTypes.DEFAULT_TYP
     await update.message.reply_text(bot_msg)
 
     # Provide keyboard of level 3 menu 
-    keyboard, bot_msg = get_keybord_and_msg(THIRD_LVL, reminder)
+    keyboard, bot_msg = get_keybord_and_msg(THIRD_LVL, update.effective_user.id, reminder)
     # And get current preset (updated) of the reminder to show to user
     job_id = str(update.effective_user.id) + '_' + PROJECTTITLE + '_' + reminder
     preset = get_job_preset(job_id, context)

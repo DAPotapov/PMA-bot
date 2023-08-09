@@ -93,7 +93,7 @@ def get_assignees(task: dict):
         if staff:
             for doer in task['actioners']:
                 for member in staff:
-                    print(f"Doer: {type(doer['actioner_id'])} \t {type(member['_id'])}")
+                    # print(f"Doer: {type(doer['actioner_id'])} \t {type(member['_id'])}")
                     if doer['actioner_id'] == member['_id']:                                                    
                         if member['tg_id']:
                             user_ids.append(member['tg_id'])              

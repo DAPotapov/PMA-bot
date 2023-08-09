@@ -60,7 +60,8 @@ def load_gan(fp):
     This is a connector from GanttProject format (.gan) to inner format.
     Get file pointer on input
     Validates and converts data to inner dict-list-dict.. format
-    Dictionaries on output        
+    Saves actioners to staff collection in DB
+    Dictionary on output        
     '''
     
     # Using untangle on GAN - WORKING. This syntax cleaner and have some useful methods like 'children'
@@ -322,6 +323,7 @@ def load_xml(fp):
     Function to import from MS Project XML file 
     Get file pointer on input
     Validates and converts data to inner dict-list-dict.. format
+    Saves actioners to staff collection in DB
     Dictionary on output    
     """
 
