@@ -43,18 +43,11 @@ PM can change settings of notifications: time to send reminders to actioners, tu
 First of all: the project file sent to bot should contain field 'tg_username' containing telegram username for members of a project team. Resources obviously should be present in file and assigned to tasks for bot to work :)
 
 ```json
-{"PMs": {
-    "pm_id": '',            # telegram id of PM
-    "pm_username": '',      # telegram username of PM
-    "pm_firstname": '',     # First name got from telegram too
-    "account_type": 'free', # For future comercial use
-    "settings": {
-        'INFORM_OF_ALL_PROJECTS': False,    #  If set to True /status command will inform PM about all his projects, otherwise   
-},                                          # only about active project  
-    "projects": [                           # PM could manage several projects
+"projects": [                           
     {
         "title": '', # Title of the project
         "active": True,     # Is this an active project? Controlled via settings and used in /status command
+        "pm_tg_id": '',        # Telegram id of PM  
         "tg_chat_id": '',   # store here group chat where project members discuss project
         "settings": {
             'ALLOW_POST_STATUS_TO_GROUP': False,        # This option controls whether /status command from group chat 
@@ -173,28 +166,38 @@ First of all: the project file sent to bot should contain field 'tg_username' co
                 ]
             },        
         ],
-        "staff": [  # Actioners are stored separately because it is more convinient to write tg_id
-            {       # If they were stored in tasks, then it will be a problem to write tg_id in each task
-                "_id": ObjectId(),
-                "name": "John",
-                "email": "",
-                "phone": "",
-                "tg_username": "some_user42", 
-                "tg_id": 000000
-            },
-            {
-                "_id": ObjectId(),
-                "name": "Mark",
-                "email": "",
-                "phone": "",
-                "tg_username": "some_user666",
-                "tg_id": 000000
-            }
-        ]
+    "staff": [  # Actioners are stored separately because it is more convinient to write tg_id
+        {       # If they were stored in tasks, then it will be a problem to write tg_id in each task
+            "_id": ObjectId(),
+            "name": "John",
+            "email": "",
+            "phone": "",
+            "tg_username": "some_user42", 
+            "tg_id": 000000,
+            "account_type": 'free',                 # For future comercial use
+            "settings": {
+                'INFORM_OF_ALL_PROJECTS': False,    #  If set to True /status command will inform PM 
+                                                    # about all his projects, otherwise   
+            },                                      # only about active project  
+        },
+        {
+            "_id": ObjectId(),
+            "name": "Mark",
+            "email": "",
+            "phone": "",
+            "tg_username": "some_user666",
+            "tg_id": 000000,
+            "account_type": 'free',                 # For future comercial use
+            "settings": {
+                'INFORM_OF_ALL_PROJECTS': False,    #  If set to True /status command will inform PM 
+                                                    # about all his projects, otherwise   
+            },                                      # only about active project  
+        },
+    ]
+        
     }
     ]
-}
-}
+
 ```
 
 Explanation of values for types of dependencies between tasks ([see docs](https://learn.microsoft.com/en-us/office-project/xml-data-interchange/xml-schema-for-the-tasks-element?view=project-client-2016)):  
