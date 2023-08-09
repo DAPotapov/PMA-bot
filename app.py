@@ -73,7 +73,7 @@ FRIDAY = "15:00"
 
 # TODO: change according to starter of the bot
 PROJECTTITLE = 'TESTING PROJECT'
-KNOWN_USERS = {}
+# KNOWN_USERS = {}
 load_dotenv()
 PM = os.environ.get("PM")
 PROJECTJSON = os.environ.get("PROJECTJSON")
@@ -1289,6 +1289,10 @@ async def settings(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     # For this purpose I will need ConversationHandler
     # + Time of daily update of starting and deadline tasks, and days too
 
+    # TODO Check if current user is acknowledged PM then proceed otherwise suggest to start a new project
+
+    # TODO Get active project title and store in user_data (because now PROJECTTITLE contain default value not associated with project)
+
     keyboard, bot_msg = get_keybord_and_msg(FIRST_LVL, update.message.from_user.id)
     if keyboard == None or bot_msg == None:
         bot_msg = "Some error happened. Unable to show a menu."
@@ -1297,8 +1301,6 @@ async def settings(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
 
         # Let's control which level of settings we are at any given moment
         context.user_data['level'] = FIRST_LVL
-
-        #TODO Need to pass user_id, because 
 
         reply_markup = InlineKeyboardMarkup(keyboard)
         # print(update.message)

@@ -21,11 +21,13 @@ PM can change settings of notifications: time to send reminders to actioners, tu
 
 ## TODO
 
-[ ] make /cancel command to work in conversation handler if user don't want to enter time or days of week
+[ ] make bot persistent https://github.com/python-telegram-bot/python-telegram-bot/wiki/Making-your-bot-persistent  
+    [ ] use MongoDB to store projects and other data
+    [x] use MongoDB to store jobs  
 [ ] fully implement connector to json format  
 [ ] ask if PM wants to rewrite project file if new uploaded
-[ ] make bot persistent https://github.com/python-telegram-bot/python-telegram-bot/wiki/Making-your-bot-persistent  
 [ ] Error handling: https://docs.python-telegram-bot.org/en/stable/telegram.ext.application.html#telegram.ext.Application.error_handlers
+[x] make /cancel command to work in conversation handler if user don't want to enter time or days of week
 [x] make status command working for team members too  
 [x] make reminders can be turned off and on
 [x] make reminders' time customizable in /settings
@@ -173,7 +175,7 @@ First of all: the project file sent to bot should contain field 'tg_username' co
         ],
         "staff": [  # Actioners are stored separately because it is more convinient to write tg_id
             {       # If they were stored in tasks, then it will be a problem to write tg_id in each task
-                "id": "0",
+                "_id": ObjectId(),
                 "name": "John",
                 "email": "",
                 "phone": "",
@@ -181,7 +183,7 @@ First of all: the project file sent to bot should contain field 'tg_username' co
                 "tg_id": 000000
             },
             {
-                "id": "1",
+                "_id": ObjectId(),
                 "name": "Mark",
                 "email": "",
                 "phone": "",
