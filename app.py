@@ -44,7 +44,8 @@ from telegram.ext import (
 from urllib.parse import quote_plus
 from ptbcontrib.ptb_jobstores import PTBMongoDBJobStore
 from helpers import (
-    add_user_id_to_db, 
+    add_user_id_to_db,
+    add_worker_to_staff, 
     get_assignees,
     get_db, 
     get_job_preset,
@@ -249,7 +250,7 @@ async def day_before_update(context: ContextTypes.DEFAULT_TYPE) -> None:
                                                 parse_mode=ParseMode.HTML)
 
 
-# TURNED ON
+# TURNED OFF because conflicting with handlers which use input from user (naming project in /start, for example)
 async def echo(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """
     This function would be added to the application as a handler for messages coming from the Bot API
@@ -264,13 +265,6 @@ async def echo(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     pprint(result)
     if not result:
         logger.warning(f"User id ({user.id}) of {user.username} was not added to DB (maybe already present).")
-
-    # global KNOWN_USERS
-    # KNOWN_USERS.update({
-    #     user.username: user.id
-    # })
-    # pprint(KNOWN_USERS)
-    # print (update.message.chat_id)
 
     # reply only to personal messages
     if update.message.chat_id == user.id:
@@ -440,9 +434,11 @@ async def start(update: Update, context: CallbackContext) -> int:
     # Call function to upload project file
     # Call function to make jobs
     pm = {
-        'tg_id': update.effective_user.id,
-        'tg_username': update.effective_user.username,
         'name': update.effective_user.first_name,
+        'email' : '',
+        'phone' : '',
+        'tg_username': update.effective_user.username,
+        'tg_id': update.effective_user.id,
         'account_type': 'free',
         'settings': {
             'INFORM_OF_ALL_PROJECTS': False,         
@@ -492,20 +488,14 @@ async def naming_project(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
     # if check_db_for_user(context.user_data['PM']['pm_id']):
 
     # Check and add PM to staff
-
-    try:
-        pm_oid = DB.staff.find_one({"tg_id": context.user_data['PM']['tg_id']}, {"_id":1})
-    except Exception as e:
-        logger.error(f"There was error getting DB: {e}")
+    pm_oid = add_worker_to_staff(context.user_data['PM'])
+    if not pm_oid:
         bot_msg = "There is a problem with database connection. Contact developer or try later."
         await update.message.reply_text(bot_msg)
         return ConversationHandler.END   
     else:
-        if not pm_oid:
-            pm_oid = DB.staff.insert_one(context.user_data['PM'])
-        prj_id = DB.projects.find_one({"title": project['title'], "pm_tg_id": context.user_data['PM']['pm_id']}, {"_id":1})
+        prj_id = DB.projects.find_one({"title": project['title'], "pm_tg_id": context.user_data['PM']['tg_id']}, {"_id":1})
         print(f"Search for project title returned this: {prj_id}")
-        # prj_id = DB.PMs.find_one({"pm_id": context.user_data['PM']['pm_id'], "projects.title": project['title']})
         if prj_id:
             bot_msg = f"You've already started project with name {project['title']}. Try another one."
             await update.message.reply_text(bot_msg)
@@ -514,15 +504,6 @@ async def naming_project(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
             bot_msg = f"Got it. Now you can upload your project file. Supported formats are: .gan (GanttProject), .json, .xml (MS Project)"
             await update.message.reply_text(bot_msg)
             return SECOND_LVL
-
-
-### DELETE? seems that this standalone function doesn't give any advantages
-# def check_db_for_user(pm_id) -> bool:
-#     ''' Function to check whether DB has a PM with provided telegram_id '''
-#     if DB.PMs.find_one({"pm_id": pm_id}):
-#         return True
-#     else:
-#         return False
 
 
 async def file_recieved(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
@@ -546,7 +527,6 @@ async def file_recieved(update: Update, context: ContextTypes.DEFAULT_TYPE) -> i
             # Save project to DB
             try:
                 prj_oid = DB.projects.insert_one(context.user_data['project'])
-                # projects_list = DB.PMs.find_one({"pm_id": context.user_data['PM']['pm_id']}, {"projects": 1, "_id": 0})
             except Exception as e:
                 logger.error(f"There was error getting DB: {e}")
                 bot_msg = (bot_msg + f"There is a problem with database connection. Contact developer or try later.")
@@ -556,12 +536,16 @@ async def file_recieved(update: Update, context: ContextTypes.DEFAULT_TYPE) -> i
                 # If succeed call function to create Jobs
                 if prj_oid:
                     bot_msg = (bot_msg + f"\nProject added to database.")
+                    print(f"can i get just here? {prj_oid}")
                     # Since new project added successfully and it's active, lets make other projects inactive
-                    result = DB.projects.update_many({"pm_tg_id": context.user_data['PM']['pm_id'], 
-                                                      "title": {"$ne": context.user_data['project']['title']}}, 
-                                                     {"$set": {"active": False}})
-                    if not result.acknowledged:
-                        raise errors.InvalidOperation("Attempt to update database was unsuccessful. Records maybe corrupted. Contact developer.")
+                    prj_count = DB.projects.count_documents({"pm_tg_id": context.user_data['PM']['tg_id'], "title": {"$ne": context.user_data['project']['title']}})
+                    if prj_count > 0:
+                        result = DB.projects.update_many({"pm_tg_id": context.user_data['PM']['tg_id'], "title": {"$ne": context.user_data['project']['title']}}, {"$set": {"active": False}})
+                        # If not all other projects switched to inactive state raise an error, 
+                        # because later bot couldn't comprehend which priject to use
+                        if result.acknowledged and result.modified_count < prj_count:
+                            # TODO consider to create new type of error derived from some base class
+                            raise ValueError("Attempt to update database was unsuccessful. Records maybe corrupted. Contact developer.")
                     if schedule_jobs(str(update.effective_user.id), context.user_data['project']['title'], context):
                         bot_msg = (bot_msg + "\nReminders were created: on the day before event,"
                                              " in the morning of event and reminder for friday file update. "
@@ -586,9 +570,9 @@ async def file_recieved(update: Update, context: ContextTypes.DEFAULT_TYPE) -> i
 
 
 async def start_ended(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
-    ''' Finish function of start routine'''
+    ''' Fallback function of start routine'''
     # TODO change this message to more meaningful
-    bot_msg = "This is fallback function. How we get here? When something unexpected happens in conversation. Text message instead of file upload, for example"
+    bot_msg = "Procedure of starting new project aborted."
     logger.warning(f"User: {update.message.from_user.username} ({update.message.from_user.id}) wrote: {update.message.text}")
     await update.message.reply_text(bot_msg)
     return ConversationHandler.END
@@ -1843,7 +1827,7 @@ def main() -> None:
     # application.add_handler(CallbackQueryHandler(buttons))    
 
     # Echo any message that is text and not a command
-    application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, echo))
+    # application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, echo))
 
     # Register handler for recieving new project file
     # It's conflicting with /start conversation, better place it in conversation as well

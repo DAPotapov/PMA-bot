@@ -111,12 +111,16 @@ def load_gan(fp):
             
             # Make dict of actioner
             worker = {
-                'id' : int(actioner['id']),
-                'name' : actioner['name'],
-                'email' : actioner['contacts'],
-                'phone' : actioner['phone'],
-                'tg_username' : tg_username,
-                'tg_id' : ""
+                "program_id" : int(actioner['id']), 
+                "name" : actioner['name'],
+                "email" : actioner['contacts'],
+                "phone" : actioner['phone'],
+                "tg_username" : tg_username,
+                "tg_id" : "",
+                "account_type": 'free',
+                "settings": {
+                    'INFORM_OF_ALL_PROJECTS': False,   
+                },
             }
 
             # Add record to DB and see result
@@ -376,10 +380,9 @@ def load_xml(fp):
             if not tg_username:
                 raise ValueError(f"'{actioner.Name.cdata}' have no tg_username value") 
 
-
             # Make dict of actioner
             worker = {
-                'id' : int(actioner.UID.cdata),
+                'program_id' : int(actioner.UID.cdata),
                 'name' : actioner.Name.cdata,
                 # Seems like XML not necessary contain email address field for resource
                 'email' : actioner.EmailAddress.cdata if 'EmailAddress' in actioner else '',
@@ -387,7 +390,11 @@ def load_xml(fp):
                 # Maybe I'll use ExtendedAttribute for this purpose later
                 'phone' : '',
                 'tg_username' : tg_username,
-                'tg_id' : ""
+                'tg_id' : "",
+                "account_type": 'free',
+                "settings": {
+                'INFORM_OF_ALL_PROJECTS': False,
+                },
             }
 
             # Add record to DB and see result
@@ -396,7 +403,6 @@ def load_xml(fp):
                     logger.warning("Something went wrong while adding worker to staff collection")
             except ValueError as e:
                 logger.error(f"{e}")
-
 
     # Gathering tasks from XML
     if 'Task' in obj.Project.Tasks:

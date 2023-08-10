@@ -26,6 +26,7 @@ def add_user_id_to_db(user: User):
     result = None
     DB = get_db()
     print(f"user is {user}")
+
     # Fill record with absent id with current one
     # For now I assume that users don't switch their usernames and such situation is force-major
     try:
@@ -34,8 +35,9 @@ def add_user_id_to_db(user: User):
     except Exception as e:
         logger.error(f"There was error getting DB: {e}")
     else:
-        # TODO refactor this (and in other places) because if no record returned this line will cause exception
-        if not record["tg_id"]:
+
+        # TODO refactor such part in any other places where key error may occur
+        if record and ('tg_id' in record.keys()) and not record['tg_id']:
             result = DB.staff.update_one({"tg_username": user.username}, {"$set": {"tg_id": user.id}})
             print(result)
             if not result:
@@ -44,10 +46,14 @@ def add_user_id_to_db(user: User):
     return result
 
 
-def add_worker_to_staff(worker):
+def add_worker_to_staff(worker: dict):
     ''' 
     Calls functions to check whether such worker exist in staff collection. 
     Adds given worker to staff collection if not exist already.
+    # TODO because PM already added to DB before we get to know his contacts from 'resources' 
+    (if he is in there) we should call here a function to update missing fields (and only them! 
+    - so it will be universal function which can be called anywhere)
+    Otherwise if  PM is actioner in other project such record will lack contact information
     '''
 
     worker_id = None
