@@ -167,7 +167,7 @@ def get_tg_un_from_gan_resources(resource_id, resources, property_id):
     '''
 
     tg_username = None
-    print(f"Func called with id: {resource_id}")
+    # print(f"Func called with id: {resource_id}")
 
     for actioner in resources.resource:
         # pprint(f"Actioner: {actioner}")
@@ -191,7 +191,7 @@ def get_tg_un_from_xml_resources(resource_id, resources, property_id):
     '''
 
     tg_username = None
-    print(f"Func called with id: {resource_id}")
+    # print(f"Func called with id: {resource_id}")
 
     for actioner in resources.Resource:
         if resource_id == actioner.UID.cdata:
@@ -214,7 +214,7 @@ def compose_tasks_list(tasks, task, allocations, resources, property_id):
     # Completeness of task assignments will be controlled in /status function
     # pprint(f"Function got these parameters:\n {list}\n{task['name']}\n{allocations}")
     actioners = [] 
-    pprint(f"Whats in resources? {resources}")
+    # pprint(f"Whats in resources? {resources}")
     for allocation in allocations:
         if task['id'] == allocation['task-id']:
             # Memo: GanntProject starts numeration of resources from 0, MS Project - from 1

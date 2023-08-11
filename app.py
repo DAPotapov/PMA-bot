@@ -116,7 +116,7 @@ def get_keybord_and_msg(level: int, user_id: int, info: str = None):
         record = DB.projects.find_one({"pm_tg_id": user_id, "active": True}, {"title": 1, "settings": 1, "_id": 0})
     except Exception as e:
         logger.error(f"There was error getting DB: {e}")
-    else:
+    else:   
         if record:
             
             # Configure keyboard and construct message depending of menu level
@@ -344,10 +344,9 @@ async def morning_update(context: ContextTypes.DEFAULT_TYPE) -> None:
     # TODO how to make observation of project a standalone function to be called elsewhere?
     # because every reminder function load project from file and looks through it
 
-    # При создании задания сохраняется user_id и data (название проекта), как к ним получить доступ? Передавать как параметры при создании?
 
-    print(f"Contents of user_data: {context.user_data}")
-    print(f"Job data: {context.job.data}")
+    print(f"Contents of user_data: {context.user_data}") # empty, because not saved to DB
+    print(f"Job data: {context.job.data}") # exist
 
     if os.path.exists(PROJECTJSON):
         with open(PROJECTJSON, 'r') as fp:
@@ -524,24 +523,28 @@ async def file_recieved(update: Update, context: ContextTypes.DEFAULT_TYPE) -> i
                 await update.message.reply_text(bot_msg)
                 return ConversationHandler.END
             else:
+
                 # If succeed call function to create Jobs
                 if prj_oid:
                     bot_msg = (bot_msg + f"\nProject added to database.")
                     print(f"can i get just here? {prj_oid}")
-                    # Since new project added successfully and it's active, lets make other projects inactive
+
+                    # Since new project added successfully and it's active, 
+                    # lets make other projects inactive (actually there should be just one, but just in case)
                     prj_count = DB.projects.count_documents({"pm_tg_id": context.user_data['PM']['tg_id'], "title": {"$ne": context.user_data['project']['title']}})
                     if prj_count > 0:
                         result = DB.projects.update_many({"pm_tg_id": context.user_data['PM']['tg_id'], "title": {"$ne": context.user_data['project']['title']}}, {"$set": {"active": False}})
-                        # If not all other projects switched to inactive state raise an error, 
+                        
+                        # If other project didn't switched to inactive state raise an error, 
                         # because later bot couldn't comprehend which priject to use
-                        if result.acknowledged and result.modified_count < prj_count:
+                        if result.acknowledged and result.modified_count == 0:
                             # TODO consider to create new type of error derived from some base class
                             raise ValueError("Attempt to update database was unsuccessful. Records maybe corrupted. Contact developer.")
-                    if schedule_jobs(str(update.effective_user.id), context.user_data['project']['title'], context):
-                        bot_msg = (bot_msg + "\nReminders were created: on the day before event,"
-                                             " in the morning of event and reminder for friday file update. "
-                                             "You can change them or turn off in /settings."
-                                             "\nProject initialization complete."
+                    if schedule_jobs(str(update.effective_user.id), context):
+                        bot_msg = (bot_msg + f"\nReminders were created: on the day before event ({ONTHEEVE}),"
+                                             f" in the morning of event ({MORNING}) and reminder for friday file update ({FRIDAY}). "
+                                             f"You can change them or turn off in /settings."
+                                             f"\nProject initialization complete."
                         )
                     else:
                         bot_msg = (bot_msg + "\nSomething went wrong while scheduling reminders."
@@ -629,8 +632,9 @@ def schedule_jobs(user_id: str, project_title: str, context: ContextTypes.DEFAUL
             
             ''' To persistence to work job must have explicit ID and 'replace_existing' must be True
             or a new copy of the job will be created every time application restarts! '''
+            data = {"project_title": context.user_data['project']['title'], "pm_tg_id": user_id}
             job_kwargs = {'id': job_id, 'replace_existing': True}
-            morning_update_job = context.job_queue.run_daily(morning_update, user_id=user_id, time=time2check, data=project_title, job_kwargs=job_kwargs)
+            morning_update_job = context.job_queue.run_daily(morning_update, user_id=user_id, time=time2check, data=data, job_kwargs=job_kwargs)
             
             # and enable it.
             morning_update_job.enabled = True 
@@ -1182,8 +1186,8 @@ async def upload(update: Update, context: CallbackContext) -> None:
                     bot_msg = "Project file saved successfully"
                     
                     # Call function to create jobs:
-                    project_title = context.user_data['project']['title']
-                    if schedule_jobs(str(update.effective_user.id), project_title, context):
+                    # project_title = context.user_data['project']['title']
+                    if schedule_jobs(str(update.effective_user.id), context):
                         bot_msg = (bot_msg + "\nReminders were created: on the day before event, in the morning of event and reminder for friday file update."
                                     "You can change them or turn off in /setttings"
                         )
@@ -1628,11 +1632,15 @@ async def reminder_time_setter(update: Update, context: ContextTypes.DEFAULT_TYP
 
         # Reschedule the job
         try:
-            job.reschedule(trigger='cron', hour=hour, minute=minute, day_of_week=day_of_week, timezone=tz)
+            job = job.reschedule(trigger='cron', hour=hour, minute=minute, day_of_week=day_of_week, timezone=tz)
         except Exception as e:
             bot_msg = (f"Unable to reschedule the reminder")
             logger.info(f'{e}')
-        bot_msg = (f"Time updated. Next time: "
+        else:
+
+            # Get job by id again because next_run_time didn't updated after reschedule (no matter what docs says)
+            job = context.job_queue.scheduler.get_job(job_id)
+            bot_msg = (f"Time updated. Next time: "
                     f"{job.next_run_time}"
                     )       
 
