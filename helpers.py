@@ -31,14 +31,14 @@ def add_user_id_to_db(user: User):
     # For now I assume that users don't switch their usernames and such situation is force-major
     try:
         record = DB.staff.find_one({"tg_username": user.username}, {"tg_id": 1, "_id": 0})
-        print(f"record is {record}")
+        # print(f"record is {record}")
     except Exception as e:
         logger.error(f"There was error getting DB: {e}")
     else:
 
         # TODO refactor such part in any other places where key error may occur
         if record and ('tg_id' in record.keys()) and not record['tg_id']:
-            result = DB.staff.update_one({"tg_username": user.username}, {"$set": {"tg_id": user.id}})
+            result = DB.staff.update_one({"tg_username": user.username}, {"$set": {"tg_id": str(user.id)}})
             print(result)
             if not result:
                 logger.warning(f"Something went wrong while adding telegram id for telegram username {user.username}")
@@ -199,7 +199,7 @@ def get_worker_oid_from_db_by_tg_id(tg_id):
     DB = get_db()
   
     try:
-        result = DB.staff.find_one({'tg_id': tg_id})
+        result = DB.staff.find_one({'tg_id': str(tg_id)})
     except Exception as e:
         logger.error(f"There was error getting DB: {e}")
     else:

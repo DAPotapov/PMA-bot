@@ -102,7 +102,7 @@ FIRST_LVL, SECOND_LVL, THIRD_LVL, FOURTH_LVL, FIFTH_LVL = range(5)
 ONE, TWO, THREE, FOUR, FIVE = range(5)
 
 
-def get_keybord_and_msg(level: int, user_id: int, info: str = None):
+def get_keybord_and_msg(level: int, user_id: str, info: str = None):
     '''
     Helper function to provide specific keyboard on different levels of settings menu
     '''
@@ -113,7 +113,7 @@ def get_keybord_and_msg(level: int, user_id: int, info: str = None):
 
     # Retrieve from DB information about active project and it's settings
     try:
-        record = DB.projects.find_one({"pm_tg_id": user_id, "active": True}, {"title": 1, "settings": 1, "_id": 0})
+        record = DB.projects.find_one({"pm_tg_id": str(user_id), "active": True}, {"title": 1, "settings": 1, "_id": 0})
     except Exception as e:
         logger.error(f"There was error getting DB: {e}")
     else:   
@@ -344,72 +344,124 @@ async def morning_update(context: ContextTypes.DEFAULT_TYPE) -> None:
     # TODO how to make observation of project a standalone function to be called elsewhere?
     # because every reminder function load project from file and looks through it
 
-
-    print(f"Contents of user_data: {context.user_data}") # empty, because not saved to DB
+    # print(f"Contents of user_data: {context.user_data}") # empty, because not saved to DB
     print(f"Job data: {context.job.data}") # exist
 
-    if os.path.exists(PROJECTJSON):
-        with open(PROJECTJSON, 'r') as fp:
-            try:
-                project = connectors.load_json(fp)
-            except Exception as e:
-                bot_msg = f"ERROR ({e}): Unable to load"
-                logger.error(f'{e}')                  
+    # Get project from DB
+    try:
+        project = DB.projects.find_one({"pm_tg_id": str(context.job.data['pm_tg_id']), "title": context.job.data['project_title']})
+    except Exception as e:
+        logger.error(f"There was error getting DB: {e}")
+    else:
+        if project:            
+
+            # Add PM username
+            record = DB.staff.find_one({"tg_id": str(context.job.data['pm_tg_id'])})
+            if record and record['tg_username']:
+                project['tg_username'] = record['tg_username']
             else:
+                logger.error(f"PM (with tg_id: {str(context.job.data['pm_tg_id'])}) was not found in db.staff!")
+            
+            # Find task to inform about and send message to users
+            for task in project['tasks']:
+                bot_msg = '' # Also acts as flag that there is something to inform user of
 
-                # Loop through actioners to inform them about actual tasks
-                for actioner in project['staff']:
+                # TODO decide about milestones
+                if task['complete'] < 100 and not task['include'] and not task['milestone']:
 
-                    # Bot can inform only ones with known id
-                    # print(actioner)
-                    if actioner['tg_id']:
-                        for task in project['tasks']:
+                    # If delta_start <0 task not started, otherwise already started
+                    delta_start = date.today() - date.fromisoformat(task['startdate'])
 
-                            # Process only tasks in which current actioner participate
-                            for doer in task['actioners']:
-                                # print(doer)
-                                if actioner['id'] == doer['actioner_id']:
-                                    bot_msg = ""
+                    # If delta_end >0 task overdue, if <0 task in progress
+                    delta_end = date.today() - date.fromisoformat(task['enddate'])
 
-                                    # Bot will inform user only of tasks with important dates
-                                    # Check if task not completed
-                                    if task['complete'] < 100:
+                    if delta_start.days == 0:
+                        bot_msg = f"task {task['id']} '{task['name']}' of '{project['title']}' (PM: @{project['tg_username']}) started today."
+                    elif delta_start.days > 0  and delta_end.days < 0:
+                        bot_msg = f"task {task['id']} '{task['name']}' of '{project['title']}' (PM: @{project['tg_username']}) is intermidiate. Due date is {task['enddate']}."
+                    elif delta_end.days == 0:
+                        bot_msg = f"task {task['id']}  '{task['name']}' of '{project['title']}' (PM: @{project['tg_username']}) must be completed today!"
+                    elif delta_start.days > 0 and delta_end.days > 0:                                       
+                        bot_msg = f"task {task['id']} '{task['name']}' of '{project['title']}' (PM: @{project['tg_username']}) is overdue! (had to be completed on {task['enddate']})"
+                    else:
+                        # print(f"Future tasks as {task['id']} '{task['name']}' goes here")   
+                        pass
 
-                                        # If delta_start <0 task not started, otherwise already started
-                                        delta_start = date.today() - date.fromisoformat(task['startdate'])
+                    # If task worth talking, and tg_id could be found in staff and actioner not PM 
+                    # (will be informed separately) then send message to actioner
+                    if bot_msg:
+                        for actioner in task['actioners']:
+                            worker = DB.staff.find_one({"_id": actioner['actioner_id']}, {"tg_id":1, "_id": 0})                            
+                            if worker and worker['tg_id'] and worker['tg_id'] != project['pm_tg_id']:
+                                # TODO I could easily add keyboard here which will send with callback_data:
+                                # project, task, actioner_id, and actioner decision (what else will be needed?..) 
+                                await context.bot.send_message(worker['tg_id'], bot_msg)
+                        
+                        # And inform PM
+                        await context.bot.send_message(project['pm_tg_id'], bot_msg)
 
-                                        # If delta_end >0 task overdue, if <0 task in progress
-                                        delta_end = date.today() - date.fromisoformat(task['enddate'])
+    # if os.path.exists(PROJECTJSON):
+    #     with open(PROJECTJSON, 'r') as fp:
+    #         try:
+    #             project = connectors.load_json(fp)
+    #         except Exception as e:
+    #             bot_msg = f"ERROR ({e}): Unable to load"
+    #             logger.error(f'{e}')                  
+    #         else:
 
-                                        # Deal with common task
-                                        if task['include']:
+    #             # Loop through actioners to inform them about actual tasks
+    #             for actioner in project['staff']:
 
-                                            # For now focus only on subtasks, that can be actually done
-                                            # I'll decide what to do with such tasks after gathering user experience
-                                            pass
-                                        else:
+    #                 # Bot can inform only ones with known id
+    #                 # print(actioner)
+    #                 if actioner['tg_id']:
+    #                     for task in project['tasks']:
 
-                                            # Don't inform about milestones, because noone assigned for them
-                                            if task['milestone'] == True:    
-                                                    pass
-                                            else:
-                                                if delta_start.days == 0:
-                                                    bot_msg = f"task {task['id']} '{task['name']}' started today."
-                                                elif delta_start.days > 0  and delta_end.days < 0:
-                                                    bot_msg = f"task {task['id']} '{task['name']}' is intermidiate. Due date is {task['enddate']}."
-                                                elif delta_end.days == 0:
-                                                    bot_msg = f"task {task['id']}  '{task['name']}' must be completed today!"
-                                                elif delta_start.days > 0 and delta_end.days > 0:                                       
-                                                    bot_msg = f"task {task['id']} '{task['name']}' is overdue! (had to be completed on {task['enddate']})"
-                                                else:
-                                                    print(f"Future tasks as {task['id']} '{task['name']}' goes here")                            
+    #                         # Process only tasks in which current actioner participate
+    #                         for doer in task['actioners']:
+    #                             # print(doer)
+    #                             if actioner['id'] == doer['actioner_id']:
+    #                                 bot_msg = ""
 
-                                        # Check if there is something to report to user
-                                        if bot_msg:
-                                            await context.bot.send_message(
-                                                actioner['tg_id'],
-                                                text=bot_msg,
-                                                parse_mode=ParseMode.HTML)
+    #                                 # Bot will inform user only of tasks with important dates
+    #                                 # Check if task not completed
+    #                                 if task['complete'] < 100:
+
+    #                                     # If delta_start <0 task not started, otherwise already started
+    #                                     delta_start = date.today() - date.fromisoformat(task['startdate'])
+
+    #                                     # If delta_end >0 task overdue, if <0 task in progress
+    #                                     delta_end = date.today() - date.fromisoformat(task['enddate'])
+
+    #                                     # Deal with common task
+    #                                     if task['include']:
+
+    #                                         # For now focus only on subtasks, that can be actually done
+    #                                         # I'll decide what to do with such tasks after gathering user experience
+    #                                         pass
+    #                                     else:
+
+    #                                         # Don't inform about milestones, because noone assigned for them
+    #                                         if task['milestone'] == True:    
+    #                                                 pass
+    #                                         else:
+    #                                             if delta_start.days == 0:
+    #                                                 bot_msg = f"task {task['id']} '{task['name']}' started today."
+    #                                             elif delta_start.days > 0  and delta_end.days < 0:
+    #                                                 bot_msg = f"task {task['id']} '{task['name']}' is intermidiate. Due date is {task['enddate']}."
+    #                                             elif delta_end.days == 0:
+    #                                                 bot_msg = f"task {task['id']}  '{task['name']}' must be completed today!"
+    #                                             elif delta_start.days > 0 and delta_end.days > 0:                                       
+    #                                                 bot_msg = f"task {task['id']} '{task['name']}' is overdue! (had to be completed on {task['enddate']})"
+    #                                             else:
+    #                                                 print(f"Future tasks as {task['id']} '{task['name']}' goes here")                            
+
+    #                                     # Check if there is something to report to user
+    #                                     if bot_msg:
+    #                                         await context.bot.send_message(
+    #                                             actioner['tg_id'],
+    #                                             text=bot_msg,
+    #                                             parse_mode=ParseMode.HTML)
 
 
 ######### START section ########################
@@ -424,11 +476,12 @@ async def start(update: Update, context: CallbackContext) -> int:
     # Call function to upload project file
     # Call function to make jobs
     pm = {
+        'program_id': '',
         'name': update.effective_user.first_name,
         'email' : '',
         'phone' : '',
         'tg_username': update.effective_user.username,
-        'tg_id': update.effective_user.id,
+        'tg_id': str(update.effective_user.id),
         'account_type': 'free',
         'settings': {
             'INFORM_OF_ALL_PROJECTS': False,         
@@ -457,7 +510,7 @@ async def naming_project(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
     project = {
         'title': PROJECTTITLE,
         'active': True,
-        'pm_tg_id': context.user_data['PM']['tg_id'],
+        'pm_tg_id': str(context.user_data['PM']['tg_id']),
         'tg_chat_id': '', # TODO store here group chat where project members discuss project
         'settings': {
             # TODO decide after user testing whether these settings should be stored in here or in PM's settings
@@ -484,7 +537,7 @@ async def naming_project(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
         await update.message.reply_text(bot_msg)
         return ConversationHandler.END   
     else:
-        prj_id = DB.projects.find_one({"title": project['title'], "pm_tg_id": context.user_data['PM']['tg_id']}, {"_id":1})
+        prj_id = DB.projects.find_one({"title": project['title'], "pm_tg_id": str(context.user_data['PM']['tg_id'])}, {"_id":1})
         print(f"Search for project title returned this: {prj_id}")
         if prj_id:
             bot_msg = f"You've already started project with name {project['title']}. Try another one."
@@ -531,20 +584,22 @@ async def file_recieved(update: Update, context: ContextTypes.DEFAULT_TYPE) -> i
 
                     # Since new project added successfully and it's active, 
                     # lets make other projects inactive (actually there should be just one, but just in case)
-                    prj_count = DB.projects.count_documents({"pm_tg_id": context.user_data['PM']['tg_id'], "title": {"$ne": context.user_data['project']['title']}})
+                    prj_count = DB.projects.count_documents({"pm_tg_id": str(context.user_data['PM']['tg_id']), "title": {"$ne": context.user_data['project']['title']}})
                     if prj_count > 0:
-                        result = DB.projects.update_many({"pm_tg_id": context.user_data['PM']['tg_id'], "title": {"$ne": context.user_data['project']['title']}}, {"$set": {"active": False}})
+                        result = DB.projects.update_many({"pm_tg_id": str(context.user_data['PM']['tg_id']), "title": {"$ne": context.user_data['project']['title']}}, {"$set": {"active": False}})
                         
                         # If other project didn't switched to inactive state raise an error, 
                         # because later bot couldn't comprehend which priject to use
                         if result.acknowledged and result.modified_count == 0:
                             # TODO consider to create new type of error derived from some base class
                             raise ValueError("Attempt to update database was unsuccessful. Records maybe corrupted. Contact developer.")
-                    if schedule_jobs(str(update.effective_user.id), context):
+                    if schedule_jobs(context):
                         bot_msg = (bot_msg + f"\nReminders were created: on the day before event ({ONTHEEVE}),"
                                              f" in the morning of event ({MORNING}) and reminder for friday file update ({FRIDAY}). "
                                              f"You can change them or turn off in /settings."
                                              f"\nProject initialization complete."
+                                             f"\nAlso you can update the schedule by uploading new file via /upload command."
+                                             f"\nRemember that you can /start a new project anytime."
                         )
                     else:
                         bot_msg = (bot_msg + "\nSomething went wrong while scheduling reminders."
@@ -603,7 +658,7 @@ def file_to_dict(fp):
         return tasks
 
 
-def schedule_jobs(user_id: str, project_title: str, context: ContextTypes.DEFAULT_TYPE):
+def schedule_jobs(context: ContextTypes.DEFAULT_TYPE):
     ''' 
     Schedule jobs for main reminders. Return false if not succeded
     TODO v2: When custom reminders functionality will be added this function must be revised
@@ -613,7 +668,8 @@ def schedule_jobs(user_id: str, project_title: str, context: ContextTypes.DEFAUL
 
     # Create jobs in mongdb in apsheduler collection
     # Configure id for job from PM id, project title and type of reminder
-    job_id = str(user_id) + '_' + project_title + '_' + 'morning_update'
+    
+    job_id = str(context.user_data['PM']['tg_id']) + '_' + context.user_data['project']['title'] + '_' + 'morning_update'
 
     # Check if already present
     preset = get_job_preset(job_id, context)
@@ -632,16 +688,17 @@ def schedule_jobs(user_id: str, project_title: str, context: ContextTypes.DEFAUL
             
             ''' To persistence to work job must have explicit ID and 'replace_existing' must be True
             or a new copy of the job will be created every time application restarts! '''
-            data = {"project_title": context.user_data['project']['title'], "pm_tg_id": user_id}
+            print(f"When writing to data what type of user id? {type(context.user_data['PM']['tg_id'])}")
+            data = {"project_title": context.user_data['project']['title'], "pm_tg_id": str(context.user_data['PM']['tg_id'])}
             job_kwargs = {'id': job_id, 'replace_existing': True}
-            morning_update_job = context.job_queue.run_daily(morning_update, user_id=user_id, time=time2check, data=data, job_kwargs=job_kwargs)
+            morning_update_job = context.job_queue.run_daily(morning_update, user_id=str(context.user_data['PM']['tg_id']), time=time2check, data=data, job_kwargs=job_kwargs)
             
             # and enable it.
             morning_update_job.enabled = True 
             print(f"Next time: {morning_update_job.next_t}, is it on? {morning_update_job.enabled}")      
             
     # 2nd - daily on the eve of task reminder
-    job_id = str(user_id) + '_' + project_title + '_' + 'day_before_update'
+    job_id = str(context.user_data['PM']['tg_id']) + '_' + context.user_data['project']['title'] + '_' + 'day_before_update'
     print(job_id)
     preset = get_job_preset(job_id, context)
     if not preset:                    
@@ -654,12 +711,12 @@ def schedule_jobs(user_id: str, project_title: str, context: ContextTypes.DEFAUL
         # Add job to queue and enable it
         else:                            
             job_kwargs = {'id': job_id, 'replace_existing': True}
-            day_before_update_job = context.job_queue.run_daily(day_before_update, user_id=user_id, time=time2check, data=project_title, job_kwargs=job_kwargs)
+            day_before_update_job = context.job_queue.run_daily(day_before_update, user_id=str(context.user_data['PM']['tg_id']), time=time2check, data=data, job_kwargs=job_kwargs)
             day_before_update_job.enabled = True
             # print(f"Next time: {day_before_update_job.next_t}, is it on? {day_before_update_job.enabled}")   
 
     # Register friday reminder
-    job_id = str(user_id) + '_' + project_title + '_' + 'file_update'
+    job_id = str(context.user_data['PM']['tg_id']) + '_' + context.user_data['project']['title'] + '_' + 'file_update'
     preset = get_job_preset(job_id, context)
     if not preset:   
         try:
@@ -671,7 +728,7 @@ def schedule_jobs(user_id: str, project_title: str, context: ContextTypes.DEFAUL
         # Add job to queue and enable it
         else:
             job_kwargs = {'id': job_id, 'replace_existing': True}
-            file_update_job = context.job_queue.run_daily(file_update, user_id=user_id, time=time2check, days=(5,), data=project_title, job_kwargs=job_kwargs)
+            file_update_job = context.job_queue.run_daily(file_update, user_id=str(context.user_data['PM']['tg_id']), time=time2check, days=(5,), data=data, job_kwargs=job_kwargs)
             file_update_job.enabled = True
             # print(f"Next time: {file_update_job.next_t}, is it on? {file_update_job.enabled}") 
 
@@ -695,7 +752,7 @@ async def status(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     bot_msg = "Should print status to user"
 
     # PPP
-    user_id = update.effective_user.id
+    user_id = str(update.effective_user.id)
     user_name = update.effective_user.username
 
     # First look up DB for PM via id
@@ -1148,66 +1205,70 @@ async def upload(update: Update, context: CallbackContext) -> None:
     '''
     Function to upload new project file
     '''
+    # TODO: make this as conversation too: 
+    # user: /upload
+    # bot: are you sure? if yes upload file, otherwise type 'cancel'
+    # user: <uploads>                           or user: cancel
+    # bot: DB updated. jobs not rescheduled         bot: ok, changes were not made
 
     # Message to return to user
-    bot_msg = ''
+    bot_msg = 'to be implemented'
 
     # Check if user is PM
-    uploader = update.message.from_user.username
-    if uploader == PM:
-        # Let's keep files got from user in temporary directory TODO what's happenning with them there?
-        with tempfile.TemporaryDirectory() as tdp:
-            gotfile = await context.bot.get_file(update.message.document)
-            fp = await gotfile.download_to_drive(os.path.join(tdp, update.message.document.file_name))
+    # uploader = update.message.from_user.username
+    # if uploader == PM:
+    #     # Let's keep files got from user in temporary directory TODO what's happenning with them there?
+    #     with tempfile.TemporaryDirectory() as tdp:
+    #         gotfile = await context.bot.get_file(update.message.document)
+    #         fp = await gotfile.download_to_drive(os.path.join(tdp, update.message.document.file_name))
             
-            # Call function which converts given file to dictionaries
-            tasks = file_to_dict(fp)
-            if tasks:
-                # Remember telegram user id
-                # TODO refactor this
-                user_oid = add_user_id_to_db(update.message.from_user)
+    #         # Call function which converts given file to dictionaries
+    #         tasks = file_to_dict(fp)
+    #         if tasks:
+    #             # Remember telegram user id
+    #             # TODO refactor this
+    #             user_oid = add_user_id_to_db(update.message.from_user)
 
-                # Call function to save project in JSON format and log exception
-                # TODO delete. this is temporary until I make DB work
-                project = {
-                    'tasks': tasks,
-                    # 'staff': staff
-                }
-                try:
-                    save_json(project, PROJECTJSON)
-                except FileNotFoundError as e:
-                    logger.error(f'{e}')
-                    # TODO better inform PM that there are problems with writing project
-                    bot_msg = "Seems like path to save project does not exist"
-                except Exception as e:
-                    logger.error(f'{e}')
-                    bot_msg = "Error saving project"
-                else:
-                    bot_msg = "Project file saved successfully"
+    #             # Call function to save project in JSON format and log exception
+    #             # TODO delete. this is temporary until I make DB work
+    #             project = {
+    #                 'tasks': tasks,
+    #                 # 'staff': staff
+    #             }
+    #             try:
+    #                 save_json(project, PROJECTJSON)
+    #             except FileNotFoundError as e:
+    #                 logger.error(f'{e}')
+    #                 # TODO better inform PM that there are problems with writing project
+    #                 bot_msg = "Seems like path to save project does not exist"
+    #             except Exception as e:
+    #                 logger.error(f'{e}')
+    #                 bot_msg = "Error saving project"
+    #             else:
+    #                 bot_msg = "Project file saved successfully"
                     
-                    # Call function to create jobs:
-                    # project_title = context.user_data['project']['title']
-                    if schedule_jobs(str(update.effective_user.id), context):
-                        bot_msg = (bot_msg + "\nReminders were created: on the day before event, in the morning of event and reminder for friday file update."
-                                    "You can change them or turn off in /setttings"
-                        )
-                    else:
-                        bot_msg = (bot_msg + "\nSomething went wrong while scheduling reminders."
-                                    "\nPlease, contact bot developer to check the logs.")
-            else:
-                bot_msg = (f"Couldn't process given file.\n"
-                           f"Supported formats are: .gan (GanttProject), .json, .xml (MS Project)"
-                           f"Make sure these files contain custom field named 'tg_username', which store usernames of project team members."
-                           f"If you would like to see other formats supported feel free to message bot developer via /feedback command."
-                )
+    #                 # Call function to create jobs:
+    #                 # project_title = context.user_data['project']['title']
+    #                 if schedule_jobs(str(update.effective_user.id), context):
+    #                     bot_msg = (bot_msg + "\nReminders were created: on the day before event, in the morning of event and reminder for friday file update."
+    #                                 "You can change them or turn off in /setttings"
+    #                     )
+    #                 else:
+    #                     bot_msg = (bot_msg + "\nSomething went wrong while scheduling reminders."
+    #                                 "\nPlease, contact bot developer to check the logs.")
+    #         else:
+    #             bot_msg = (f"Couldn't process given file.\n"
+    #                        f"Supported formats are: .gan (GanttProject), .json, .xml (MS Project)"
+    #                        f"Make sure these files contain custom field named 'tg_username', which store usernames of project team members."
+    #                        f"If you would like to see other formats supported feel free to message bot developer via /feedback command."
+    #             )
         
-    else:
-        bot_msg = 'Only Project Manager is allowed to upload new schedule'
+    # else:
+    #     bot_msg = 'Only Project Manager is allowed to upload new schedule'
     await update.message.reply_text(bot_msg)
 
 
 ### This part contains functions which make settings menu functionality #########################################################################
-
 async def settings(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     """
     This function handles /settings command
@@ -1235,14 +1296,14 @@ async def settings(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     # + Time of daily update of starting and deadline tasks, and days too
 
     # Check if current user is acknowledged PM then proceed otherwise suggest to start a new project
-    docs_count = DB.projects.count_documents({"pm_tg_id": update.effective_user.id})
+    docs_count = DB.projects.count_documents({"pm_tg_id": str(update.effective_user.id)})
     if docs_count > 0:
 
         # Get active project title and store in user_data (because now PROJECTTITLE contain default value not associated with project)
-        result = DB.projects.find_one({"pm_tg_id": update.effective_user.id, "active": True}, {"title": 1, "_id": 0})
+        result = DB.projects.find_one({"pm_tg_id": str(update.effective_user.id), "active": True}, {"title": 1, "_id": 0})
         if result:
             context.user_data['projecttitle'] = result['title']
-        keyboard, bot_msg = get_keybord_and_msg(FIRST_LVL, update.message.from_user.id)
+        keyboard, bot_msg = get_keybord_and_msg(FIRST_LVL, str(update.message.from_user.id))
         if keyboard == None or bot_msg == None:
             bot_msg = "Some error happened. Unable to show a menu."
             await update.message.reply_text(bot_msg)
@@ -1256,6 +1317,9 @@ async def settings(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
             await update.message.reply_text(bot_msg, reply_markup=reply_markup)
         return FIRST_LVL
     else:
+
+        # If user is not PM at least add his id in DB (if his username is there)
+        add_user_id_to_db(update.effective_user)
         bot_msg = f"Settings available after starting a project: use /start command for a new one."
         await update.message.reply_text(bot_msg)
         return ConversationHandler.END
@@ -1281,16 +1345,16 @@ async def allow_status_to_group(update: Update, context: ContextTypes.DEFAULT_TY
     await query.answer()
 
     # Read parameter and switch it
-    result = DB.projects.find_one({"pm_tg_id": update.effective_user.id, "title": context.user_data['projecttitle']}, 
+    result = DB.projects.find_one({"pm_tg_id": str(update.effective_user.id), "title": context.user_data['projecttitle']}, 
                                   {"settings.ALLOW_POST_STATUS_TO_GROUP": 1, "_id": 0})
     if result:
         ALLOW_POST_STATUS_TO_GROUP = result['settings']['ALLOW_POST_STATUS_TO_GROUP']
         ALLOW_POST_STATUS_TO_GROUP = False if ALLOW_POST_STATUS_TO_GROUP else True
-        DB.projects.update_one({"pm_tg_id": update.effective_user.id, "title": context.user_data['projecttitle']}, 
+        DB.projects.update_one({"pm_tg_id": str(update.effective_user.id), "title": context.user_data['projecttitle']}, 
                                {"$set": {"settings.ALLOW_POST_STATUS_TO_GROUP": ALLOW_POST_STATUS_TO_GROUP}})
 
     # Call function which create keyboard and generate message to send to user. End conversation if that was unsuccessful.
-    keyboard, bot_msg = get_keybord_and_msg(FIRST_LVL, update.effective_user.id)
+    keyboard, bot_msg = get_keybord_and_msg(FIRST_LVL, str(update.effective_user.id))
     if keyboard == None or bot_msg == None:
         bot_msg = "Some error happened. Unable to show a menu."
         await update.message.reply_text(bot_msg)
@@ -1309,16 +1373,16 @@ async def milestones_anounce(update: Update, context: ContextTypes.DEFAULT_TYPE)
     await query.answer()
 
     # Read parameter and switch it
-    result = DB.projects.find_one({"pm_tg_id": update.effective_user.id, "title": context.user_data['projecttitle']}, 
+    result = DB.projects.find_one({"pm_tg_id": str(update.effective_user.id), "title": context.user_data['projecttitle']}, 
                                   {"settings.INFORM_ACTIONERS_OF_MILESTONES": 1, "_id": 0})
     if result:
         INFORM_ACTIONERS_OF_MILESTONES = result['settings']['INFORM_ACTIONERS_OF_MILESTONES']
         INFORM_ACTIONERS_OF_MILESTONES = False if INFORM_ACTIONERS_OF_MILESTONES else True
-        DB.projects.update_one({"pm_tg_id": update.effective_user.id, "title": context.user_data['projecttitle']}, 
+        DB.projects.update_one({"pm_tg_id": str(update.effective_user.id), "title": context.user_data['projecttitle']}, 
                                {"$set": {"settings.INFORM_ACTIONERS_OF_MILESTONES": INFORM_ACTIONERS_OF_MILESTONES}})
 
     # Call function which create keyboard and generate message to send to user. End conversation if that was unsuccessful.
-    keyboard, bot_msg = get_keybord_and_msg(FIRST_LVL, update.effective_user.id)
+    keyboard, bot_msg = get_keybord_and_msg(FIRST_LVL, str(update.effective_user.id))
     if keyboard == None or bot_msg == None:
         bot_msg = "Some error happened. Unable to show a menu."
         await update.message.reply_text(bot_msg)
