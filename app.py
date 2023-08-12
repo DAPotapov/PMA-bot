@@ -181,64 +181,61 @@ async def day_before_update(context: ContextTypes.DEFAULT_TYPE) -> None:
     start of task, deadline
     '''
 
-    if os.path.exists(PROJECTJSON):
-        with open(PROJECTJSON, 'r') as fp:
-            try:
-                project = connectors.load_json(fp)
-            except Exception as e:
-                bot_msg = f"ERROR ({e}): Unable to load"
-                logger.error(f'{e}')                  
+
+
+    # TODO use data to associate project name with job
+    # TODO how to make observation of project a standalone function to be called elsewhere?
+    # because every reminder function load project from file and looks through it
+
+    # print(f"Contents of user_data: {context.user_data}") # empty, because not saved to DB
+    print(f"Job data: {context.job.data}") # exist
+
+    # Get project from DB
+    try:
+        project = DB.projects.find_one({"pm_tg_id": str(context.job.data['pm_tg_id']), "title": context.job.data['project_title']})
+    except Exception as e:
+        logger.error(f"There was error getting DB: {e}")
+    else:
+        if project:            
+
+            # Add PM username
+            record = DB.staff.find_one({"tg_id": str(context.job.data['pm_tg_id'])})
+            if record and record['tg_username']:
+                project['tg_username'] = record['tg_username']
             else:
+                logger.error(f"PM (with tg_id: {str(context.job.data['pm_tg_id'])}) was not found in db.staff!")
+            
+            # Find task to inform about and send message to users
+            for task in project['tasks']:
+                bot_msg = '' # Also acts as flag that there is something to inform user of
 
-                # Loop through actioners to inform them about actual tasks
-                for actioner in project['staff']:
+                # TODO decide about milestones
+                if task['complete'] < 100 and not task['include'] and not task['milestone']:
 
-                    # Bot can inform only ones with known id
-                    # print(actioner)
-                    if actioner['tg_id']:
-                        for task in project['tasks']:
+                    # If delta_start <0 task not started, otherwise already started
+                    delta_start = date.today() - date.fromisoformat(task['startdate'])
 
-                            # Process only tasks in which current actioner participate
-                            for doer in task['actioners']:
-                                # print(doer)
-                                if actioner['id'] == doer['actioner_id']:
-                                    bot_msg = ""
+                    # If delta_end >0 task overdue, if <0 task in progress
+                    delta_end = date.today() - date.fromisoformat(task['enddate'])
 
-                                    # Bot will inform user only of tasks with important dates
-                                    # Check if task not completed
-                                    if task['complete'] < 100:
+                    # If task starts tomorrow
+                    if delta_start.days == -1:
+                        bot_msg = f"task {task['id']} '{task['name']}' of '{project['title']}' (PM: @{project['tg_username']}) starts tomorrow."
+                    elif delta_end.days == -1:
+                        bot_msg = f"Tomorrow is deadline for task {task['id']} '{task['name']}' of '{project['title']}' (PM: @{project['tg_username']})!" 
 
-                                        # If delta_start <0 task not started, otherwise already started
-                                        delta_start = date.today() - date.fromisoformat(task['startdate'])
-
-                                        # If delta_end >0 task overdue, if <0 task in progress
-                                        delta_end = date.today() - date.fromisoformat(task['enddate'])
-
-                                        # Deal with common task
-                                        if task['include']:
-
-                                            # For now focus only on subtasks, that can be actually done
-                                            # I'll decide what to do with such tasks after gathering user experience
-                                            pass
-                                        else:
-
-                                            # Don't inform about milestones, because noone assigned for them
-                                            if task['milestone'] == True:    
-                                                    pass
-                                            else:
-
-                                                # If task starts tomorrow
-                                                if delta_start.days == -1:
-                                                    bot_msg = f"task {task['id']} '{task['name']}' starts tomorrow."
-                                                elif delta_end.days == -1:
-                                                    bot_msg = f"Tomorrow is deadline for task {task['id']} '{task['name']}'!" 
-
-                                        # Inform users if there are something to inform
-                                        if bot_msg:
-                                            await context.bot.send_message(
-                                                actioner['tg_id'],
-                                                text=bot_msg,
-                                                parse_mode=ParseMode.HTML)
+                    # If task worth talking, and tg_id could be found in staff and actioner not PM 
+                    # (will be informed separately) then send message to actioner
+                    if bot_msg:
+                        for actioner in task['actioners']:
+                            worker = DB.staff.find_one({"_id": actioner['actioner_id']}, {"tg_id":1, "_id": 0})                            
+                            if worker and worker['tg_id'] and worker['tg_id'] != project['pm_tg_id']:
+                                # TODO I could easily add keyboard here which will send with callback_data:
+                                # project, task, actioner_id, and actioner decision (what else will be needed?..) 
+                                await context.bot.send_message(worker['tg_id'], bot_msg)
+                        
+                        # And inform PM
+                        await context.bot.send_message(project['pm_tg_id'], bot_msg)
 
 
 # TURNED OFF because conflicting with handlers which use input from user (naming project in /start, for example)
@@ -399,69 +396,6 @@ async def morning_update(context: ContextTypes.DEFAULT_TYPE) -> None:
                         
                         # And inform PM
                         await context.bot.send_message(project['pm_tg_id'], bot_msg)
-
-    # if os.path.exists(PROJECTJSON):
-    #     with open(PROJECTJSON, 'r') as fp:
-    #         try:
-    #             project = connectors.load_json(fp)
-    #         except Exception as e:
-    #             bot_msg = f"ERROR ({e}): Unable to load"
-    #             logger.error(f'{e}')                  
-    #         else:
-
-    #             # Loop through actioners to inform them about actual tasks
-    #             for actioner in project['staff']:
-
-    #                 # Bot can inform only ones with known id
-    #                 # print(actioner)
-    #                 if actioner['tg_id']:
-    #                     for task in project['tasks']:
-
-    #                         # Process only tasks in which current actioner participate
-    #                         for doer in task['actioners']:
-    #                             # print(doer)
-    #                             if actioner['id'] == doer['actioner_id']:
-    #                                 bot_msg = ""
-
-    #                                 # Bot will inform user only of tasks with important dates
-    #                                 # Check if task not completed
-    #                                 if task['complete'] < 100:
-
-    #                                     # If delta_start <0 task not started, otherwise already started
-    #                                     delta_start = date.today() - date.fromisoformat(task['startdate'])
-
-    #                                     # If delta_end >0 task overdue, if <0 task in progress
-    #                                     delta_end = date.today() - date.fromisoformat(task['enddate'])
-
-    #                                     # Deal with common task
-    #                                     if task['include']:
-
-    #                                         # For now focus only on subtasks, that can be actually done
-    #                                         # I'll decide what to do with such tasks after gathering user experience
-    #                                         pass
-    #                                     else:
-
-    #                                         # Don't inform about milestones, because noone assigned for them
-    #                                         if task['milestone'] == True:    
-    #                                                 pass
-    #                                         else:
-    #                                             if delta_start.days == 0:
-    #                                                 bot_msg = f"task {task['id']} '{task['name']}' started today."
-    #                                             elif delta_start.days > 0  and delta_end.days < 0:
-    #                                                 bot_msg = f"task {task['id']} '{task['name']}' is intermidiate. Due date is {task['enddate']}."
-    #                                             elif delta_end.days == 0:
-    #                                                 bot_msg = f"task {task['id']}  '{task['name']}' must be completed today!"
-    #                                             elif delta_start.days > 0 and delta_end.days > 0:                                       
-    #                                                 bot_msg = f"task {task['id']} '{task['name']}' is overdue! (had to be completed on {task['enddate']})"
-    #                                             else:
-    #                                                 print(f"Future tasks as {task['id']} '{task['name']}' goes here")                            
-
-    #                                     # Check if there is something to report to user
-    #                                     if bot_msg:
-    #                                         await context.bot.send_message(
-    #                                             actioner['tg_id'],
-    #                                             text=bot_msg,
-    #                                             parse_mode=ParseMode.HTML)
 
 
 ######### START section ########################
