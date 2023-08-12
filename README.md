@@ -94,13 +94,13 @@ First of all: the project file sent to bot should contain field 'tg_username' co
                 "include": [],
                 "actioners": [  # Actioner (doer) of this task
                     {
-                        "actioner_id": 1,   # This is id of person in actioners list below
-                        "nofeedback": false # This flag will store if person didn't respond on last reminder
-                    },                      # And will be used to inform PM that this task may lack of attention 
+                        "actioner_id": ObjectId(""),    # This is id of person in staff collection below
+                        "nofeedback": false             # This flag will store if person didn't respond on last reminder
+                    },                                  # And will be used to inform PM that this task may lack of attention 
                     {
-                        "actioner_id": 2,   # It is better to decompose project to small task  
-                        "nofeedback": false # which can be assigned to one doer, but some tasks (like moving furniture)
-                    }                       # need two or more people envolved
+                        "actioner_id": ObjectId(""),    # It is better to decompose project to small task  
+                        "nofeedback": false             # which can be assigned to one doer, but some tasks (like moving furniture)
+                }                                       # need two or more people envolved
                 ]
             },
             {

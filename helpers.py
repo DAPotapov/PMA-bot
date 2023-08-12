@@ -167,6 +167,34 @@ def get_job_preset(job_id: str, context: ContextTypes.DEFAULT_TYPE):
     return preset
 
 
+def get_project_team(project: dict):
+    """
+    Construct list of project team members.
+    Returns None if it is not possible to achieve or something went wrong.
+    """
+    team = []
+    
+    DB = get_db()
+  
+    # Loop through project tasks and gather information about project team
+    for task in project['tasks']:
+
+        # Process only tasks with actioners
+        if task['actioners']:
+            for actioner in task['actioners']:
+                try:
+                    result = DB.staff.find_one({'_id': actioner['actioner_id']})
+                except Exception as e:
+                    logger.error(f"There was error getting DB: {e}")
+                else:
+                    if result:
+                        team.append(result)
+    
+    if not team:
+        logger.error(f"Maybe DB is corrupted: project '{project['title']}' (id: {project['_id']}) has no project team!")
+
+    return team
+
 def get_worker_oid_from_db_by_tg_username(tg_username: str):
     '''
     Search staff collection in DB for given telegram username and return DB-id.

@@ -49,6 +49,7 @@ from helpers import (
     get_assignees,
     get_db, 
     get_job_preset,
+    get_project_team,
     get_worker_oid_from_db_by_tg_id,
     get_worker_oid_from_db_by_tg_username, 
     save_json)
@@ -180,10 +181,6 @@ async def day_before_update(context: ContextTypes.DEFAULT_TYPE) -> None:
     This reminder must be send to all team members on the day before of the important dates:
     start of task, deadline
     '''
-
-
-
-    # TODO use data to associate project name with job
     # TODO how to make observation of project a standalone function to be called elsewhere?
     # because every reminder function load project from file and looks through it
 
@@ -283,25 +280,29 @@ async def file_update(context: ContextTypes.DEFAULT_TYPE) -> None:
     This function is a reminder for team members that common files should be updated in the end of the week
     '''
 
-    if os.path.exists(PROJECTJSON):
-        with open(PROJECTJSON, 'r') as fp:
-            try:
-                project = connectors.load_json(fp)
-            except Exception as e:
-                logger.error(f'{e}')                  
+    # Get project from DB
+    try:
+        project = DB.projects.find_one({"pm_tg_id": str(context.job.data['pm_tg_id']), "title": context.job.data['project_title']})
+    except Exception as e:
+        logger.error(f"There was error getting DB: {e}")
+    else:
+        if project:            
+
+            # Add PM username
+            record = DB.staff.find_one({"tg_id": str(context.job.data['pm_tg_id'])})
+            if record and record['tg_username']:
+                project['tg_username'] = record['tg_username']
             else:
-
-                # Loop through actioners to inform them about actual tasks
-                bot_msg = "Напоминаю, что сегодня надо освежить файлы по проекту! Чтобы другие участники команды имели актуальную информацию. Спасибо!"
-                for actioner in project['staff']:
-
-                    # Bot can inform only ones with known id
-                    # print(actioner)
-                    if actioner['tg_id']:
-                        await context.bot.send_message(
-                            actioner['tg_id'],
-                            text=bot_msg,
-                            parse_mode=ParseMode.HTML)
+                logger.error(f"PM (with tg_id: {str(context.job.data['pm_tg_id'])}) was not found in db.staff!")
+            
+            team = get_project_team(project)
+            if team:
+                for member in team:
+                    if member['tg_id']:
+                        bot_msg = (f"{member['name']}, remember to update common files for project '{project['title']}'!\n"
+                                f"Other team members should have actual information!"
+                        )
+                        await context.bot.send_message(member['tg_id'], bot_msg)
 
 
 # async def freshstart(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
