@@ -338,7 +338,6 @@ async def morning_update(context: ContextTypes.DEFAULT_TYPE) -> None:
     This routine will be executed on daily basis to control project(s) schedule
     '''
 
-    # TODO use data to associate project name with job
     # TODO how to make observation of project a standalone function to be called elsewhere?
     # because every reminder function load project from file and looks through it
 
@@ -690,147 +689,95 @@ async def status(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     user_id = str(update.effective_user.id)
     user_name = update.effective_user.username
 
-    # First look up DB for PM via id
+    # Read setting for effective user
     try:
-        result = DB.PMs.find_one({"pm_id": user_id})
+        record = DB.staff.find_one({"tg_id": user_id}, {"settings.INFORM_OF_ALL_PROJECTS":1, "_id": 0})
     except Exception as e:
         logger.error(f"There was error getting DB: {e}")
-        bot_msg = f"There is a problem with database connection. Contact developer or try later."
-        await update.message.reply_text(bot_msg)
-    else:     
-        if not result:
+    else:
+        if record:
+            # Get 'list' of projects, which depending on preset consists of one project or many
+            if record['settings']['INFORM_OF_ALL_PROJECTS']:
+                projects = DB.projects.find({"pm_tg_id": user_id})
+            else:
+                projects = DB.projects.find({"pm_tg_id": user_id, "active": True})
+            
+            if projects:
 
-            # Then by his username
-            result = DB.PMs.find_one({"pm_username": user_name})
-        if result:
+                # Iterate through list
+                for project in projects:
+                    msg_title = f"Status of events for project '{project['title']}':"
+                    msg = ''
 
-            # Go on and update PM telegram id
-            # TODO - old function isn't useful here
-            # TODO also update username if changed ???
-            # Then read settings 
-            INFORM_OF_ALL_PROJECTS = result['settings']['INFORM_OF_ALL_PROJECTS']
-            # print(f"INFORM_OF_ALL_PROJECTS = {INFORM_OF_ALL_PROJECTS}")
-            for project in result['projects']:
-                text_accumulator = ''
-                user_ids = []
-                # print(f"We are in this project: {project['title']}") # What if None?
-                ALLOW_POST_STATUS_TO_GROUP = project['settings']['ALLOW_POST_STATUS_TO_GROUP']
-                INFORM_ACTIONERS_OF_MILESTONES = project['settings']['INFORM_ACTIONERS_OF_MILESTONES']
-
-                # Proceed only if this project is active or PM want to be informed about all projects
-                if INFORM_OF_ALL_PROJECTS or project['active']:
-                    bot_msg = f"Status of events for project '{project['title']}':"
+                    # Find task to inform about 
                     for task in project['tasks']:
-
-                        # Bot will inform user only of tasks with important dates
-
-                        # Check if task not completed
-                        if task['complete'] < 100:
+                        if task['complete'] < 100 and not task['include']:
 
                             # If delta_start <0 task not started, otherwise already started
                             delta_start = date.today() - date.fromisoformat(task['startdate'])
 
                             # If delta_end >0 task overdue, if <0 task in progress
                             delta_end = date.today() - date.fromisoformat(task['enddate'])
-                            
-                            # Deal with common task
-                            if task['include']:
 
-                                # For now focus only on subtasks, that can be actually done
-                                # I'll decide what to do with such tasks after gathering user experience
-                                pass
+                            # Information about milestones and other tasks composed slightly different
+                            if task['milestone'] == True:
+                                if delta_end.days < 0:
+
+                                    # If milestone in future inform user
+                                    msg = msg + f"\nMilestone '{task['name']}' is near ({task['enddate']})!"
                             else:
 
-                                # Inform about milestone
-                                # TODO what about informing actioners about milestones? Should I have separate message collectors for PM and for others?
-                                if task['milestone'] == True:
-                                    if delta_end.days < 0:
+                                # Check dates and compose message including information about human resurces
+                                if delta_start.days == 0:
+                                    people, user_ids = get_assignees(task)
+                                    if not people:
+                                        people = "can't say, better check assignments in project file."
 
-                                        # If milestone in future inform user
-                                        text_accumulator = text_accumulator + f"\nMilestone '{task['name']}' is near ({task['enddate']})!"
-                                    else:
-
-                                        # if milestone in past do nothing
-                                        pass
+                                    # TODO: I can compose not only message here but also a keyboard to send to user to interact with
+                                    msg = msg + f"\nTask {task['id']} '{task['name']}' started today. Assigned to: {people}"
+                                elif delta_start.days > 0  and delta_end.days < 0:
+                                    people, user_ids = get_assignees(task)
+                                    if not people:
+                                        people = "can't say, better check assignments in project file."
+                                    msg = msg + f"\nTask {task['id']} '{task['name']}' is intermidiate. Due date is {task['enddate']}. Assigned to: {people}"
+                                elif delta_end.days == 0:
+                                    people, user_ids = get_assignees(task)
+                                    if not people:
+                                        people = "can't say, better check assignments in project file."
+                                    msg = msg + f"\nTask {task['id']}  '{task['name']}' must be completed today! Assigned to: {people}"
+                                elif delta_start.days > 0 and delta_end.days > 0:         
+                                    people, user_ids = get_assignees(task)
+                                    if not people:
+                                        people = "can't say, better check assignments in project file."                              
+                                    msg = msg + f"\nTask {task['id']} '{task['name']}' is overdue! (had to be completed on {task['enddate']}). Assigned to: {people}"
                                 else:
-
-                                    # Message to actioner(s) will be send after each task
-                                    actioner_msg = f"You have assigned task in project '{project['title']}' (project manager: @{user_name})"
-                                    
-                                    # Collect starting events
-                                    if delta_start.days == 0:
-                                        try:
-                                            people, user_ids = get_assignees(task)
-                                        except Exception as e:
-                                            text_accumulator = text_accumulator + f"\nError occured while processing assigned actioners to task {task['id']} '{task['name']}'"
-                                            logger.error(f'{e}')
-                                        else:
-                                            text_accumulator = text_accumulator + f"\nTask {task['id']} '{task['name']}' starts today. Assigned to: {people}"
-                                            actioner_msg = (actioner_msg + f"\nTask: '{task['name']}' starts today.")
-                                    
-                                    # Collect events which should be in work
-                                    elif delta_start.days > 0  and delta_end.days < 0:
-                                        try:
-                                            people, user_ids = get_assignees(task)
-                                        except Exception as e:
-                                            text_accumulator = text_accumulator + f"\nError occured while processing assigned actioners to task {task['id']} {task['name']}"
-                                            logger.error(f'{e}')
-                                        else:
-                                            text_accumulator = text_accumulator + f"\nTask {task['id']} '{task['name']}' is intermediate. Due date is {task['enddate']}. Assigned to: {people}"
-                                            actioner_msg = (actioner_msg + f"\nTask: '{task['name']}' should be in progress, due date is {task['enddate']}.")
-                                    
-
-                                    # Collect events on a deadline
-                                    elif delta_end.days == 0:
-                                        try:
-                                            people, user_ids = get_assignees(task)
-                                        except Exception as e:
-                                            text_accumulator = text_accumulator + f"\nError occured while processing assigned actioners to task {task['id']} {task['name']}"
-                                            logger.error(f'{e}')
-                                        else:                                        
-                                            text_accumulator = text_accumulator + f"\nTask {task['id']}  '{task['name']}' must be completed today! Assigned to: {people}"
-                                            actioner_msg = (actioner_msg + f"\nTask: '{task['name']}' should be completed today.")
-                                    
-                                    # Collect overdue events
-                                    elif delta_start.days > 0 and delta_end.days > 0:
-                                        try:
-                                            people, user_ids = get_assignees(task)
-                                        except Exception as e:
-                                            text_accumulator = text_accumulator + f"\nError occured while processing assigned actioners to task {task['id']} {task['name']}"
-                                            logger.error(f'{e}')
-                                        else:                                         
-                                            text_accumulator = text_accumulator + f"\nTask {task['id']} '{task['name']}' is overdue! (had to be completed on {task['enddate']}). Assigned to: {people}"
-                                            actioner_msg = (actioner_msg + f"\nTask: '{task['name']}' is overdue, had to be completed on {task['enddate']}")
-                                    
-                                    # Here goes tasks which not started yet
-                                    else:
-                                        logger.info(f"Loop through future task '{task['id']}' '{task['name']}'")
-
-                                    # Send message to actioners immediately (if it is not a PM)
-                                    for id in user_ids:
-                                        # print(f"Participator id: {id}")
-                                        if id != user_id: 
-                                            await context.bot.send_message(
-                                                id,
-                                                text=actioner_msg,
-                                                parse_mode=ParseMode.HTML)
-
-                    # Check if there is something to report to user
-                    if not text_accumulator:
-                        bot_msg = f"{bot_msg}\nSeems like there are no events worth mention"
+                                    logger.info(f"Loop through future task '{task['id']}' '{task['name']}'")
+                                    pass
                     
-                    bot_msg = f"{bot_msg}\n{text_accumulator}"
+            #  TODO Коллизия: если команда выполнена в чате и стоит уведомлять о всех проектах - зачем другим командам знать про другие проекты?
+            # выход: 
+            # Считать настройку проекта об уведомлении в чате
+            # если да и при этом пришло из чата, который указан в поле tg_chat_id, то reply
+            # иначе пишем напрямую
+            # пока можно не мудрить и просто РП отправить, а потом додумать логику.
 
-                    # Send reply to PM in group chat if allowed
-                    if ALLOW_POST_STATUS_TO_GROUP == True:
-                        await update.message.reply_text(bot_msg)
+                    # Check if there is smth to inform
+                    if msg:
+                        bot_msg = msg_title + msg
                     else:
+                        bot_msg = msg_title + 'Seems like there are no events to inform about at this time.'
 
-                        # Or in private chat
+                    # Check current setting and chat where update came from to decide where to send answer
+                    if project['settings']['ALLOW_POST_STATUS_TO_GROUP'] and update.message.chat_id != update.effective_user.id:
+                        await update.message.reply_text(bot_msg)
+                    else:                        
+                        # TODO buttons should be send only in direct message to PM,
+                        # so maybe move the above check somewhere before composing keyboard
                         await context.bot.send_message(user_id, bot_msg)
 
+
+
         else:
-            #TODO
             # If current user not found in project managers 
             # then just search him by his ObjectId in all records and inform about events
             # if nothing found - Suggest him to start a project
@@ -847,6 +794,8 @@ async def status(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
                 await context.bot.send_message(user_id, bot_msg)
             else:
                 # print(f"Here we should have an object id: {user_oid}")
+
+                #TODO REFACTOR this for a new schema
                 # Get all documents where user mentioned
                 records = DB.PMs.find({"projects.tasks.actioners":{"$elemMatch":{"actioner_id": user_oid}}}, 
                                          {"pm_username":1, "projects.title":1, 

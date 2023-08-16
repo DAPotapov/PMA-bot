@@ -108,7 +108,9 @@ def get_assignees(task: dict):
                         else:
                             people = f"{people}@{member['tg_username']} ({member['name']})"
         else:
-            raise ValueError(f"While proceding task {task} has found out that staff collection is empty.")
+            # Return nothing if something not right
+            # raise ValueError(f"While proceding task {task} has found out that staff collection is empty.")
+            logger.error(f"While proceding task {task} had found out that staff collection is empty.")
 
     return people, user_ids
 
