@@ -45,10 +45,10 @@ First of all: the project file sent to bot should contain field 'tg_username' co
 ```json
 "projects": [                           
     {
-        "title": '', # Title of the project
-        "active": True,     # Is this an active project? Controlled via settings and used in /status command
-        "pm_tg_id": '',        # Telegram id of PM  
-        "tg_chat_id": '',   # store here group chat where project members discuss project
+        "title": '',                                    # Title of the project
+        "active": True,                                 # Is this an active project? Controlled via settings and used in /status command
+        "pm_tg_id": '',                                 # Telegram id of PM  
+        "tg_chat_id": '',                               # store here group chat where project members discuss project
         "settings": {
             'ALLOW_POST_STATUS_TO_GROUP': False,        # This option controls whether /status command from group chat 
                                                         # will send message  to group chat or directly to user
@@ -58,19 +58,19 @@ First of all: the project file sent to bot should contain field 'tg_username' co
         "tasks": [
             {
                 "id": 0,
-                "WBS": "1", # Filled when project imported from MS Project, otherwise it's empty; bot not using it for now.
+                "WBS": "1",                             # Filled when project imported from MS Project, otherwise it's empty; bot not using it for now.
                 "name": "Common task",
                 "startdate": "2023-05-15",
                 "enddate": "2023-05-18",
-                "duration": 3, # Business days
-                "predecessor": [], # Filled when project imported from MS Project, otherwise it's empty; bot not using it for now.
+                "duration": 3,                          # Business days
+            "predecessor": [],                          # Filled when project imported from MS Project, otherwise it's empty; bot not using it for now.
                 "successors": [], 
-                "milestone": false, # True if task is a milestone
-                "complete": 0, # should 0-100 indicate percentage of completion
-                "curator": "", # for future purposes - if overseer role will be needed
+            "milestone": false,                         # True if task is a milestone
+                "complete": 0,                          # should 0-100 indicate percentage of completion
+                "curator": "",                          # for future purposes - if overseer role will be needed
                 "basicplan_startdate": "2023-05-15",
                 "basicplan_enddate": "2023-05-18",
-                "include": [  # For common task in this list goes ids of included subtasks. 
+                "include": [                            # For common task in this list goes ids of included subtasks. 
                     1,
                     4,
                     2
@@ -87,12 +87,12 @@ First of all: the project file sent to bot should contain field 'tg_username' co
                 "predecessor": [],
                 "successors": [],
                 "milestone": false,
-                "complete": 100, # 100 means completed
+                "complete": 100,                        # 100 means completed
                 "curator": "",
                 "basicplan_startdate": "2023-05-08",
                 "basicplan_enddate": "2023-05-15",
                 "include": [],
-                "actioners": [  # Actioner (doer) of this task
+                "actioners": [                          # Actioner (doer) of this task
                     {
                         "actioner_id": ObjectId(""),    # This is id of person in staff collection below
                         "nofeedback": false             # This flag will store if person didn't respond on last reminder
@@ -109,13 +109,13 @@ First of all: the project file sent to bot should contain field 'tg_username' co
                 "name": "Some milestone",
                 "startdate": "2023-05-15",
                 "enddate": "2023-05-15",
-                "duration": 0, # Milestones have zero duration
+                "duration": 0,                          # Milestones have zero duration
                 "predecessor": [],
-                "successors": [ # Achiving this milestone means "successors" task started
+                "successors": [                         # Achiving this milestone means "successors" task started
                     {
-                        "id": 2, # id of such task
-                        "depend_type": 1, # Type of dependency (see below)
-                        "depend_offset": 0  # Offset in days from current task (negative number means its earlier in time)
+                        "id": 2,                        # id of such task
+                        "depend_type": 1,               # Type of dependency (see below)
+                        "depend_offset": 0              # Offset in days from current task (negative number means its earlier in time)
                     },
                     {
                         "id": 5,
@@ -166,15 +166,15 @@ First of all: the project file sent to bot should contain field 'tg_username' co
                 ]
             },        
         ],
-    "staff": [  # Actioners are stored separately because it is more convinient to write tg_id
-        {       # If they were stored in tasks, then it will be a problem to write tg_id in each task
+    "staff": [                                      # Actioners are stored separately because it is more convinient to write tg_id
+        {                                           # If they were stored in tasks, then it will be a problem to write tg_id in each task
             "_id": ObjectId(),
             "program_id": '',                       # id of this resource from original project file
             "name": "John",
             "email": "",
             "phone": "",
             "tg_username": "some_user42", 
-            "tg_id": 000000,
+            "tg_id": '000000',
             "account_type": 'free',                 # For future comercial use
             "settings": {
                 'INFORM_OF_ALL_PROJECTS': False,    #  If set to True /status command will inform PM 
@@ -188,7 +188,7 @@ First of all: the project file sent to bot should contain field 'tg_username' co
             "email": "",
             "phone": "",
             "tg_username": "some_user666",
-            "tg_id": 000000,
+            "tg_id": '000000',
             "account_type": 'free',                 # For future comercial use
             "settings": {
                 'INFORM_OF_ALL_PROJECTS': False,    #  If set to True /status command will inform PM 

@@ -354,50 +354,23 @@ async def morning_update(context: ContextTypes.DEFAULT_TYPE) -> None:
     else:
         if project:            
 
-            # Add PM username
-            record = DB.staff.find_one({"tg_id": str(context.job.data['pm_tg_id'])})
-            if record and record['tg_username']:
-                project['tg_username'] = record['tg_username']
+            # Get project team to inform
+            team = get_project_team(project)
+            if team:
+
+                # For each member compose status update on project and send
+                for member in team:
+                    bot_msg = get_status_on_project(project, member['_id'])
+                    await context.bot.send_message(member['tg_id'], bot_msg)
+
+                    # Send such update to PM too if it was not sent already like to an actioner
+                    if member['tg_id'] != str(context.job.data['pm_tg_id']):                                          
+                        await context.bot.send_message(str(context.job.data['pm_tg_id']), bot_msg)
+
+            # If no team inform only PM about such situation
             else:
-                logger.error(f"PM (with tg_id: {str(context.job.data['pm_tg_id'])}) was not found in db.staff!")
-            
-            # Find task to inform about and send message to users
-            for task in project['tasks']:
-                bot_msg = '' # Also acts as flag that there is something to inform user of
-
-                # TODO decide about milestones
-                if task['complete'] < 100 and not task['include'] and not task['milestone']:
-
-                    # If delta_start <0 task not started, otherwise already started
-                    delta_start = date.today() - date.fromisoformat(task['startdate'])
-
-                    # If delta_end >0 task overdue, if <0 task in progress
-                    delta_end = date.today() - date.fromisoformat(task['enddate'])
-
-                    if delta_start.days == 0:
-                        bot_msg = f"task {task['id']} '{task['name']}' of '{project['title']}' (PM: @{project['tg_username']}) started today."
-                    elif delta_start.days > 0  and delta_end.days < 0:
-                        bot_msg = f"task {task['id']} '{task['name']}' of '{project['title']}' (PM: @{project['tg_username']}) is intermidiate. Due date is {task['enddate']}."
-                    elif delta_end.days == 0:
-                        bot_msg = f"task {task['id']}  '{task['name']}' of '{project['title']}' (PM: @{project['tg_username']}) must be completed today!"
-                    elif delta_start.days > 0 and delta_end.days > 0:                                       
-                        bot_msg = f"task {task['id']} '{task['name']}' of '{project['title']}' (PM: @{project['tg_username']}) is overdue! (had to be completed on {task['enddate']})"
-                    else:
-                        # print(f"Future tasks as {task['id']} '{task['name']}' goes here")   
-                        pass
-
-                    # If task worth talking, and tg_id could be found in staff and actioner not PM 
-                    # (will be informed separately) then send message to actioner
-                    if bot_msg:
-                        for actioner in task['actioners']:
-                            worker = DB.staff.find_one({"_id": actioner['actioner_id']}, {"tg_id":1, "_id": 0})                            
-                            if worker and worker['tg_id'] and worker['tg_id'] != project['pm_tg_id']:
-                                # TODO I could easily add keyboard here which will send with callback_data:
-                                # project, task, actioner_id, and actioner decision (what else will be needed?..) 
-                                await context.bot.send_message(worker['tg_id'], bot_msg)
-                        
-                        # And inform PM
-                        await context.bot.send_message(project['pm_tg_id'], bot_msg)
+                bot_msg = f"Project has no team or something is wrong with database - consult developer."
+                await context.bot.send_message(str(context.job.data['pm_tg_id']), bot_msg)
 
 
 ######### START section ########################

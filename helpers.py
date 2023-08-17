@@ -186,13 +186,16 @@ def get_project_team(project: dict):
         # Process only tasks with actioners
         if task['actioners']:
             for actioner in task['actioners']:
-                try:
-                    result = DB.staff.find_one({'_id': actioner['actioner_id']})
-                except Exception as e:
-                    logger.error(f"There was error getting DB: {e}")
-                else:
-                    if result:
-                        team.append(result)
+
+                # Proceed if such actioner not in team already
+                if not any(str(actioner['actioner_id']) in str(member['_id']) for member in team):
+                    try:
+                        result = DB.staff.find_one({'_id': actioner['actioner_id']})
+                    except Exception as e:
+                        logger.error(f"There was error getting DB: {e}")
+                    else:
+                        if result:
+                            team.append(result)
     
     if not team:
         logger.error(f"Maybe DB is corrupted: project '{project['title']}' (id: {project['_id']}) has no project team!")
@@ -207,6 +210,7 @@ def get_status_on_project(project: dict, user_oid: ObjectId) -> str:
     DB = get_db()
 
     bot_msg = f"Status of events for project '{project['title']}'"
+
     # Add PM username
     try:
         record = DB.staff.find_one({"tg_id": project['pm_tg_id']})
@@ -220,37 +224,43 @@ def get_status_on_project(project: dict, user_oid: ObjectId) -> str:
         else:
             logger.error(f"PM (with tg_id: {project['pm_tg_id']}) was not found in db.staff!")
 
-        # Find task to inform about and send message to users
-        msg = ''
-        for task in project['tasks']:
-            if (task['complete'] < 100 and 
-                not task['include'] and 
-                not task['milestone'] and 
-                # User object_id is not iterable so convert it to string previously
-                any(str(user_oid) in str(doer['actioner_id']) for doer in task['actioners'])):
- 
-                # If delta_start <0 task not started, otherwise already started
-                delta_start = date.today() - date.fromisoformat(task['startdate'])
+        # Get user telegram username to add to message
+        user = DB.staff.find_one({"_id": user_oid},{"tg_username":1, "_id": 0})
+        if user and user['tg_username']:
 
-                # If delta_end >0 task overdue, if <0 task in progress
-                delta_end = date.today() - date.fromisoformat(task['enddate'])
+            # Find task to inform about: not completed yet, not a milestone, not common task (doesn't consist of subtasks), and this user assigned to it
+            msg = ''
+            for task in project['tasks']:
+                if (task['complete'] < 100 and 
+                    not task['include'] and 
+                    not task['milestone'] and 
+                    # User object_id is not iterable so convert it to string previously
+                    any(str(user_oid) in str(doer['actioner_id']) for doer in task['actioners'])):
+    
+                    # If delta_start <0 task not started, otherwise already started
+                    delta_start = date.today() - date.fromisoformat(task['startdate'])
 
-                if delta_start.days == 0:
-                    msg = msg + f"\nTask {task['id']} '{task['name']}' started today."
-                elif delta_start.days > 0  and delta_end.days < 0:
-                    msg = msg + f"\nTask {task['id']} '{task['name']}' is intermidiate. Due date is {task['enddate']}."
-                elif delta_end.days == 0:
-                    msg = msg + f"\nTask {task['id']}  '{task['name']}' must be completed today!"
-                elif delta_start.days > 0 and delta_end.days > 0:                                       
-                    msg = msg + f"\nTask {task['id']} '{task['name']}' is overdue! (had to be completed on {task['enddate']})"
-                else:
-                    # print(f"Future tasks as {task['id']} '{task['name']}' goes here")   
-                    pass
-        if msg:
-            bot_msg = bot_msg + msg
+                    # If delta_end >0 task overdue, if <0 task in progress
+                    delta_end = date.today() - date.fromisoformat(task['enddate'])
+
+                    if delta_start.days == 0:
+                        msg = msg + f"\nTask {task['id']} '{task['name']}' started today."
+                    elif delta_start.days > 0  and delta_end.days < 0:
+                        msg = msg + f"\nTask {task['id']} '{task['name']}' is intermidiate. Due date is {task['enddate']}."
+                    elif delta_end.days == 0:
+                        msg = msg + f"\nTask {task['id']}  '{task['name']}' must be completed today!"
+                    elif delta_start.days > 0 and delta_end.days > 0:                                       
+                        msg = msg + f"\nTask {task['id']} '{task['name']}' is overdue! (had to be completed on {task['enddate']})"
+                    else:
+                        # print(f"Future tasks as {task['id']} '{task['name']}' goes here")   
+                        pass
+            if msg:
+                bot_msg = bot_msg + f"\nTasks assigned to @{user['tg_username']}:\n" + msg
+            else:
+                bot_msg = bot_msg + f"\nNo events for @{user['tg_username']} to inform for now."
         else:
-            bot_msg = bot_msg + f"\nNo events to inform for now."
-
+            logger.error(f"Something wrong: user has id: {user_oid} but no tg_username in DB")
+            bot_msg = f"Error occured while processing your query"
     return bot_msg
 
 
