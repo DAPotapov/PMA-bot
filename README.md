@@ -160,7 +160,7 @@ First of all: the project file sent to bot should contain field 'tg_username' co
                 "include": [],
                 "actioners": [
                     {
-                        "actioner_id": 0,
+                        "actioner_id": ObjectId(""),
                         "nofeedback": false
                     }
                 ]

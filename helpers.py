@@ -7,6 +7,8 @@ import logging
 import pymongo
 import os
 
+from bson import ObjectId
+from datetime import date
 from dotenv import load_dotenv
 from pprint import pprint
 from telegram import User
@@ -196,6 +198,61 @@ def get_project_team(project: dict):
         logger.error(f"Maybe DB is corrupted: project '{project['title']}' (id: {project['_id']}) has no project team!")
 
     return team
+
+
+def get_status_on_project(project: dict, user_oid: ObjectId) -> str:
+    """
+    Function compose message contains status update on given project for given tg_id
+    """
+    DB = get_db()
+
+    bot_msg = f"Status of events for project '{project['title']}'"
+    # Add PM username
+    try:
+        record = DB.staff.find_one({"tg_id": project['pm_tg_id']})
+    except Exception as e:
+        logger.error(f"Error happens while accessing DB for PM tg_id={project['pm_tg_id']} in staff collection: {e}")
+        bot_msg = f"Error occured while processing your query"
+    else:
+        if record and record['tg_username']:
+            project['tg_username'] = record['tg_username']
+            bot_msg = bot_msg + f" (PM: @{project['tg_username']}):"
+        else:
+            logger.error(f"PM (with tg_id: {project['pm_tg_id']}) was not found in db.staff!")
+
+        # Find task to inform about and send message to users
+        msg = ''
+        for task in project['tasks']:
+            if (task['complete'] < 100 and 
+                not task['include'] and 
+                not task['milestone'] and 
+                # User object_id is not iterable so convert it to string previously
+                any(str(user_oid) in str(doer['actioner_id']) for doer in task['actioners'])):
+ 
+                # If delta_start <0 task not started, otherwise already started
+                delta_start = date.today() - date.fromisoformat(task['startdate'])
+
+                # If delta_end >0 task overdue, if <0 task in progress
+                delta_end = date.today() - date.fromisoformat(task['enddate'])
+
+                if delta_start.days == 0:
+                    msg = msg + f"\nTask {task['id']} '{task['name']}' started today."
+                elif delta_start.days > 0  and delta_end.days < 0:
+                    msg = msg + f"\nTask {task['id']} '{task['name']}' is intermidiate. Due date is {task['enddate']}."
+                elif delta_end.days == 0:
+                    msg = msg + f"\nTask {task['id']}  '{task['name']}' must be completed today!"
+                elif delta_start.days > 0 and delta_end.days > 0:                                       
+                    msg = msg + f"\nTask {task['id']} '{task['name']}' is overdue! (had to be completed on {task['enddate']})"
+                else:
+                    # print(f"Future tasks as {task['id']} '{task['name']}' goes here")   
+                    pass
+        if msg:
+            bot_msg = bot_msg + msg
+        else:
+            bot_msg = bot_msg + f"\nNo events to inform for now."
+
+    return bot_msg
+
 
 def get_worker_oid_from_db_by_tg_username(tg_username: str):
     '''
