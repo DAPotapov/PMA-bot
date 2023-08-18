@@ -803,13 +803,8 @@ async def stop(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
 
 async def upload(update: Update, context: CallbackContext) -> int:
     '''
-    Function to upload new project file
+    Starting point of conversation of uploading new project file
     '''
-    # TODO: make this as conversation too: 
-    # user: /upload
-    # bot: are you sure? if yes upload file, otherwise type 'cancel'
-    # user: <uploads>                           or user: cancel
-    # bot: DB updated. jobs not rescheduled         bot: ok, changes were not made
 
     # Check if user is PM and remember what project to update
     docs_count = DB.projects.count_documents({"pm_tg_id": str(update.effective_user.id)})
@@ -824,10 +819,12 @@ async def upload(update: Update, context: CallbackContext) -> int:
             context.user_data['project'] = project
 
             # Message to return to user
-            bot_msg = ("This function will replace existing schedule. Reminders will not change.\n"
+            bot_msg = (f"This function will replace existing schedule for '{result['title']}' project. Reminders will not change.\n"
                        "If you are sure just upload file with new schedule.\n"
-                        "If you changed your mind type 'cancel' instead.")
-            await update.message.reply_text(bot_msg)
+                        "If you changed your mind press a button")
+            cancel_btn = InlineKeyboardButton("Cancel", callback_data=str(ONE))
+            kbd = InlineKeyboardMarkup([[cancel_btn]])
+            await update.message.reply_text(bot_msg, reply_markup=kbd)#InlineKeyboardMarkup.from_button(cancel_btn))
             return FIRST_LVL
         else:
             logger.error(f"User '{update.effective_user.id}' has projects, but none of them active. Check the DB.")
@@ -884,62 +881,11 @@ async def upload_file_recieved(update: Update, context: CallbackContext) -> int:
 
 async def upload_ended(update: Update, context: CallbackContext) -> int:
     """Fallback function for /upload command conversation"""
-    bot_msg = "upload aborted"
-    await update.message.reply_text(bot_msg)
+    bot_msg = "Upload aborted"
+    query = update.callback_query
+    await query.answer()
+    await query.edit_message_text(bot_msg)
     return ConversationHandler.END
-
-    # Check if user is PM
-    # uploader = update.message.from_user.username
-    # if uploader == PM:
-    #     # Let's keep files got from user in temporary directory TODO what's happenning with them there?
-    #     with tempfile.TemporaryDirectory() as tdp:
-    #         gotfile = await context.bot.get_file(update.message.document)
-    #         fp = await gotfile.download_to_drive(os.path.join(tdp, update.message.document.file_name))
-            
-    #         # Call function which converts given file to dictionaries
-    #         tasks = file_to_dict(fp)
-    #         if tasks:
-    #             # Remember telegram user id
-    #             # TODO refactor this
-    #             user_oid = add_user_id_to_db(update.message.from_user)
-
-    #             # Call function to save project in JSON format and log exception
-    #             # TODO delete. this is temporary until I make DB work
-    #             project = {
-    #                 'tasks': tasks,
-    #                 # 'staff': staff
-    #             }
-    #             try:
-    #                 save_json(project, PROJECTJSON)
-    #             except FileNotFoundError as e:
-    #                 logger.error(f'{e}')
-    #                 # TODO better inform PM that there are problems with writing project
-    #                 bot_msg = "Seems like path to save project does not exist"
-    #             except Exception as e:
-    #                 logger.error(f'{e}')
-    #                 bot_msg = "Error saving project"
-    #             else:
-    #                 bot_msg = "Project file saved successfully"
-                    
-    #                 # Call function to create jobs:
-    #                 # project_title = context.user_data['project']['title']
-    #                 if schedule_jobs(str(update.effective_user.id), context):
-    #                     bot_msg = (bot_msg + "\nReminders were created: on the day before event, in the morning of event and reminder for friday file update."
-    #                                 "You can change them or turn off in /setttings"
-    #                     )
-    #                 else:
-    #                     bot_msg = (bot_msg + "\nSomething went wrong while scheduling reminders."
-    #                                 "\nPlease, contact bot developer to check the logs.")
-    #         else:
-    #             bot_msg = (f"Couldn't process given file.\n"
-    #                        f"Supported formats are: .gan (GanttProject), .json, .xml (MS Project)"
-    #                        f"Make sure these files contain custom field named 'tg_username', which store usernames of project team members."
-    #                        f"If you would like to see other formats supported feel free to message bot developer via /feedback command."
-    #             )
-        
-    # else:
-    #     bot_msg = 'Only Project Manager is allowed to upload new schedule'
-    await update.message.reply_text(bot_msg)
 
 
 ### This part contains functions which make settings menu functionality #########################################################################
@@ -1646,7 +1592,9 @@ def main() -> None:
     upload_conv = ConversationHandler(
         entry_points=[CommandHandler(upload_cmd.command, upload)],
         states={
-            FIRST_LVL: [MessageHandler(filters.Document.ALL, upload_file_recieved)],
+            FIRST_LVL: [
+                MessageHandler(filters.Document.ALL, upload_file_recieved),
+                CallbackQueryHandler(upload_ended, pattern="^" + str(ONE) + "$")],
         },
         fallbacks=[MessageHandler(filters.TEXT & ~filters.COMMAND, upload_ended)]
     )
