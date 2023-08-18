@@ -97,6 +97,8 @@ settings_cmd = BotCommand("settings", "настройка параметров �
 feedback_cmd = BotCommand("feedback", "отправка сообщения разработчику")
 start_cmd = BotCommand("start", "запуск бота")
 stop_cmd = BotCommand("stop", "прекращение работы бота")
+upload_cmd = BotCommand("upload", "загрузка нового файла проекта для активного проекта \
+                        (например, если сдвинули сроки или заменили исполнителя в MS Project'е)")
 
 # Stages of settings menu:
 FIRST_LVL, SECOND_LVL, THIRD_LVL, FOURTH_LVL, FIFTH_LVL = range(5)
@@ -461,8 +463,7 @@ async def naming_project(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
 async def file_recieved(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     ''' Function to proceed uploaded file and saving to DB'''
 
-    # TODO consider to make this part as standalone function because it's same as in /upload
-    # Call function to recieve file and call converters
+    # Get file and save it as temp
     with tempfile.TemporaryDirectory() as tdp:
         gotfile = await context.bot.get_file(update.message.document)
         fp = await gotfile.download_to_drive(os.path.join(tdp, update.message.document.file_name))
@@ -470,7 +471,6 @@ async def file_recieved(update: Update, context: ContextTypes.DEFAULT_TYPE) -> i
         # Call function which converts given file to dictionary and add actioners to staff collection
         tasks = file_to_dict(fp)
         if tasks:
-
             bot_msg = "File parsed successfully"
 
             # Add tasks to user data dictionary in context
@@ -801,7 +801,7 @@ async def stop(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
                 job.remove()
 
 
-async def upload(update: Update, context: CallbackContext) -> None:
+async def upload(update: Update, context: CallbackContext) -> int:
     '''
     Function to upload new project file
     '''
@@ -811,8 +811,82 @@ async def upload(update: Update, context: CallbackContext) -> None:
     # user: <uploads>                           or user: cancel
     # bot: DB updated. jobs not rescheduled         bot: ok, changes were not made
 
-    # Message to return to user
-    bot_msg = 'to be implemented'
+    # Check if user is PM and remember what project to update
+    docs_count = DB.projects.count_documents({"pm_tg_id": str(update.effective_user.id)})
+    if docs_count > 0:
+
+        # Get active project title and store in user_data (because now PROJECTTITLE contain default value not associated with project)
+        result = DB.projects.find_one({"pm_tg_id": str(update.effective_user.id), "active": True}, {"title": 1, "_id": 0})
+        if result:
+            project = {
+                "title" : result['title']
+            }
+            context.user_data['project'] = project
+
+            # Message to return to user
+            bot_msg = ("This function will replace existing schedule. Reminders will not change.\n"
+                       "If you are sure just upload file with new schedule.\n"
+                        "If you changed your mind type 'cancel' instead.")
+            await update.message.reply_text(bot_msg)
+            return FIRST_LVL
+        else:
+            logger.error(f"User '{update.effective_user.id}' has projects, but none of them active. Check the DB.")
+            bot_msg = "Houston, we have a problems. Contact the developer."
+            await update.message.reply_text(bot_msg)
+            return ConversationHandler.END
+
+    # If user is not PM at least add his id in DB (if his username is there)
+    else:
+        add_user_id_to_db(update.effective_user)
+        bot_msg = f"Change in project can be made only after starting one: use /start command to start a project."
+        await update.message.reply_text(bot_msg)
+        return ConversationHandler.END
+    
+
+async def upload_file_recieved(update: Update, context: CallbackContext) -> int:
+    """Function to proceed uploaded new project file and updating corresponding record in DB"""
+    with tempfile.TemporaryDirectory() as tdp:
+        gotfile = await context.bot.get_file(update.message.document)
+        fp = await gotfile.download_to_drive(os.path.join(tdp, update.message.document.file_name))
+        
+        # Call function which converts given file to dictionary and add actioners to staff collection
+        tasks = file_to_dict(fp)
+        if tasks:
+            bot_msg = "File parsed successfully."
+    
+            # Update tasks in active project
+            result = DB.projects.update_one({"pm_tg_id": str(update.effective_user.id), "title": context.user_data['project']['title']}, \
+                                            {"$set": {"tasks": tasks}})
+            if result.matched_count > 0:
+                if result.modified_count > 0:
+                    bot_msg = bot_msg + f"\nProject schedule updated successfully."
+                else:
+                    bot_msg = bot_msg + f"\nProject schedule is same as existing, didn't updated."
+            else:
+                bot_msg = bot_msg + f"\nSomething went wrong while updating project schedule."
+                logger.warning(f"Project {context.user_data['project']['title']} was not found \
+                               for user {str(update.effective_user.id)} during update, but was found on previous step.")
+
+            # End on success
+            await update.message.reply_text(bot_msg)
+            return ConversationHandler.END
+        
+        else:
+            bot_msg = (f"Couldn't process given file.\n"
+                        f"Supported formats are: .gan (GanttProject), .json, .xml (MS Project)\n"
+                        f"Make sure these files contain custom field named 'tg_username', which store usernames of project team members.\n"
+                        f"If you would like to see other formats supported feel free to message bot developer via /feedback command.\n"
+                        f"Try upload another one."
+            )
+            await update.message.reply_text(bot_msg)
+            return FIRST_LVL
+        
+
+async def upload_ended(update: Update, context: CallbackContext) -> int:
+    """Fallback function for /upload command conversation"""
+    bot_msg = "upload aborted"
+    await update.message.reply_text(bot_msg)
+    return ConversationHandler.END
 
     # Check if user is PM
     # uploader = update.message.from_user.username
@@ -1459,7 +1533,8 @@ async def post_init(application: Application):
                                         settings_cmd,
                                         # freshstart_cmd,
                                         feedback_cmd,
-                                        stop_cmd
+                                        stop_cmd,
+                                        upload_cmd
     ])
 
 
@@ -1508,10 +1583,6 @@ def main() -> None:
     # Echo any message that is text and not a command
     # application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, echo))
 
-    # Register handler for recieving new project file
-    # It's conflicting with /start conversation, better place it in conversation as well
-    # application.add_handler(MessageHandler(filters.Document.ALL, upload))
-
     # Conversation handler for /start
     start_conv = ConversationHandler(
         entry_points=[CommandHandler(start_cmd.command, start)],
@@ -1536,6 +1607,7 @@ def main() -> None:
     application.add_handler(feedback_conv)
 
     # PM should have the abibility to change bot behaviour, such as reminder interval and so on
+    # Configure /settings conversation and add a handler
     settings_conv = ConversationHandler(
         entry_points=[CommandHandler(settings_cmd.command, settings)],
         states={
@@ -1570,6 +1642,15 @@ def main() -> None:
     )
     application.add_handler(settings_conv)
 
+    # Configure /upload conversation and add a handler
+    upload_conv = ConversationHandler(
+        entry_points=[CommandHandler(upload_cmd.command, upload)],
+        states={
+            FIRST_LVL: [MessageHandler(filters.Document.ALL, upload_file_recieved)],
+        },
+        fallbacks=[MessageHandler(filters.TEXT & ~filters.COMMAND, upload_ended)]
+    )
+    application.add_handler(upload_conv)
 
     # Start the Bot and run it until Ctrl+C pressed
     application.run_polling()

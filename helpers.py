@@ -22,30 +22,33 @@ logger = logging.getLogger(__name__)
 
 def add_user_id_to_db(user: User):
     ''' 
-    Helper function to add telegram id of username provided to DB. Returns ObjectId on success
-    TODO try to fill other fields as well
+    Helper function to add telegram id of username provided to DB. 
+    Returns None if telegram username not found in staff collection, did't updated or something went wrong.
+    Returns ObjectId if record updated
+    TODO try to fill other fields as well - use standalone function
     '''
-    result = None
+    output = None
     DB = get_db()
     print(f"user is {user}")
 
     # Fill record with absent id with current one
     # For now I assume that users don't switch their usernames and such situation is force-major
     try:
-        record = DB.staff.find_one({"tg_username": user.username}, {"tg_id": 1, "_id": 0})
+        record = DB.staff.find_one({"tg_username": user.username}, {"tg_id": 1})
         # print(f"record is {record}")
     except Exception as e:
         logger.error(f"There was error getting DB: {e}")
     else:
 
         # TODO refactor such part in any other places where key error may occur
-        if record and ('tg_id' in record.keys()) and not record['tg_id']:
-            result = DB.staff.update_one({"tg_username": user.username}, {"$set": {"tg_id": str(user.id)}})
-            print(result)
-            if not result:
-                logger.warning(f"Something went wrong while adding telegram id for telegram username {user.username}")
+        if record and ('tg_id' in record.keys()) and not record['tg_id']:            
 
-    return result
+            # Remember: for update_one matched_count will not be more than one
+            result = DB.staff.update_one({"tg_username": user.username}, {"$set": {"tg_id": str(user.id)}})
+            if result.modified_count > 0:            
+                output = record["_id"]
+
+    return output
 
 
 def add_worker_to_staff(worker: dict):
