@@ -92,13 +92,14 @@ DB = get_db()
 # Set list of commands
 help_cmd = BotCommand("help","выводит данное описание")
 status_cmd = BotCommand("status", "информация о текущем состоянии проекта")
-settings_cmd = BotCommand("settings", "настройка параметров бота")
+settings_cmd = BotCommand("settings", "настройка параметров бота (работает только в личных сообщениях)")
 # freshstart_cmd = BotCommand("freshstart", "начало нового проекта")
 feedback_cmd = BotCommand("feedback", "отправка сообщения разработчику")
 start_cmd = BotCommand("start", "запуск бота")
 stop_cmd = BotCommand("stop", "прекращение работы бота")
 upload_cmd = BotCommand("upload", "загрузка нового файла проекта для активного проекта \
-                        (например, если сдвинули сроки или заменили исполнителя в MS Project'е)")
+                        (например, если сдвинули сроки или заменили исполнителя в MS Project'е)\
+                        (работает только в личных сообщениях)")
 
 # Stages of settings menu:
 FIRST_LVL, SECOND_LVL, THIRD_LVL, FOURTH_LVL, FIFTH_LVL = range(5)
@@ -919,6 +920,7 @@ async def settings(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     docs_count = DB.projects.count_documents({"pm_tg_id": str(update.effective_user.id)})
     if docs_count > 0:
 
+        # Check if command called in chat
         # Get active project title and store in user_data (because now PROJECTTITLE contain default value not associated with project)
         result = DB.projects.find_one({"pm_tg_id": str(update.effective_user.id), "active": True}, {"title": 1, "_id": 0})
         if result:
@@ -935,6 +937,7 @@ async def settings(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
             reply_markup = InlineKeyboardMarkup(keyboard)
             # print(update.message)
             await update.message.reply_text(bot_msg, reply_markup=reply_markup)
+            # await context.bot.send_message(update.effective_user.id, bot_msg, reply_markup=reply_markup)
         return FIRST_LVL
     else:
 
@@ -1555,7 +1558,7 @@ def main() -> None:
     # PM should have the abibility to change bot behaviour, such as reminder interval and so on
     # Configure /settings conversation and add a handler
     settings_conv = ConversationHandler(
-        entry_points=[CommandHandler(settings_cmd.command, settings)],
+        entry_points=[CommandHandler(settings_cmd.command, settings, ~filters.ChatType.GROUPS)],
         states={
             FIRST_LVL: [
                 CallbackQueryHandler(allow_status_to_group, pattern="^" + str(ONE) + "$"),
@@ -1590,7 +1593,7 @@ def main() -> None:
 
     # Configure /upload conversation and add a handler
     upload_conv = ConversationHandler(
-        entry_points=[CommandHandler(upload_cmd.command, upload)],
+        entry_points=[CommandHandler(upload_cmd.command, upload, ~filters.ChatType.GROUPS)],
         states={
             FIRST_LVL: [
                 MessageHandler(filters.Document.ALL, upload_file_recieved),
