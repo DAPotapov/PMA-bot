@@ -140,28 +140,19 @@ def get_assignees(task: dict):
     user_ids = []
     DB = get_db()
 
-    # TODO refactor this all!! No need in manual looking in staff
-    try:
-        staff = DB.staff.find()
-    except Exception as e:
-        logger.error(f"There was error getting DB: {e}")
-    else:
-        # pprint(f"Staff dict: {staff}")
-        if staff:
-            for doer in task['actioners']:
-                for member in staff:
-                    # print(f"Doer: {type(doer['actioner_id'])} \t {type(member['_id'])}")
-                    if doer['actioner_id'] == member['_id']:                                                    
-                        if member['tg_id']:
-                            user_ids.append(member['tg_id'])              
-                        if len(people) > 0:
-                            people = people + "and @" + member['tg_username'] + " (" + member['name'] + ")"
-                        else:
-                            people = f"{people}@{member['tg_username']} ({member['name']})"
+    for doer in task['actioners']:
+        try:
+            team_member = DB.staff.find_one({"_id": doer['actioner_id']})
+        except Exception as e:
+            logger.error(f"There was error getting DB: {e}")
         else:
-            # Return nothing if something not right
-            # raise ValueError(f"While proceding task {task} has found out that staff collection is empty.")
-            logger.error(f"While proceding task {task} had found out that staff collection is empty.")
+            if team_member and type(team_member) == dict:
+                if 'tg_id' in team_member.keys() and team_member['tg_id']:
+                    user_ids.append(team_member['tg_id'])
+                if len(people) > 0:
+                    people = people + "and @" + team_member['tg_username'] + " (" + team_member['name'] + ")"
+                else:
+                    people = f"{people}@{team_member['tg_username']} ({team_member['name']})"
 
     return people, user_ids
 
