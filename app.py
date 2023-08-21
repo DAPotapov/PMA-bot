@@ -238,7 +238,8 @@ async def day_before_update(context: ContextTypes.DEFAULT_TYPE) -> None:
                     if bot_msg:
                         for actioner in task['actioners']:
                             worker = DB.staff.find_one({"_id": actioner['actioner_id']}, {"tg_id":1, "_id": 0})                            
-                            if worker and worker['tg_id'] and worker['tg_id'] != project['pm_tg_id']:
+                            if (worker and type(worker) == dict and 'tg_id' in worker.keys() and
+                                worker['tg_id'] and worker['tg_id'] != project['pm_tg_id']):
                                 # TODO I could easily add keyboard here which will send with callback_data:
                                 # project, task, actioner_id, and actioner decision (what else will be needed?..) 
                                 await context.bot.send_message(worker['tg_id'], bot_msg)
@@ -298,11 +299,12 @@ async def file_update(context: ContextTypes.DEFAULT_TYPE) -> None:
     except Exception as e:
         logger.error(f"There was error getting DB: {e}")
     else:
-        if project:            
+        if project and type(project) == dict:                
 
             # Add PM username
             record = DB.staff.find_one({"tg_id": str(context.job.data['pm_tg_id'])})
-            if record and record['tg_username']:
+            if (record and type(record) == dict and 
+                'tg_username' in record.keys() and record['tg_username']):
                 project['tg_username'] = record['tg_username']
             else:
                 logger.error(f"PM (with tg_id: {str(context.job.data['pm_tg_id'])}) was not found in db.staff!")
@@ -315,15 +317,6 @@ async def file_update(context: ContextTypes.DEFAULT_TYPE) -> None:
                                 f"Other team members should have actual information!"
                         )
                         await context.bot.send_message(member['tg_id'], bot_msg)
-
-
-# async def freshstart(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-#     """
-#     TODO: This function handles /freshstart command
-#     """
-#     freshstart_markup = InlineKeyboardMarkup(freshstart_kbd)
-#     bot_msg = "Are you really want to start a new project?"
-#     await update.message.reply_text(bot_msg, reply_markup=freshstart_markup)
 
 
 async def help(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -363,7 +356,7 @@ async def morning_update(context: ContextTypes.DEFAULT_TYPE) -> None:
     except Exception as e:
         logger.error(f"There was error getting DB: {e}")
     else:
-        if project:            
+        if project and type(project) == dict:            
 
             # Get project team to inform
             team = get_project_team(project)
@@ -389,12 +382,7 @@ async def start(update: Update, context: CallbackContext) -> int:
     '''
     Function to handle start of the bot
     '''
-
-    # TODO PPP: 
-    # check connection to DB?
-    # inform user what to do with this bot
-    # Call function to upload project file
-    # Call function to make jobs
+    # Collect information about PM
     pm = {
         'program_id': '',
         'name': update.effective_user.first_name,
@@ -406,7 +394,6 @@ async def start(update: Update, context: CallbackContext) -> int:
         'settings': {
             'INFORM_OF_ALL_PROJECTS': False,         
         },
-        # 'projects': [],
     }
 
     # Store information about PM in context
@@ -438,17 +425,12 @@ async def naming_project(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
             'INFORM_ACTIONERS_OF_MILESTONES': False,
             },
         'tasks': [],
-        # 'staff': []
     }
 
     # Add project data to dictionary in user_data. 
     # One start = one project. But better keep PM and project separated, 
     # because they could be written to DB separately
     context.user_data['project'] = project
-
-    # Check DB for such name for this user, (TODO standalone?)
-    # print(context.user_data['PM']['pm_id'])
-    # if check_db_for_user(context.user_data['PM']['pm_id']):
 
     # Check and add PM to staff
     pm_oid = add_worker_info_to_staff(context.user_data['PM'])
@@ -459,7 +441,8 @@ async def naming_project(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
     else:
         prj_id = DB.projects.find_one({"title": project['title'], "pm_tg_id": str(context.user_data['PM']['tg_id'])}, {"_id":1})
         print(f"Search for project title returned this: {prj_id}")
-        if prj_id:
+        if (prj_id and type(prj_id) == dict and 
+            '_id' in prj_id.keys() and prj_id['id']):
             bot_msg = f"You've already started project with name {project['title']}. Try another one."
             await update.message.reply_text(bot_msg)
             return FIRST_LVL
@@ -496,7 +479,7 @@ async def file_recieved(update: Update, context: ContextTypes.DEFAULT_TYPE) -> i
             else:
 
                 # If succeed call function to create Jobs
-                if prj_oid:
+                if prj_oid and prj_oid.inserted_id:
                     bot_msg = (bot_msg + f"\nProject added to database.")
                     print(f"can i get just here? {prj_oid}")
 
@@ -679,7 +662,8 @@ async def status(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     except Exception as e:
         logger.error(f"There was error getting DB: {e}")
     else:
-        if record:
+        if (record and type(record) == dict and
+            'settings' in record.keys() and record['settings']):
 
             # Get 'list' of projects, which depending on preset consists of one project or many
             # Cursor object never None, so cast it to list first
@@ -821,7 +805,8 @@ async def upload(update: Update, context: CallbackContext) -> int:
 
         # Get active project title and store in user_data (because now PROJECTTITLE contain default value not associated with project)
         result = DB.projects.find_one({"pm_tg_id": str(update.effective_user.id), "active": True}, {"title": 1, "_id": 0})
-        if result:
+        if (result and type(result) == dict and 
+            'title' in result.keys() and result['title']):
             project = {
                 "title" : result['title']
             }
@@ -907,7 +892,7 @@ async def settings(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     # TODO: Add buttons to change project settings, such as:
     # 1. change of PM (see below) (Need to remake Jobs (because of ID))
     # PPP: 
-    # Take new PM name, check if he's member of chat members, otherwise do nothing and inform user 
+    # Take new PM name, check if he's member of project team, otherwise do nothing and inform user 
     # 
     # message = ''
     # global PM
@@ -931,7 +916,9 @@ async def settings(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
         # Check if command called in chat
         # Get active project title and store in user_data (because now PROJECTTITLE contain default value not associated with project)
         result = DB.projects.find_one({"pm_tg_id": str(update.effective_user.id), "active": True}, {"title": 1, "_id": 0})
-        if result:
+        if (result and type(result) == dict and 
+            'title' in result.keys() and result['title']):
+            # TODO be more consistent how to store title - one way around all functions
             context.user_data['projecttitle'] = result['title']
         keyboard, bot_msg = get_keybord_and_msg(FIRST_LVL, str(update.message.from_user.id))
         if keyboard == None or bot_msg == None:
@@ -941,11 +928,8 @@ async def settings(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
 
             # Let's control which level of settings we are at any given moment
             context.user_data['level'] = FIRST_LVL
-
             reply_markup = InlineKeyboardMarkup(keyboard)
-            # print(update.message)
             await update.message.reply_text(bot_msg, reply_markup=reply_markup)
-            # await context.bot.send_message(update.effective_user.id, bot_msg, reply_markup=reply_markup)
         return FIRST_LVL
     else:
 
@@ -978,9 +962,12 @@ async def allow_status_to_group(update: Update, context: ContextTypes.DEFAULT_TY
     # Read parameter and switch it
     result = DB.projects.find_one({"pm_tg_id": str(update.effective_user.id), "title": context.user_data['projecttitle']}, 
                                   {"settings.ALLOW_POST_STATUS_TO_GROUP": 1, "_id": 0})
-    if result:
+    if (result and type(result) == dict and 
+        'settings' in result.keys() and result['settings']):
         ALLOW_POST_STATUS_TO_GROUP = result['settings']['ALLOW_POST_STATUS_TO_GROUP']
         ALLOW_POST_STATUS_TO_GROUP = False if ALLOW_POST_STATUS_TO_GROUP else True
+        
+        # No need to check for success, let app proceed
         DB.projects.update_one({"pm_tg_id": str(update.effective_user.id), "title": context.user_data['projecttitle']}, 
                                {"$set": {"settings.ALLOW_POST_STATUS_TO_GROUP": ALLOW_POST_STATUS_TO_GROUP}})
 
@@ -1006,9 +993,12 @@ async def milestones_anounce(update: Update, context: ContextTypes.DEFAULT_TYPE)
     # Read parameter and switch it
     result = DB.projects.find_one({"pm_tg_id": str(update.effective_user.id), "title": context.user_data['projecttitle']}, 
                                   {"settings.INFORM_ACTIONERS_OF_MILESTONES": 1, "_id": 0})
-    if result:
+    if (result and type(result) == dict and 
+        'settings' in result.keys() and result['settings']):
         INFORM_ACTIONERS_OF_MILESTONES = result['settings']['INFORM_ACTIONERS_OF_MILESTONES']
         INFORM_ACTIONERS_OF_MILESTONES = False if INFORM_ACTIONERS_OF_MILESTONES else True
+
+        # No need to check for success, let app proceed
         DB.projects.update_one({"pm_tg_id": str(update.effective_user.id), "title": context.user_data['projecttitle']}, 
                                {"$set": {"settings.INFORM_ACTIONERS_OF_MILESTONES": INFORM_ACTIONERS_OF_MILESTONES}})
 
@@ -1061,7 +1051,7 @@ async def settings_back(update: Update, context: ContextTypes.DEFAULT_TYPE) -> i
         context.user_data['level'] = context.user_data['level'] - 1  
 
     # Make keyboard appropriate to a level we are returning to
-    keyboard, bot_msg = get_keybord_and_msg(context.user_data['level'], update.effective_user.id)
+    keyboard, bot_msg = get_keybord_and_msg(context.user_data['level'], str(update.effective_user.id))
 
     # Call function which create keyboard and generate message to send to user. End conversation if that was unsuccessful.
     if keyboard == None or bot_msg == None:
@@ -1095,7 +1085,7 @@ async def day_before_update_item(update: Update, context: ContextTypes.DEFAULT_T
     # Call function which create keyboard and generate message to send to user. 
     # Call function which get current preset of reminder, to inform user.
     # End conversation if that was unsuccessful. 
-    keyboard, bot_msg = get_keybord_and_msg(THIRD_LVL, update.effective_user.id, context.user_data['last_position'])
+    keyboard, bot_msg = get_keybord_and_msg(THIRD_LVL, str(update.effective_user.id), context.user_data['last_position'])
     job_id = str(update.effective_user.id) + '_' + context.user_data['projecttitle'] + '_' + str(context.user_data['last_position'])
     preset = get_job_preset(job_id, context)
     
@@ -1127,7 +1117,7 @@ async def morning_update_item(update: Update, context: ContextTypes.DEFAULT_TYPE
     # Call function which create keyboard and generate message to send to user. 
     # Call function which get current preset of reminder, to inform user.
     # End conversation if that was unsuccessful. 
-    keyboard, bot_msg = get_keybord_and_msg(THIRD_LVL, update.effective_user.id, context.user_data['last_position'])
+    keyboard, bot_msg = get_keybord_and_msg(THIRD_LVL, str(update.effective_user.id), context.user_data['last_position'])
     job_id = str(update.effective_user.id) + '_' + context.user_data['projecttitle'] + '_' + str(context.user_data['last_position'])
     preset = get_job_preset(job_id, context)
     # preset = get_job_preset(context.user_data['last_position'], update.effective_user.id, PROJECTTITLE, context)
@@ -1158,10 +1148,9 @@ async def file_update_item(update: Update, context: ContextTypes.DEFAULT_TYPE) -
     # Call function which create keyboard and generate message to send to user. 
     # Call function which get current preset of reminder, to inform user.
     # End conversation if that was unsuccessful. 
-    keyboard, bot_msg = get_keybord_and_msg(THIRD_LVL, update.effective_user.id, context.user_data['last_position'])
+    keyboard, bot_msg = get_keybord_and_msg(THIRD_LVL, str(pdate.effective_user.id), context.user_data['last_position'])
     job_id = str(update.effective_user.id) + '_' + context.user_data['projecttitle'] + '_' + str(context.user_data['last_position'])
     preset = get_job_preset(job_id, context)
-    # preset = get_job_preset(context.user_data['last_position'], update.effective_user.id, PROJECTTITLE, context)
     if keyboard == None or bot_msg == None:
         bot_msg = "Some error happened. Unable to show a menu."
         await update.message.reply_text(bot_msg)
@@ -1198,9 +1187,8 @@ async def reminder_switcher(update: Update, context: ContextTypes.DEFAULT_TYPE) 
     # Call function which create keyboard and generate message to send to user. 
     # Call function which get current preset of reminder, to inform user.
     # End conversation if that was unsuccessful. 
-    keyboard, bot_msg = get_keybord_and_msg(THIRD_LVL, update.effective_user.id, reminder)
+    keyboard, bot_msg = get_keybord_and_msg(THIRD_LVL, str(update.effective_user.id), reminder)
     preset = get_job_preset(job_id, context)
-    # preset = get_job_preset(context.user_data['last_position'], update.effective_user.id, PROJECTTITLE, context)
     if keyboard == None or bot_msg == None:
         bot_msg = "Some error happened. Unable to show a menu."
         await update.message.reply_text(bot_msg)
@@ -1225,14 +1213,13 @@ async def reminder_time_pressed(update: Update, context: ContextTypes.DEFAULT_TY
     # Call function to get current preset for reminder
     job_id = str(update.effective_user.id) + '_' + context.user_data['projecttitle'] + '_' + str(context.user_data['last_position'])
     preset = get_job_preset(job_id, context)
-    # preset = get_job_preset(reminder, update.effective_user.id, PROJECTTITLE, context)
 
     # If reminder not set return menu with reminder settings
     if not preset:
         text = (f"Seems that reminder doesn't set")
 
         # Call function which create keyboard and generate message to send to user. End conversation if that was unsuccessful.
-        keyboard, bot_msg = get_keybord_and_msg(THIRD_LVL, update.effective_user.id, reminder)
+        keyboard, bot_msg = get_keybord_and_msg(THIRD_LVL, str(update.effective_user.id), reminder)
         if keyboard == None or bot_msg == None:
             bot_msg = f"{text}\nSome error happened. Unable to show a menu."
             await query.edit_message_text(bot_msg)
@@ -1266,7 +1253,6 @@ async def reminder_days_pressed(update: Update, context: ContextTypes.DEFAULT_TY
     reminder = context.user_data['last_position']
 
     # Call function to get current preset for reminder
-    # preset = get_job_preset(reminder, update.effective_user.id, PROJECTTITLE, context)
     job_id = str(update.effective_user.id) + '_' + context.user_data['projecttitle'] + '_' + reminder
     preset = get_job_preset(job_id, context)
 
@@ -1275,7 +1261,7 @@ async def reminder_days_pressed(update: Update, context: ContextTypes.DEFAULT_TY
         text = (f"Seems that reminder doesn't set")
 
         # Call function which create keyboard and generate message to send to user. End conversation if that was unsuccessful.
-        keyboard, bot_msg = get_keybord_and_msg(THIRD_LVL, update.effective_user.id, reminder)
+        keyboard, bot_msg = get_keybord_and_msg(THIRD_LVL, str(update.effective_user.id), reminder)
         if keyboard == None or bot_msg == None:
             bot_msg = f"{text}\nSome error happened. Unable to show a menu."
             await query.edit_message_text(bot_msg)
@@ -1316,9 +1302,11 @@ async def reminder_time_setter(update: Update, context: ContextTypes.DEFAULT_TYP
         # Prepare message if not succeded
         bot_msg = "Did not recognize time. Please use 24h format: 15:05"
     else:
+
         # Find a job by id for further rescheduling
         job_id = str(update.effective_user.id) + '_' + context.user_data['projecttitle'] + '_' + reminder
         job = context.job_queue.scheduler.get_job(job_id)
+
         # Get timezone attribute from current job
         tz = job.trigger.timezone
 
@@ -1343,7 +1331,7 @@ async def reminder_time_setter(update: Update, context: ContextTypes.DEFAULT_TYP
     await update.message.reply_text(bot_msg)
 
     # Provide keyboard of level 3 menu 
-    keyboard, bot_msg = get_keybord_and_msg(THIRD_LVL, update.effective_user.id, reminder)
+    keyboard, bot_msg = get_keybord_and_msg(THIRD_LVL, str(update.effective_user.id), reminder)
 
     # And get current (updated) preset
     job_id = str(update.effective_user.id) + '_' + context.user_data['projecttitle'] + '_' + reminder
@@ -1426,7 +1414,7 @@ async def reminder_days_setter(update: Update, context: ContextTypes.DEFAULT_TYP
     await update.message.reply_text(bot_msg)
 
     # Provide keyboard of level 3 menu 
-    keyboard, bot_msg = get_keybord_and_msg(THIRD_LVL, update.effective_user.id, reminder)
+    keyboard, bot_msg = get_keybord_and_msg(THIRD_LVL, str(update.effective_user.id), reminder)
     # And get current preset (updated) of the reminder to show to user
     job_id = str(update.effective_user.id) + '_' + context.user_data['projecttitle'] + '_' + reminder
     preset = get_job_preset(job_id, context)
@@ -1443,43 +1431,7 @@ async def reminder_days_setter(update: Update, context: ContextTypes.DEFAULT_TYP
     return THIRD_LVL  
 
 ### END OF SETTINGS PART #################################
-
-
-# async def buttons(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-#     """ Function to control buttons (for 'fresh start' - early version)"""
-#     bot_msg = "Bot answer"
-#     """Parses the CallbackQuery and updates the message text."""
-#     query = update.callback_query
-#     """ As said in documentation CallbackQueries need to be answered """
-#     await query.answer()
-#     # Should use global variables
-#     global ALLOW_POST_STATUS_TO_GROUP
-#     global INFORM_ACTIONERS_OF_MILESTONES
-#     match query.data:
-#        
-#         # Handling freshstart buttons here
-#         case "1":
-#             bot_msg = "As you wish. Upload new project file"
-#             await query.edit_message_text(bot_msg)
-#         case "2":
-#             bot_msg = "Let's continue with current project"
-#             await query.edit_message_text(bot_msg)
-#         case "3":
-#             bot_msg = "Starting new project will replace your current reminders with new schedule"
-#             await query.edit_message_text(bot_msg)
-#             # Telegram API can't edit markup at this time, so this is workaround: send new message with buttons
-#             freshstart_markup = InlineKeyboardMarkup(freshstart_kbd)
-#             bot_msg = "So what did you decide?"
-#             await context.bot.send_message(
-#                 update.effective_message.chat_id,
-#                 parse_mode=ParseMode.MARKDOWN_V2,
-#                 text=bot_msg,
-#                 reply_markup=freshstart_markup)
-#         # Here we could add new buttons behaviour if we decide to create new menus
-#         case _:
-#             bot_msg = "Unknown answer"
-#             await query.edit_message_text(bot_msg)                        
-
+                  
 
 async def post_init(application: Application):
     """Function to control list of commands in bot itself. Commands itself are global """
@@ -1488,7 +1440,6 @@ async def post_init(application: Application):
                                         start_cmd,
                                         status_cmd,
                                         settings_cmd,
-                                        # freshstart_cmd,
                                         feedback_cmd,
                                         stop_cmd,
                                         upload_cmd
@@ -1513,20 +1464,14 @@ def main() -> None:
 
     # Then, we register each handler and the conditions the update must meet to trigger it
     # Register commands
-    # Start communicating with user from the new begining
-    # application.add_handler(CommandHandler(start_cmd.command, start)) 
+
     # /stop should make bot 'forget' about this user and stop jobs
-    application.add_handler(CommandHandler(stop_cmd.command, stop)) # in case smth went wrong 
-    application.add_handler(CommandHandler(help_cmd.command, help)) # make it show description
+    application.add_handler(CommandHandler(stop_cmd.command, stop))
+    application.add_handler(CommandHandler(help_cmd.command, help)) 
 
     # Command to trigger project status check.
     application.add_handler(CommandHandler(status_cmd.command, status))
-    # Initialize start of the project: project name, db initialization and so on, previous project should be archived
-    # application.add_handler(CommandHandler(freshstart_cmd.command, freshstart))  
-    # Bot should have the ability for user to inform developer of something: bugs, features and so on
-    # application.add_handler(CommandHandler(feedback_cmd.command, feedback))  # see below
-    # It will be useful if schedule changed outside the bot
-    # application.add_handler(CommandHandler("upload", upload))  
+
     # And if changes were made inside the bot, PM could download updated schedule (original format?)
     # dispatcher.add_handler(CommandHandler("download", download))
 
@@ -1534,9 +1479,6 @@ def main() -> None:
     # in this case reminders edit ability should be separated from settings
     # application.add_handler(CommandHandler("remind", add_reminder))
     
-    # Handler to control buttons 
-    # application.add_handler(CallbackQueryHandler(buttons))    
-
     # Echo any message that is text and not a command
     # application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, echo))
 
