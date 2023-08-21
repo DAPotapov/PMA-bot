@@ -25,7 +25,6 @@ def add_user_id_to_db(user: User):
     Helper function to add telegram id of username provided to DB. 
     Returns None if telegram username not found in staff collection, did't updated or something went wrong.
     Returns ObjectId if record updated
-    TODO try to fill other fields as well - use standalone function
     '''
     output = None
     DB = get_db()
@@ -41,7 +40,8 @@ def add_user_id_to_db(user: User):
     else:
 
         # TODO refactor such part in any other places where key error may occur, check in temp.py what is better
-        if record and ('tg_id' in record.keys()) and not record['tg_id']:            
+        if (record and type(record) == dict and 
+            'tg_id' in record.keys() and not record['tg_id']):            
 
             # Remember: for update_one matched_count will not be more than one
             result = DB.staff.update_one({"tg_username": user.username}, {"$set": {"tg_id": str(user.id)}})
@@ -68,7 +68,8 @@ def add_user_info_to_db(user: User):
     else:
 
     # Check if field is empty and fill it with corresponding field from User
-        if db_user and ('tg_id' in db_user.keys() and 'name' in db_user.keys()) :
+        if (db_user and type(db_user) == dict and 
+            'tg_id' in db_user.keys() and 'name' in db_user.keys()) :
             dict2update = {}
             if not db_user['tg_id']:
                 dict2update['tg_id'] = str(user.id)
@@ -116,11 +117,10 @@ def add_worker_info_to_staff(worker: dict):
             worker_id = DB.staff.insert_one(worker).inserted_id
         else:
             db_worker = DB.staff.find_one({"_id": worker_id})
-            if db_worker:
+            if db_worker and type(db_worker) == dict:
                 for key in worker.keys():
                     if not db_worker[key]:
                         db_worker[key] = worker[key]
-                # replacement = tuple(db_worker)
                 result = DB.staff.replace_one({"_id": worker_id}, replacement=db_worker)
                 # TODO consider make it info rather than warning after development finished
                 logger.warning(f"Results of worker {db_worker['tg_username']} update: '{result.matched_count}' found, '{result.modified_count}' modified.")
@@ -140,6 +140,7 @@ def get_assignees(task: dict):
     user_ids = []
     DB = get_db()
 
+    # TODO refactor this all!! No need in manual looking in staff
     try:
         staff = DB.staff.find()
     except Exception as e:
@@ -166,6 +167,9 @@ def get_assignees(task: dict):
 
 
 def get_db():
+    """
+    Establish connection to database and returns database instance
+    """
     load_dotenv()
     BOT_NAME = os.environ.get('BOT_NAME')
     BOT_PASS = os.environ.get('BOT_PASS')
@@ -224,8 +228,7 @@ def get_project_team(project: dict):
     Construct list of project team members.
     Returns None if it is not possible to achieve or something went wrong.
     """
-    team = []
-    
+    team = []    
     DB = get_db()
   
     # Loop through project tasks and gather information about project team
@@ -242,7 +245,7 @@ def get_project_team(project: dict):
                     except Exception as e:
                         logger.error(f"There was error getting DB: {e}")
                     else:
-                        if result:
+                        if result and type(result) == dict:
                             team.append(result)
     
     if not team:
@@ -266,7 +269,8 @@ def get_status_on_project(project: dict, user_oid: ObjectId) -> str:
         logger.error(f"Error happens while accessing DB for PM tg_id={project['pm_tg_id']} in staff collection: {e}")
         bot_msg = f"Error occured while processing your query"
     else:
-        if record and record['tg_username']:
+        if (record and type(record) == dict and 
+            'tg_username' in record.keys() and record['tg_username']):
             project['tg_username'] = record['tg_username']
             bot_msg = bot_msg + f" (PM: @{project['tg_username']}):"
         else:
@@ -274,7 +278,8 @@ def get_status_on_project(project: dict, user_oid: ObjectId) -> str:
 
         # Get user telegram username to add to message
         user = DB.staff.find_one({"_id": user_oid},{"tg_username":1, "_id": 0})
-        if user and user['tg_username']:
+        if (user and type(user) == dict and 
+            'tg_username' in user.keys() and user['tg_username']):
 
             # Find task to inform about: not completed yet, not a milestone, not common task (doesn't consist of subtasks), and this user assigned to it
             msg = ''
@@ -326,10 +331,9 @@ def get_worker_oid_from_db_by_tg_username(tg_username: str):
     except Exception as e:
         logger.error(f"There was error getting DB: {e}")
     else:
-        if result:
-            # print(f"result of searching db for username: {result['_id']}")
+        if (result and type(result) == dict and 
+            '_id' in result.keys() and result['_id']):
             worker_id = result['_id']
-            # print(type(worker_id))
 
     return worker_id
 
@@ -348,10 +352,9 @@ def get_worker_oid_from_db_by_tg_id(tg_id):
     except Exception as e:
         logger.error(f"There was error getting DB: {e}")
     else:
-        if result:
-            # print(f"result of searching db for username: {result['_id']}")
+        if (result and type(result) == dict and 
+            '_id' in result.keys() and result['_id']):
             worker_id = result['_id']
-            # print(type(worker_id))
 
     return worker_id
 
@@ -370,10 +373,9 @@ def get_worker_tg_id_from_db_by_tg_username(tg_username: str):
     except Exception as e:
         logger.error(f"There was error getting DB: {e}")
     else:
-        if result:
-            # print(f"result of searching db for username: {result['_id']}")
+        if (result and type(result) == dict and 
+            'tg_id' in result.keys() and result['tg_id']):
             tg_id = result['tg_id']
-            # print(type(worker_id))
 
     return tg_id
 
