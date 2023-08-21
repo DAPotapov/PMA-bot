@@ -156,8 +156,7 @@ def load_gan(fp):
     # TODO Resolving GanttProject bug of duplication of resource allocation. 
     # Better use standalone function in case they will fix this bug
     
-    # TODO in new schema i don't have to pass staff - it can be obtained from DB anytime
-    return tasks #, staff
+    return tasks 
 
 
 def get_tg_un_from_gan_resources(resource_id, resources, property_id):
@@ -172,7 +171,6 @@ def get_tg_un_from_gan_resources(resource_id, resources, property_id):
     for actioner in resources.resource:
         # pprint(f"Actioner: {actioner}")
         if resource_id == actioner['id']:
-            # tg_username = actioner['tg_username'] # NO such field there
 
             for property in actioner.custom_property:
                 if property['definition-id'] == property_id:
@@ -331,10 +329,7 @@ def load_xml(fp):
     Dictionary on output    
     """
 
-    # List for staff
     tasks = []
-    # staff = []
-
     obj = untangle.parse(str(fp))
 
     #TODO consider adding version check if difficulties ocurr
@@ -475,7 +470,6 @@ def load_xml(fp):
                 'include': [],  # will be calculated later from WBS and OutlineLevel
                 'actioners': actioners
             })
-            # pprint(tasks[i-1])
 
         # Go through collection of tasks and find it is a someone predecessor
         for record in tasks:
@@ -503,8 +497,10 @@ def load_xml(fp):
                 # Also find included tasks
                 # Look at outline level to comprehend level of WBS to look for - more than one
                 if int(task.OutlineLevel.cdata) > 1:
+
                 # Take part of WBS of task before last dot - this is WBS of Parent task
                     parentWBS = task.WBS.cdata[:task.WBS.cdata.rindex('.')]
+                    
                     # Find in gathered tasks list task with such WBS and add UID of task to 'include' sublist
                     if record['WBS'] == parentWBS:
                         record['include'].append(int(task.UID.cdata))
