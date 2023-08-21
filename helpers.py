@@ -40,7 +40,7 @@ def add_user_id_to_db(user: User):
         logger.error(f"There was error getting DB: {e}")
     else:
 
-        # TODO refactor such part in any other places where key error may occur
+        # TODO refactor such part in any other places where key error may occur, check in temp.py what is better
         if record and ('tg_id' in record.keys()) and not record['tg_id']:            
 
             # Remember: for update_one matched_count will not be more than one
@@ -69,22 +69,19 @@ def add_user_info_to_db(user: User):
 
     # Check if field is empty and fill it with corresponding field from User
         if db_user and ('tg_id' in db_user.keys() and 'name' in db_user.keys()) :
-            fields_list = []
+            dict2update = {}
             if not db_user['tg_id']:
-                # db_user['tg_id'] = user.id
-                fields_list.append({'tg_id': user.id})
+                dict2update['tg_id'] = str(user.id)
             if not db_user['name']:
                 if user.first_name:
-                    # db_user['name'] = user.first_name
-                    fields_list.append({'name': user.first_name})
+                    dict2update['name'] = user.first_name
                 elif user.name:
-                    # db_user['name'] = user.name
-                    fields_list.append({'name': user.name})
+                    dict2update['name'] = user.name
 
             # Make update in DB using list of collected list of should be modified fields converted to tuple
-            if fields_list:
-                fields2update = tuple(fields_list)                
-                result = DB.staff.update_one({"tg_username": user.username}, {"$set": {fields2update}})
+            if dict2update:
+                result = DB.staff.update_one({"tg_username": user.username}, {"$set": dict2update})
+                
                 if result.modified_count > 0:    
                     output = db_user['_id']
 
