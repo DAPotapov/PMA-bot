@@ -45,7 +45,8 @@ from urllib.parse import quote_plus
 from ptbcontrib.ptb_jobstores import PTBMongoDBJobStore
 from helpers import (
     add_user_id_to_db,
-    add_worker_to_staff, 
+    add_user_info_to_db,
+    add_worker_info_to_staff, 
     get_assignees,
     get_db, 
     get_job_preset,
@@ -250,7 +251,7 @@ async def echo(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     logger.info(f'{user.id} ({user.username}): {text}')
 
     # TODO I can use it to gather id from chat members and add them to project
-    result = add_user_id_to_db(user)
+    result = add_user_info_to_db(user)
     pprint(result)
     if not result:
         logger.warning(f"User id ({user.id}) of {user.username} was not added to DB (maybe already present).")
@@ -443,7 +444,7 @@ async def naming_project(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
     # if check_db_for_user(context.user_data['PM']['pm_id']):
 
     # Check and add PM to staff
-    pm_oid = add_worker_to_staff(context.user_data['PM'])
+    pm_oid = add_worker_info_to_staff(context.user_data['PM'])
     if not pm_oid:
         bot_msg = "There is a problem with database connection. Contact developer or try later."
         await update.message.reply_text(bot_msg)
@@ -833,9 +834,9 @@ async def upload(update: Update, context: CallbackContext) -> int:
             await update.message.reply_text(bot_msg)
             return ConversationHandler.END
 
-    # If user is not PM at least add his id in DB (if his username is there)
+    # If user is not PM at least add his id in DB (if his telegram username is there)
     else:
-        add_user_id_to_db(update.effective_user)
+        add_user_info_to_db(update.effective_user)
         bot_msg = f"Change in project can be made only after starting one: use /start command to start a project."
         await update.message.reply_text(bot_msg)
         return ConversationHandler.END
@@ -941,8 +942,8 @@ async def settings(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
         return FIRST_LVL
     else:
 
-        # If user is not PM at least add his id in DB (if his username is there)
-        add_user_id_to_db(update.effective_user)
+        # If user is not PM at least add his id in DB (if his telegram username is there)
+        add_user_info_to_db(update.effective_user)
         bot_msg = f"Settings available after starting a project: use /start command for a new one."
         await update.message.reply_text(bot_msg)
         return ConversationHandler.END

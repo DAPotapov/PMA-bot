@@ -51,14 +51,51 @@ def add_user_id_to_db(user: User):
     return output
 
 
-def add_worker_to_staff(worker: dict):
+def add_user_info_to_db(user: User):
+    """
+    Adds missing user info (telegram id and name) to DB
+    Returns None if telegram username not found in staff collection, did't updated or something went wrong.
+    Returns ObjectId if record updated
+    """
+    output = None
+    DB = get_db()
+
+    # Get user from DB
+    try:
+        db_user = DB.staff.find_one({"tg_username": user.username})
+    except Exception as e:
+        logger.error(f"There was error getting DB: {e}")
+    else:
+
+    # Check if field is empty and fill it with corresponding field from User
+        if db_user and ('tg_id' in db_user.keys() and 'name' in db_user.keys()) :
+            fields_list = []
+            if not db_user['tg_id']:
+                # db_user['tg_id'] = user.id
+                fields_list.append({'tg_id': user.id})
+            if not db_user['name']:
+                if user.first_name:
+                    # db_user['name'] = user.first_name
+                    fields_list.append({'name': user.first_name})
+                elif user.name:
+                    # db_user['name'] = user.name
+                    fields_list.append({'name': user.name})
+
+            # Make update in DB using list of collected list of should be modified fields converted to tuple
+            if fields_list:
+                fields2update = tuple(fields_list)                
+                result = DB.staff.update_one({"tg_username": user.username}, {"$set": {fields2update}})
+                if result.modified_count > 0:    
+                    output = db_user['_id']
+
+    return output
+
+
+def add_worker_info_to_staff(worker: dict):
     ''' 
     Calls functions to check whether such worker exist in staff collection. 
     Adds given worker to staff collection if not exist already.
-    # TODO because PM already added to DB before we get to know his contacts from 'resources' 
-    (if he is in there) we should call here a function to update missing fields (and only them! 
-    - so it will be universal function which can be called anywhere)
-    Otherwise if  PM is actioner in other project such record will lack contact information
+    Fill empty fields in case worker already present in staff (for ex. PM is actioner in other project)
     '''
 
     worker_id = None
@@ -77,8 +114,19 @@ def add_worker_to_staff(worker: dict):
         else:
             raise ValueError(f"Not enough information about worker provided: neither tg_id nor tg_username. Provided dict:\n{worker}")
         
+        # If worker not found in staff collection add him, if exist then fill empty fields
         if not worker_id:
             worker_id = DB.staff.insert_one(worker).inserted_id
+        else:
+            db_worker = DB.staff.find_one({"_id": worker_id})
+            if db_worker:
+                for key in worker.keys():
+                    if not db_worker[key]:
+                        db_worker[key] = worker[key]
+                # replacement = tuple(db_worker)
+                result = DB.staff.replace_one({"_id": worker_id}, replacement=db_worker)
+                # TODO consider make it info rather than warning after development finished
+                logger.warning(f"Results of worker {db_worker['tg_username']} update: '{result.matched_count}' found, '{result.modified_count}' modified.")
 
     return worker_id
 
@@ -343,3 +391,5 @@ def save_json(project: dict, PROJECTJSON: str) -> None:
     json_fh.close()
 
     return bot_msg
+
+

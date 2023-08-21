@@ -4,7 +4,7 @@ import re
 import untangle
 import json
 
-from helpers import add_worker_to_staff, get_worker_oid_from_db_by_tg_username
+from helpers import add_worker_info_to_staff, get_worker_oid_from_db_by_tg_username
 from numpy import busday_offset, busday_count, floor, datetime64
 # For testing purposes
 from pprint import pprint
@@ -125,7 +125,7 @@ def load_gan(fp):
 
             # Add record to DB and see result
             try:
-                if not add_worker_to_staff(worker):
+                if not add_worker_info_to_staff(worker):
                     logger.warning("Something went wrong while adding worker to staff collection")
             except ValueError as e:
                 logger.error(f"{e}")
@@ -399,7 +399,7 @@ def load_xml(fp):
 
             # Add record to DB and see result
             try:
-                if not add_worker_to_staff(worker):
+                if not add_worker_info_to_staff(worker):
                     logger.warning("Something went wrong while adding worker to staff collection")
             except ValueError as e:
                 logger.error(f"{e}")
