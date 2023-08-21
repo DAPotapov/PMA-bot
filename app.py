@@ -122,8 +122,12 @@ def get_keybord_and_msg(level: int, user_id: str, info: str = None):
         record = DB.projects.find_one({"pm_tg_id": str(user_id), "active": True}, {"title": 1, "settings": 1, "_id": 0})
     except Exception as e:
         logger.error(f"There was error getting DB: {e}")
-    else:   
-        if record:
+    else:
+
+        # Check returned data to prevent from exceptions
+        if (record and type(record) == dict and 
+            'title' in record.keys() and 'settings' in record.keys() and 
+            record['title'] and record['settings']):
             
             # Configure keyboard and construct message depending of menu level
             match level:
@@ -198,11 +202,14 @@ async def day_before_update(context: ContextTypes.DEFAULT_TYPE) -> None:
     except Exception as e:
         logger.error(f"There was error getting DB: {e}")
     else:
-        if project:            
+
+        # Check type of return if it is dictionary, don't bother to check every expected field
+        if project and type(project) == dict:            
 
             # Add PM username
             record = DB.staff.find_one({"tg_id": str(context.job.data['pm_tg_id'])})
-            if record and record['tg_username']:
+            if (record and type(record) == dict and 
+                'tg_username' in record.keys() and record['tg_username']):
                 project['tg_username'] = record['tg_username']
             else:
                 logger.error(f"PM (with tg_id: {str(context.job.data['pm_tg_id'])}) was not found in db.staff!")
