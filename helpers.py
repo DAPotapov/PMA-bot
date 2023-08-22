@@ -154,7 +154,7 @@ def get_assignees(task: dict):
                 else:
                     people = f"{people}@{team_member['tg_username']} ({team_member['name']})"
 
-    return people, user_ids
+    return people, user_ids # ids will be needed for buttons to ping users
 
 
 def get_db():

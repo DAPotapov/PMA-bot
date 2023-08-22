@@ -485,9 +485,12 @@ async def file_recieved(update: Update, context: ContextTypes.DEFAULT_TYPE) -> i
 
                     # Since new project added successfully and it's active, 
                     # lets make other projects inactive (actually there should be just one, but just in case)
-                    prj_count = DB.projects.count_documents({"pm_tg_id": str(context.user_data['PM']['tg_id']), "title": {"$ne": context.user_data['project']['title']}})
+                    prj_count = DB.projects.count_documents({"pm_tg_id": str(context.user_data['PM']['tg_id']), 
+                                                             "title": {"$ne": context.user_data['project']['title']}})
                     if prj_count > 0:
-                        result = DB.projects.update_many({"pm_tg_id": str(context.user_data['PM']['tg_id']), "title": {"$ne": context.user_data['project']['title']}}, {"$set": {"active": False}})
+                        result = DB.projects.update_many({"pm_tg_id": str(context.user_data['PM']['tg_id']), 
+                                                          "title": {"$ne": context.user_data['project']['title']}}, 
+                                                          {"$set": {"active": False}})
                         
                         # If other project didn't switched to inactive state raise an error, 
                         # because later bot couldn't comprehend which priject to use
@@ -568,10 +571,13 @@ def schedule_jobs(context: ContextTypes.DEFAULT_TYPE):
     morning_update_job, day_before_update_job, file_update_job = None, None, None
 
     # Create jobs in mongdb in apsheduler collection
-    # Configure id for job from PM id, project title and type of reminder
-    
+    # Configure id for job from PM id, project title and type of reminder    
     job_id = str(context.user_data['PM']['tg_id']) + '_' + context.user_data['project']['title'] + '_' + 'morning_update'
-
+    
+    # Construct additinal information to store in job.data to be available when job runs
+    data = {"project_title": context.user_data['project']['title'], 
+            "pm_tg_id": str(context.user_data['PM']['tg_id'])}
+    
     # Check if already present
     preset = get_job_preset(job_id, context)
     print(f"Job '{job_id}' scheduled with preset: '{preset}'")    
@@ -589,10 +595,14 @@ def schedule_jobs(context: ContextTypes.DEFAULT_TYPE):
             
             ''' To persistence to work job must have explicit ID and 'replace_existing' must be True
             or a new copy of the job will be created every time application restarts! '''
-            print(f"When writing to data what type of user id? {type(context.user_data['PM']['tg_id'])}")
-            data = {"project_title": context.user_data['project']['title'], "pm_tg_id": str(context.user_data['PM']['tg_id'])}
+            # print(f"When writing to data what type of user id? {type(context.user_data['PM']['tg_id'])}")
+
             job_kwargs = {'id': job_id, 'replace_existing': True}
-            morning_update_job = context.job_queue.run_daily(morning_update, user_id=str(context.user_data['PM']['tg_id']), time=time2check, data=data, job_kwargs=job_kwargs)
+            morning_update_job = context.job_queue.run_daily(morning_update, 
+                                                             user_id=str(context.user_data['PM']['tg_id']), 
+                                                             time=time2check, 
+                                                             data=data, 
+                                                             job_kwargs=job_kwargs)
             
             # and enable it.
             morning_update_job.enabled = True 
@@ -612,7 +622,11 @@ def schedule_jobs(context: ContextTypes.DEFAULT_TYPE):
         # Add job to queue and enable it
         else:                            
             job_kwargs = {'id': job_id, 'replace_existing': True}
-            day_before_update_job = context.job_queue.run_daily(day_before_update, user_id=str(context.user_data['PM']['tg_id']), time=time2check, data=data, job_kwargs=job_kwargs)
+            day_before_update_job = context.job_queue.run_daily(day_before_update, 
+                                                                user_id=str(context.user_data['PM']['tg_id']), 
+                                                                time=time2check, 
+                                                                data=data, 
+                                                                job_kwargs=job_kwargs)
             day_before_update_job.enabled = True
             # print(f"Next time: {day_before_update_job.next_t}, is it on? {day_before_update_job.enabled}")   
 
@@ -629,7 +643,12 @@ def schedule_jobs(context: ContextTypes.DEFAULT_TYPE):
         # Add job to queue and enable it
         else:
             job_kwargs = {'id': job_id, 'replace_existing': True}
-            file_update_job = context.job_queue.run_daily(file_update, user_id=str(context.user_data['PM']['tg_id']), time=time2check, days=(5,), data=data, job_kwargs=job_kwargs)
+            file_update_job = context.job_queue.run_daily(file_update, 
+                                                          user_id=str(context.user_data['PM']['tg_id']), 
+                                                          time=time2check, 
+                                                          days=(5,), 
+                                                          data=data, 
+                                                          job_kwargs=job_kwargs)
             file_update_job.enabled = True
             # print(f"Next time: {file_update_job.next_t}, is it on? {file_update_job.enabled}") 
 
@@ -914,12 +933,14 @@ async def settings(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     if docs_count > 0:
 
         # Check if command called in chat
-        # Get active project title and store in user_data (because now PROJECTTITLE contain default value not associated with project)
-        result = DB.projects.find_one({"pm_tg_id": str(update.effective_user.id), "active": True}, {"title": 1, "_id": 0})
+        # Get active project title and store in user_data 
+        # (because now PROJECTTITLE contain default value not associated with project)
+        result = DB.projects.find_one({"pm_tg_id": str(update.effective_user.id), "active": True}, 
+                                      {"title": 1, "_id": 0})
         if (result and type(result) == dict and 
             'title' in result.keys() and result['title']):
-            # TODO be more consistent how to store title - one way around all functions
-            context.user_data['projecttitle'] = result['title']
+            context.user_data['project'] = {}
+            context.user_data['project']['title'] = result['title']
         keyboard, bot_msg = get_keybord_and_msg(FIRST_LVL, str(update.message.from_user.id))
         if keyboard == None or bot_msg == None:
             bot_msg = "Some error happened. Unable to show a menu."
@@ -960,7 +981,7 @@ async def allow_status_to_group(update: Update, context: ContextTypes.DEFAULT_TY
     await query.answer()
 
     # Read parameter and switch it
-    result = DB.projects.find_one({"pm_tg_id": str(update.effective_user.id), "title": context.user_data['projecttitle']}, 
+    result = DB.projects.find_one({"pm_tg_id": str(update.effective_user.id), "title": context.user_data['project']['title']}, 
                                   {"settings.ALLOW_POST_STATUS_TO_GROUP": 1, "_id": 0})
     if (result and type(result) == dict and 
         'settings' in result.keys() and result['settings']):
@@ -968,7 +989,7 @@ async def allow_status_to_group(update: Update, context: ContextTypes.DEFAULT_TY
         ALLOW_POST_STATUS_TO_GROUP = False if ALLOW_POST_STATUS_TO_GROUP else True
         
         # No need to check for success, let app proceed
-        DB.projects.update_one({"pm_tg_id": str(update.effective_user.id), "title": context.user_data['projecttitle']}, 
+        DB.projects.update_one({"pm_tg_id": str(update.effective_user.id), "title": context.user_data['project']['title']}, 
                                {"$set": {"settings.ALLOW_POST_STATUS_TO_GROUP": ALLOW_POST_STATUS_TO_GROUP}})
 
     # Call function which create keyboard and generate message to send to user. End conversation if that was unsuccessful.
@@ -991,7 +1012,7 @@ async def milestones_anounce(update: Update, context: ContextTypes.DEFAULT_TYPE)
     await query.answer()
 
     # Read parameter and switch it
-    result = DB.projects.find_one({"pm_tg_id": str(update.effective_user.id), "title": context.user_data['projecttitle']}, 
+    result = DB.projects.find_one({"pm_tg_id": str(update.effective_user.id), "title": context.user_data['project']['title']}, 
                                   {"settings.INFORM_ACTIONERS_OF_MILESTONES": 1, "_id": 0})
     if (result and type(result) == dict and 
         'settings' in result.keys() and result['settings']):
@@ -999,7 +1020,7 @@ async def milestones_anounce(update: Update, context: ContextTypes.DEFAULT_TYPE)
         INFORM_ACTIONERS_OF_MILESTONES = False if INFORM_ACTIONERS_OF_MILESTONES else True
 
         # No need to check for success, let app proceed
-        DB.projects.update_one({"pm_tg_id": str(update.effective_user.id), "title": context.user_data['projecttitle']}, 
+        DB.projects.update_one({"pm_tg_id": str(update.effective_user.id), "title": context.user_data['project']['title']}, 
                                {"$set": {"settings.INFORM_ACTIONERS_OF_MILESTONES": INFORM_ACTIONERS_OF_MILESTONES}})
 
     # Call function which create keyboard and generate message to send to user. End conversation if that was unsuccessful.
@@ -1086,7 +1107,7 @@ async def day_before_update_item(update: Update, context: ContextTypes.DEFAULT_T
     # Call function which get current preset of reminder, to inform user.
     # End conversation if that was unsuccessful. 
     keyboard, bot_msg = get_keybord_and_msg(THIRD_LVL, str(update.effective_user.id), context.user_data['last_position'])
-    job_id = str(update.effective_user.id) + '_' + context.user_data['projecttitle'] + '_' + str(context.user_data['last_position'])
+    job_id = str(update.effective_user.id) + '_' + context.user_data['project']['title'] + '_' + str(context.user_data['last_position'])
     preset = get_job_preset(job_id, context)
     
     # preset = get_job_preset(context.user_data['last_position'], update.effective_user.id, PROJECTTITLE, context)
@@ -1118,7 +1139,7 @@ async def morning_update_item(update: Update, context: ContextTypes.DEFAULT_TYPE
     # Call function which get current preset of reminder, to inform user.
     # End conversation if that was unsuccessful. 
     keyboard, bot_msg = get_keybord_and_msg(THIRD_LVL, str(update.effective_user.id), context.user_data['last_position'])
-    job_id = str(update.effective_user.id) + '_' + context.user_data['projecttitle'] + '_' + str(context.user_data['last_position'])
+    job_id = str(update.effective_user.id) + '_' + context.user_data['project']['title'] + '_' + str(context.user_data['last_position'])
     preset = get_job_preset(job_id, context)
     # preset = get_job_preset(context.user_data['last_position'], update.effective_user.id, PROJECTTITLE, context)
     if keyboard == None or bot_msg == None:
@@ -1148,8 +1169,8 @@ async def file_update_item(update: Update, context: ContextTypes.DEFAULT_TYPE) -
     # Call function which create keyboard and generate message to send to user. 
     # Call function which get current preset of reminder, to inform user.
     # End conversation if that was unsuccessful. 
-    keyboard, bot_msg = get_keybord_and_msg(THIRD_LVL, str(pdate.effective_user.id), context.user_data['last_position'])
-    job_id = str(update.effective_user.id) + '_' + context.user_data['projecttitle'] + '_' + str(context.user_data['last_position'])
+    keyboard, bot_msg = get_keybord_and_msg(THIRD_LVL, str(update.effective_user.id), context.user_data['last_position'])
+    job_id = str(update.effective_user.id) + '_' + context.user_data['project']['title'] + '_' + str(context.user_data['last_position'])
     preset = get_job_preset(job_id, context)
     if keyboard == None or bot_msg == None:
         bot_msg = "Some error happened. Unable to show a menu."
@@ -1176,7 +1197,7 @@ async def reminder_switcher(update: Update, context: ContextTypes.DEFAULT_TYPE) 
     # print(f"Reminder in reminder switcher: {reminder}")
 
     # Find a job by id and pause it if it's enabled or resume if it's paused
-    job_id = str(update.effective_user.id) + '_' + context.user_data['projecttitle'] + '_' + str(context.user_data['last_position'])
+    job_id = str(update.effective_user.id) + '_' + context.user_data['project']['title'] + '_' + str(context.user_data['last_position'])
     job = context.job_queue.scheduler.get_job(job_id)
     if job.next_run_time:
         job = job.pause()
@@ -1211,7 +1232,7 @@ async def reminder_time_pressed(update: Update, context: ContextTypes.DEFAULT_TY
     reminder = context.user_data['last_position']
 
     # Call function to get current preset for reminder
-    job_id = str(update.effective_user.id) + '_' + context.user_data['projecttitle'] + '_' + str(context.user_data['last_position'])
+    job_id = str(update.effective_user.id) + '_' + context.user_data['project']['title'] + '_' + str(context.user_data['last_position'])
     preset = get_job_preset(job_id, context)
 
     # If reminder not set return menu with reminder settings
@@ -1253,7 +1274,7 @@ async def reminder_days_pressed(update: Update, context: ContextTypes.DEFAULT_TY
     reminder = context.user_data['last_position']
 
     # Call function to get current preset for reminder
-    job_id = str(update.effective_user.id) + '_' + context.user_data['projecttitle'] + '_' + reminder
+    job_id = str(update.effective_user.id) + '_' + context.user_data['project']['title'] + '_' + reminder
     preset = get_job_preset(job_id, context)
 
     # If reminder not set return menu with reminder settings
@@ -1304,7 +1325,7 @@ async def reminder_time_setter(update: Update, context: ContextTypes.DEFAULT_TYP
     else:
 
         # Find a job by id for further rescheduling
-        job_id = str(update.effective_user.id) + '_' + context.user_data['projecttitle'] + '_' + reminder
+        job_id = str(update.effective_user.id) + '_' + context.user_data['project']['title'] + '_' + reminder
         job = context.job_queue.scheduler.get_job(job_id)
 
         # Get timezone attribute from current job
@@ -1334,7 +1355,7 @@ async def reminder_time_setter(update: Update, context: ContextTypes.DEFAULT_TYP
     keyboard, bot_msg = get_keybord_and_msg(THIRD_LVL, str(update.effective_user.id), reminder)
 
     # And get current (updated) preset
-    job_id = str(update.effective_user.id) + '_' + context.user_data['projecttitle'] + '_' + reminder
+    job_id = str(update.effective_user.id) + '_' + context.user_data['project']['title'] + '_' + reminder
     preset = get_job_preset(job_id, context)
     if keyboard == None or bot_msg == None:
         bot_msg = "Some error happened. Unable to show a menu."
@@ -1389,7 +1410,7 @@ async def reminder_days_setter(update: Update, context: ContextTypes.DEFAULT_TYP
         if new_days:
 
             # Find job by id to reschedule
-            job_id = str(update.effective_user.id) + '_' + context.user_data['projecttitle'] + '_' + reminder
+            job_id = str(update.effective_user.id) + '_' + context.user_data['project']['title'] + '_' + reminder
             job = context.job_queue.scheduler.get_job(job_id)
             # Get current parameters of job
             tz = job.trigger.timezone
@@ -1416,7 +1437,7 @@ async def reminder_days_setter(update: Update, context: ContextTypes.DEFAULT_TYP
     # Provide keyboard of level 3 menu 
     keyboard, bot_msg = get_keybord_and_msg(THIRD_LVL, str(update.effective_user.id), reminder)
     # And get current preset (updated) of the reminder to show to user
-    job_id = str(update.effective_user.id) + '_' + context.user_data['projecttitle'] + '_' + reminder
+    job_id = str(update.effective_user.id) + '_' + context.user_data['project']['title'] + '_' + reminder
     preset = get_job_preset(job_id, context)
     if keyboard == None or bot_msg == None:
         bot_msg = "Some error happened. Unable to show a menu."
