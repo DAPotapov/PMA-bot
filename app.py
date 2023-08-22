@@ -795,22 +795,80 @@ async def status(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
                         await context.bot.send_message(user_id, bot_msg)
 
 
-async def stop(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+async def stop(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     '''
     Function to stop the bot.
     Should make bot forget about the user, 
     and stop all jobs associated with the user
     '''
+    #TODO Decide what should /stop do: stop all reminders of all user projects? 
+    # Remove all user projects from DB? (keep in mind that project can be easily uploaded again)
+    # Remove from staff? No, because user can be actioner in someone else project
 
-    # Find all jobs for current user associated with current project and remove them
-    job_id_mask = str(update.effective_user.id) + '_' + PROJECTTITLE
+    bot_msg = ''
+
+    # Check if user is PM, if not it is not for him to decide about reminders of project events
+    docs_count = DB.projects.count_documents({"pm_tg_id": str(update.effective_user.id)})
+    if docs_count > 0:
+
+        # DO I really need these?
+        # project = DB.projects.find_one({"pm_tg_id": str(update.effective_user.id), "active": True}, {"title": 1, "_id": 0})
+        # if (project and type(project) == dict and 
+        #     'title' in project.keys() and project['title']):
+        #     context.user_data['project'] = project 
+        # # till this
+
+        bot_msg = (f"Are you sure? This will delete all of your projects from bot." 
+                    "You can disable reminders in /settings if they are bothering you"
+                        " (but this will made bot pointless)")
+        keyboard = [        
+                [InlineKeyboardButton("Yes, delete all, I could start again any moment", callback_data=str(ONE))],
+                [InlineKeyboardButton("No, I want to keep data and bot running", callback_data=str(TWO))],
+        ]
+        reply_markup = InlineKeyboardMarkup(keyboard)
+        await context.bot.send_message(update.effective_user.id, bot_msg, reply_markup=reply_markup)
+        return FIRST_LVL
+    else:
+
+        # If he is an actioner
+        user_oid = get_worker_oid_from_db_by_tg_id(str(update.effective_user.id))
+        projects_count = 0
+        if user_oid:
+            projects_count = DB.projects.count_documents({"tasks.actioners": {"$elemMatch":{"actioner_id": user_oid}}})
+            if projects_count > 0:
+                # TODO add here getting names of projects with their PMs tg_username to contact
+                bot_msg = f"I'm afraid I can't stop informing you of events of other people projects."
+
+        # If he don't participate in any project - be quiet
+        if not user_oid or projects_count == 0:
+            bot_msg = f"Bot stopped"
+        await context.bot.send_message(update.effective_user.id, bot_msg)
+        return ConversationHandler.END
+
+
+async def stopping(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    # Find all jobs for current user and remove them
+    # job_id_mask = str(update.effective_user.id) 
     current_jobs = context.job_queue.scheduler.get_jobs()   
     if not current_jobs:
         pass
     else:
         for job in current_jobs:
-            if job_id_mask in job.id:
+            if str(update.effective_user.id) in job.id:
                 job.remove()
+
+    # Delete all projects for current user. I don't see necessity for checking result of operation for now.
+    result = DB.projects.delete_many({"pm_tg_id": str(update.effective_user.id)})
+
+    bot_msg = "Projects deleted. Reminders too. Bot stopped."
+    await context.bot.send_message(update.effective_user.id, bot_msg)    
+    return ConversationHandler.END
+
+
+async def stop_aborted(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    bot_msg = "Stopping bot aborted."
+    await context.bot.send_message(update.effective_user.id, bot_msg)  
+    return ConversationHandler.END
 
 
 async def upload(update: Update, context: CallbackContext) -> int:
@@ -1487,7 +1545,7 @@ def main() -> None:
     # Register commands
 
     # /stop should make bot 'forget' about this user and stop jobs
-    application.add_handler(CommandHandler(stop_cmd.command, stop))
+    # application.add_handler(CommandHandler(stop_cmd.command, stop))
     application.add_handler(CommandHandler(help_cmd.command, help)) 
 
     # Command to trigger project status check.
@@ -1562,6 +1620,19 @@ def main() -> None:
     )
     application.add_handler(settings_conv)
 
+    # Configure /stop conversation and add a handler
+    stop_conv = ConversationHandler(
+        entry_points=[CommandHandler(stop_cmd.command, stop)],
+        states={
+            FIRST_LVL: [
+                CallbackQueryHandler(stopping, pattern="^" + str(ONE) + "$"),
+                CallbackQueryHandler(stop_aborted, pattern="^" + str(TWO) + "$")
+            ]
+        },
+        fallbacks=[MessageHandler(filters.TEXT & ~filters.COMMAND, stop_aborted)]
+    )
+    application.add_handler(stop_conv)
+
     # Configure /upload conversation and add a handler
     upload_conv = ConversationHandler(
         entry_points=[CommandHandler(upload_cmd.command, upload, ~filters.ChatType.GROUPS)],
@@ -1569,6 +1640,7 @@ def main() -> None:
             FIRST_LVL: [
                 MessageHandler(filters.Document.ALL, upload_file_recieved),
                 CallbackQueryHandler(upload_ended, pattern="^" + str(ONE) + "$")],
+            # TODO v.2: add ability (and dialog to choose file format) for user to download his data (projects as separate files)
         },
         fallbacks=[MessageHandler(filters.TEXT & ~filters.COMMAND, upload_ended)]
     )
