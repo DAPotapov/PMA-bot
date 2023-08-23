@@ -110,7 +110,7 @@ FIRST_LVL, SECOND_LVL, THIRD_LVL, FOURTH_LVL, FIFTH_LVL = range(5)
 ONE, TWO, THREE, FOUR, FIVE = range(5)
 
 
-def get_keybord_and_msg(level: int, user_id: str, info: str = None):
+def get_keybord_and_msg(level: int, user_id: str, branch: str = None):
     '''
     Helper function to provide specific keyboard on different levels of settings menu
     '''
@@ -134,33 +134,77 @@ def get_keybord_and_msg(level: int, user_id: str, info: str = None):
             # Configure keyboard and construct message depending of menu level
             match level:
 
+
+# TODO reconfigure keyboard to new menu structure
                 # First level of menu 
                 case 0:
-                    msg = (f"Current settings for project: '{record['title']}'")
+                    msg = (f"Manage settings for project: '{record['title']}'")
                     keyboard = [        
-                        [InlineKeyboardButton(f"Allow status update in group chat: {'On' if record['settings']['ALLOW_POST_STATUS_TO_GROUP'] == True else 'Off'}", callback_data=str(ONE))],
-                        [InlineKeyboardButton(f"Users get anounces about milestones {'On' if record['settings']['INFORM_ACTIONERS_OF_MILESTONES'] == True else 'Off'}", callback_data=str(TWO))],
+                        [InlineKeyboardButton(f"Change notifications settings", callback_data=str(ONE))],
+                        [InlineKeyboardButton(f"Manage projects", callback_data=str(TWO))],
                         [InlineKeyboardButton("Reminders settings", callback_data=str(THREE))],
-                        [InlineKeyboardButton("Finish settings", callback_data=str(FOUR))],        
+                        [InlineKeyboardButton("Finish settings", callback_data='finish')],        
                     ]
 
                 # Second level of menu
                 case 1:
-                    # TODO: Here I could construct keyboard out of jobs registered for current user
-                    msg = (f"You can customize reminders here.")
-                    keyboard = [        
-                        [InlineKeyboardButton("Reminder on day before", callback_data=str(ONE))],
-                        [InlineKeyboardButton("Everyday morning reminder", callback_data=str(TWO))],
-                        [InlineKeyboardButton("Friday reminder of project files update", callback_data=str(THREE))],
-                        [InlineKeyboardButton("Back", callback_data=str(FOUR))],        
-                        [InlineKeyboardButton("Finish settings", callback_data=str(FIVE))],        
-                    ]
+
+                    match branch:
+
+                        case "notifications":
+                            try:
+                                pm_settings = DB.staff.find_one({"tg_id": str(user_id)}, {"settings":1, "_id":0})
+                            except Exception as e:
+                                logger.error(f"There was error getting DB: {e}")
+                            else:
+                                if (pm_settings and 
+                                    type(pm_settings) == dict and
+                                    'settings' in pm_settings.keys() and
+                                    'INFORM_OF_ALL_PROJECTS' in pm_settings['settings'].keys() and
+                                    pm_settings['settings']['INFORM_OF_ALL_PROJECTS']):
+
+                                    msg = f"Manage notification settings:"
+                                    keyboard = [        
+                                        [InlineKeyboardButton(f"Allow status update in group chat: {'On' if record['settings']['ALLOW_POST_STATUS_TO_GROUP'] == True else 'Off'}", callback_data=str(ONE))],
+                                        [InlineKeyboardButton(f"Users get anounces about milestones {'On' if record['settings']['INFORM_ACTIONERS_OF_MILESTONES'] == True else 'Off'}", callback_data=str(TWO))],
+                                        [InlineKeyboardButton(f"/status command notify PM of all projects (not only active) {'On' if pm_settings['settings']['INFORM_OF_ALL_PROJECTS'] == True else 'Off'}", callback_data=str(THREE))],
+                                        [InlineKeyboardButton("Reminders settings", callback_data=str(THREE))],
+                                        [InlineKeyboardButton("Finish settings", callback_data='finish')],        
+                                    ]
+
+                        case "projects":
+                            # TODO implement
+                            msg = f"You can manage these projects: <to be implemented>"
+                            # TODO Get list of projects for user
+                            # for each project make buttons: active(if not active), rename, delete
+                            project = {} # 
+                            action = 'rename'
+                            callback_data = str(project['_id']) + action
+                            keyboard = [
+                                [InlineKeyboardButton(f"{project['title']}", callback_data=callback_data)], 
+                                [InlineKeyboardButton("Back", callback_data='back')],        
+                                [InlineKeyboardButton("Finish settings", callback_data='finish')],  
+                            ]
+
+                        case "reminders":
+                            # TODO: Here I could construct keyboard out of jobs registered for current user,
+                            # but this will need of passing composite callback_data,
+                            # first part of which will be checked by pattern parameter of CallbackQueryHandler
+                            # and second used inside universal reminder function
+                            msg = (f"You can customize reminders here.")
+                            keyboard = [        
+                                [InlineKeyboardButton("Reminder on day before", callback_data=str(FOUR))],
+                                [InlineKeyboardButton("Everyday morning reminder", callback_data=str(FIVE))],
+                                [InlineKeyboardButton("Friday reminder of project files update", callback_data=str(SIX))],
+                                [InlineKeyboardButton("Back", callback_data='back')],        
+                                [InlineKeyboardButton("Finish settings", callback_data='finish')],        
+                            ]
 
                 # Third menu level
                 case 2:
 
                     # Message contents depend on a branch of menu, return None if nonsense given
-                    match info:
+                    match branch:
                         case 'morning_update':                    
                             msg = (f"Daily morning reminder has to be set here.\n"
                                     )
@@ -178,8 +222,8 @@ def get_keybord_and_msg(level: int, user_id: str, info: str = None):
                         [InlineKeyboardButton("Turn on/off", callback_data=str(ONE))],
                         [InlineKeyboardButton("Set time", callback_data=str(TWO))],
                         [InlineKeyboardButton("Set days of week", callback_data=str(THREE))],
-                        [InlineKeyboardButton("Back", callback_data=str(FOUR))],        
-                        [InlineKeyboardButton("Finish settings", callback_data=str(FIVE))],        
+                        [InlineKeyboardButton("Back", callback_data='back')],        
+                        [InlineKeyboardButton("Finish settings", callback_data='finish')],        
                     ]
                 case _:
                     keyboard = None
@@ -1034,6 +1078,7 @@ async def finish_settings(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
     await query.edit_message_text(text="Settings done. You can do something else now.")
     return ConversationHandler.END
 
+### SECOND LEVEL
 
 async def allow_status_to_group(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     """Switch for menu option 'Allow status update in group chat'"""
@@ -1097,7 +1142,28 @@ async def milestones_anounce(update: Update, context: ContextTypes.DEFAULT_TYPE)
     return FIRST_LVL
 
 
-async def reminders(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+async def notification_settings(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    return SECOND_LVL
+
+async def projects_management(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    return SECOND_LVL
+
+async def notify_of_all_projects(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    return SECOND_LVL
+
+async def project_rename(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    # Should ask for new name
+    return THIRD_LVL
+
+async def project_activate(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    # Should work as switcher and return keyboard with projects
+    return SECOND_LVL
+
+async def project_delete(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    # Should ask for confirmation
+    return THIRD_LVL
+
+async def reminders_settings(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     """Menu option 'Reminders settings'"""
     
     # TODO: using future unified function for reminders, 
@@ -1594,24 +1660,30 @@ def main() -> None:
         entry_points=[CommandHandler(settings_cmd.command, settings, ~filters.ChatType.GROUPS)],
         states={
             FIRST_LVL: [
-                CallbackQueryHandler(allow_status_to_group, pattern="^" + str(ONE) + "$"),
-                CallbackQueryHandler(milestones_anounce, pattern="^" + str(TWO) + "$"),
-                CallbackQueryHandler(reminders, pattern="^" + str(THREE) + "$"),
-                CallbackQueryHandler(finish_settings, pattern="^" + str(FOUR) + "$"),
+                CallbackQueryHandler(notification_settings,pattern="^" + str(ONE) + "$"),
+                CallbackQueryHandler(projects_management, pattern="^" + str(TWO) + "$"),
+                CallbackQueryHandler(reminders_settings, pattern="^" + str(THREE) + "$"),
+                CallbackQueryHandler(finish_settings, pattern="^finish$"),
             ],
             SECOND_LVL: [
-                CallbackQueryHandler(day_before_update_item, pattern="^" + str(ONE) + "$"),
-                CallbackQueryHandler(morning_update_item, pattern="^" + str(TWO) + "$"),
-                CallbackQueryHandler(file_update_item, pattern="^" + str(THREE) + "$"),
-                CallbackQueryHandler(settings_back, pattern="^" + str(FOUR) + "$"),
-                CallbackQueryHandler(finish_settings, pattern="^" + str(FIVE) + "$"),
+                CallbackQueryHandler(allow_status_to_group, pattern="^" + str(ONE) + "$"),
+                CallbackQueryHandler(milestones_anounce, pattern="^" + str(TWO) + "$"),
+                CallbackQueryHandler(notify_of_all_projects, pattern="^" + str(THREE) + "$"),
+                CallbackQueryHandler(day_before_update_item, pattern="^" + str(FOUR) + "$"),
+                CallbackQueryHandler(morning_update_item, pattern="^" + str(FIVE) + "$"),
+                CallbackQueryHandler(file_update_item, pattern="^" + str(SIX) + "$"),
+                CallbackQueryHandler(project_rename, pattern="^rename$"),
+                CallbackQueryHandler(project_activate, pattern="^activate$"),
+                CallbackQueryHandler(project_delete, pattern="^delete$"),
+                CallbackQueryHandler(settings_back, pattern="^back$"),
+                CallbackQueryHandler(finish_settings, pattern="^finish$"),
             ],
             THIRD_LVL: [
                 CallbackQueryHandler(reminder_switcher, pattern="^" + str(ONE) + "$"),
                 CallbackQueryHandler(reminder_time_pressed, pattern="^" + str(TWO) + "$"),
                 CallbackQueryHandler(reminder_days_pressed, pattern="^" + str(THREE) + "$"),
-                CallbackQueryHandler(settings_back, pattern="^" + str(FOUR) + "$"),
-                CallbackQueryHandler(finish_settings, pattern="^" + str(FIVE) + "$"),
+                CallbackQueryHandler(settings_back, pattern="^back$"),
+                CallbackQueryHandler(finish_settings, pattern="^finish$"),
             ],
             FOURTH_LVL:[
                 MessageHandler(filters.TEXT & ~filters.COMMAND, reminder_time_setter),
@@ -1623,6 +1695,36 @@ def main() -> None:
         fallbacks=[CallbackQueryHandler(finish_settings)]
     )
     application.add_handler(settings_conv)
+# Old states:
+# states={
+#             FIRST_LVL: [
+#                 CallbackQueryHandler(allow_status_to_group, pattern="^" + str(ONE) + "$"),
+#                 CallbackQueryHandler(milestones_anounce, pattern="^" + str(TWO) + "$"),
+#                 CallbackQueryHandler(reminders, pattern="^" + str(THREE) + "$"),
+#                 CallbackQueryHandler(finish_settings, pattern="^" + str(FOUR) + "$"),
+#             ],
+#             SECOND_LVL: [
+#                 CallbackQueryHandler(day_before_update_item, pattern="^" + str(ONE) + "$"),
+#                 CallbackQueryHandler(morning_update_item, pattern="^" + str(TWO) + "$"),
+#                 CallbackQueryHandler(file_update_item, pattern="^" + str(THREE) + "$"),
+#                 CallbackQueryHandler(settings_back, pattern="^" + str(FOUR) + "$"),
+#                 CallbackQueryHandler(finish_settings, pattern="^" + str(FIVE) + "$"),
+#             ],
+#             THIRD_LVL: [
+#                 CallbackQueryHandler(reminder_switcher, pattern="^" + str(ONE) + "$"),
+#                 CallbackQueryHandler(reminder_time_pressed, pattern="^" + str(TWO) + "$"),
+#                 CallbackQueryHandler(reminder_days_pressed, pattern="^" + str(THREE) + "$"),
+#                 CallbackQueryHandler(settings_back, pattern="^" + str(FOUR) + "$"),
+#                 CallbackQueryHandler(finish_settings, pattern="^" + str(FIVE) + "$"),
+#             ],
+#             FOURTH_LVL:[
+#                 MessageHandler(filters.TEXT & ~filters.COMMAND, reminder_time_setter),
+#             ],
+#             FIFTH_LVL:[
+#                 MessageHandler(filters.TEXT & ~filters.COMMAND, reminder_days_setter),
+#             ]
+#         },
+
 
     # Configure /stop conversation and add a handler
     stop_conv = ConversationHandler(
