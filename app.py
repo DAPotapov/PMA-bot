@@ -55,6 +55,7 @@ from helpers import (
     get_status_on_project,
     get_worker_oid_from_db_by_tg_id,
     get_worker_oid_from_db_by_tg_username, 
+    get_worker_tg_username_by_tg_id,
     save_json)
 
 # For testing purposes
@@ -208,10 +209,9 @@ async def day_before_update(context: ContextTypes.DEFAULT_TYPE) -> None:
         if project and type(project) == dict:            
 
             # Add PM username
-            record = DB.staff.find_one({"tg_id": str(context.job.data['pm_tg_id'])})
-            if (record and type(record) == dict and 
-                'tg_username' in record.keys() and record['tg_username']):
-                project['tg_username'] = record['tg_username']
+            pm_username = get_worker_tg_username_by_tg_id(str(context.job.data['pm_tg_id']))
+            if pm_username:
+                project['tg_username'] = pm_username
             else:
                 logger.error(f"PM (with tg_id: {str(context.job.data['pm_tg_id'])}) was not found in db.staff!")
             
@@ -303,10 +303,9 @@ async def file_update(context: ContextTypes.DEFAULT_TYPE) -> None:
         if project and type(project) == dict:                
 
             # Add PM username
-            record = DB.staff.find_one({"tg_id": str(context.job.data['pm_tg_id'])})
-            if (record and type(record) == dict and 
-                'tg_username' in record.keys() and record['tg_username']):
-                project['tg_username'] = record['tg_username']
+            pm_username = get_worker_tg_username_by_tg_id(str(context.job.data['pm_tg_id']))
+            if pm_username:
+                project['tg_username'] = pm_username
             else:
                 logger.error(f"PM (with tg_id: {str(context.job.data['pm_tg_id'])}) was not found in db.staff!")
             
@@ -842,7 +841,7 @@ async def stop(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
         if user_oid:
             projects_count = DB.projects.count_documents({"tasks.actioners": {"$elemMatch":{"actioner_id": user_oid}}})
             if projects_count > 0:
-                
+
                 # Collect names of projects with their PMs tg_username to contact
                 projects_with_PMs = get_projects_and_pms_for_user(user_oid)
                 if projects_with_PMs:

@@ -270,64 +270,58 @@ def get_project_team(project: dict):
 
 def get_status_on_project(project: dict, user_oid: ObjectId) -> str:
     """
-    Function compose message contains status update on given project for given tg_id
+    Function compose message contains status update on given project for given ObjectId (actioner)
     """
     DB = get_db()
 
     bot_msg = f"Status of events for project '{project['title']}'"
 
     # Add PM username
-    try:
-        record = DB.staff.find_one({"tg_id": project['pm_tg_id']})
-    except Exception as e:
-        logger.error(f"Error happens while accessing DB for PM tg_id={project['pm_tg_id']} in staff collection: {e}")
-        bot_msg = f"Error occured while processing your query"
+    pm_username = get_worker_tg_username_by_tg_id(project['pm_tg_id'])
+
+    if pm_username:
+        project['tg_username'] = pm_username
+        bot_msg = bot_msg + f" (PM: @{project['tg_username']}):"
     else:
-        if (record and type(record) == dict and 
-            'tg_username' in record.keys() and record['tg_username']):
-            project['tg_username'] = record['tg_username']
-            bot_msg = bot_msg + f" (PM: @{project['tg_username']}):"
+        logger.error(f"PM (with tg_id: {project['pm_tg_id']}) was not found in db.staff!")
+
+    # Get user telegram username to add to message
+    actioner_username = get_worker_tg_username_by_oid(user_oid)
+    if actioner_username:
+
+        # Find task to inform about: not completed yet, not a milestone, not common task (doesn't consist of subtasks), and this user assigned to it
+        msg = ''
+        for task in project['tasks']:
+            if (task['complete'] < 100 and 
+                not task['include'] and 
+                not task['milestone'] and 
+                # User object_id is not iterable so convert it to string previously
+                any(str(user_oid) in str(doer['actioner_id']) for doer in task['actioners'])):
+
+                # If delta_start <0 task not started, otherwise already started
+                delta_start = date.today() - date.fromisoformat(task['startdate'])
+
+                # If delta_end >0 task overdue, if <0 task in progress
+                delta_end = date.today() - date.fromisoformat(task['enddate'])
+
+                if delta_start.days == 0:
+                    msg = msg + f"\nTask {task['id']} '{task['name']}' started today."
+                elif delta_start.days > 0  and delta_end.days < 0:
+                    msg = msg + f"\nTask {task['id']} '{task['name']}' is intermidiate. Due date is {task['enddate']}."
+                elif delta_end.days == 0:
+                    msg = msg + f"\nTask {task['id']}  '{task['name']}' must be completed today!"
+                elif delta_start.days > 0 and delta_end.days > 0:                                       
+                    msg = msg + f"\nTask {task['id']} '{task['name']}' is overdue! (had to be completed on {task['enddate']})"
+                else:
+                    # print(f"Future tasks as {task['id']} '{task['name']}' goes here")   
+                    pass
+        if msg:
+            bot_msg = bot_msg + f"\nTasks assigned to @{actioner_username}:\n" + msg
         else:
-            logger.error(f"PM (with tg_id: {project['pm_tg_id']}) was not found in db.staff!")
-
-        # Get user telegram username to add to message
-        user = DB.staff.find_one({"_id": user_oid},{"tg_username":1, "_id": 0})
-        if (user and type(user) == dict and 
-            'tg_username' in user.keys() and user['tg_username']):
-
-            # Find task to inform about: not completed yet, not a milestone, not common task (doesn't consist of subtasks), and this user assigned to it
-            msg = ''
-            for task in project['tasks']:
-                if (task['complete'] < 100 and 
-                    not task['include'] and 
-                    not task['milestone'] and 
-                    # User object_id is not iterable so convert it to string previously
-                    any(str(user_oid) in str(doer['actioner_id']) for doer in task['actioners'])):
-    
-                    # If delta_start <0 task not started, otherwise already started
-                    delta_start = date.today() - date.fromisoformat(task['startdate'])
-
-                    # If delta_end >0 task overdue, if <0 task in progress
-                    delta_end = date.today() - date.fromisoformat(task['enddate'])
-
-                    if delta_start.days == 0:
-                        msg = msg + f"\nTask {task['id']} '{task['name']}' started today."
-                    elif delta_start.days > 0  and delta_end.days < 0:
-                        msg = msg + f"\nTask {task['id']} '{task['name']}' is intermidiate. Due date is {task['enddate']}."
-                    elif delta_end.days == 0:
-                        msg = msg + f"\nTask {task['id']}  '{task['name']}' must be completed today!"
-                    elif delta_start.days > 0 and delta_end.days > 0:                                       
-                        msg = msg + f"\nTask {task['id']} '{task['name']}' is overdue! (had to be completed on {task['enddate']})"
-                    else:
-                        # print(f"Future tasks as {task['id']} '{task['name']}' goes here")   
-                        pass
-            if msg:
-                bot_msg = bot_msg + f"\nTasks assigned to @{user['tg_username']}:\n" + msg
-            else:
-                bot_msg = bot_msg + f"\nNo events for @{user['tg_username']} to inform for now."
-        else:
-            logger.error(f"Something wrong: user has id: {user_oid} but no tg_username in DB")
-            bot_msg = f"Error occured while processing your query"
+            bot_msg = bot_msg + f"\nNo events for @{actioner_username} to inform for now."
+    else:
+        logger.error(f"Something wrong: user has id: {user_oid} but no tg_username in DB")
+        bot_msg = f"Error occured while processing your query"
     return bot_msg
 
 
@@ -390,8 +384,25 @@ def get_worker_tg_id_from_db_by_tg_username(tg_username: str):
         if (result and type(result) == dict and 
             'tg_id' in result.keys() and result['tg_id']):
             tg_id = result['tg_id']
-
     return tg_id
+
+
+def get_worker_tg_username_by_oid(user_oid: ObjectId) -> str:
+    """Search staff collection in DB for given ObjectId and return telegram username.
+    If something went wrong return empty string (should be checked on calling side)"""
+
+    tg_un = ''
+    DB = get_db()
+  
+    try:
+        result = DB.staff.find_one({'_id': user_oid})
+    except Exception as e:
+        logger.error(f"There was error getting DB: {e}")
+    else:
+        if (result and type(result) == dict and 
+            'tg_username' in result.keys()):
+            tg_un = result['tg_username']
+    return tg_un
 
 
 def get_worker_tg_username_by_tg_id(tg_id: str) -> str:
