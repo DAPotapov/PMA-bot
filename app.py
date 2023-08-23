@@ -543,7 +543,6 @@ def file_to_dict(fp):
     '''
 
     tasks = None
-    # staff = []
 
     # If file is known format: call appropriate function with this file as argument and expect project dictionary on return
     try:
@@ -802,27 +801,16 @@ async def status(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
 
 async def stop(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     '''
-    Function to stop the bot.
-    Should make bot forget about the user, 
-    and stop all jobs associated with the user
+    Entry function to stop the bot. 
+    Checks if bot can be stopped for user.
+    Asks confirmation if it is.
     '''
-    #TODO Decide what should /stop do: stop all reminders of all user projects? 
-    # Remove all user projects from DB? (keep in mind that project can be easily uploaded again)
-    # Remove from staff? No, because user can be actioner in someone else project
 
     bot_msg = ''
 
     # Check if user is PM, if not it is not for him to decide about reminders of project events
     docs_count = DB.projects.count_documents({"pm_tg_id": str(update.effective_user.id)})
     if docs_count > 0:
-
-        # DO I really need these?
-        # project = DB.projects.find_one({"pm_tg_id": str(update.effective_user.id), "active": True}, {"title": 1, "_id": 0})
-        # if (project and type(project) == dict and 
-        #     'title' in project.keys() and project['title']):
-        #     context.user_data['project'] = project 
-        # # till this
-
         bot_msg = (f"Are you sure? This will delete all of your projects from bot." 
                     "You can disable reminders in /settings if they are bothering you"
                         " (but this will made bot pointless)")
@@ -857,10 +845,13 @@ async def stop(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
         return ConversationHandler.END
 
 
-
 async def stopping(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    """ 
+    Second step of stopping bot.
+    Delete all user's projects and jobs
+    """
+
     # Find all jobs for current user and remove them
-    # job_id_mask = str(update.effective_user.id) 
     current_jobs = context.job_queue.scheduler.get_jobs()   
     if not current_jobs:
         pass
@@ -878,6 +869,7 @@ async def stopping(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
 
 
 async def stop_aborted(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    """ Fallback function for bot stopping """
     bot_msg = "Stopping bot aborted."
     await context.bot.send_message(update.effective_user.id, bot_msg)  
     return ConversationHandler.END
