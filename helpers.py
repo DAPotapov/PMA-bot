@@ -214,6 +214,29 @@ def get_job_preset(job_id: str, context: ContextTypes.DEFAULT_TYPE):
     return preset
 
 
+def get_projects_and_pms_for_user(user_oid: ObjectId) -> str:
+    ''' Function to get string of projects (and their PMs) where user participate as actioner '''
+    
+    projects_and_pms = ''
+    DB = get_db()
+    try:
+        projects = list(DB.projects.find({"tasks.actioners": {"$elemMatch":{"actioner_id": user_oid}}}, {"title":1, "pm_tg_id":1, "_id":0}))
+    except Exception as e:
+        logger.error(f"There was error getting DB: {e}")
+    else:
+        if projects:
+            for project in projects:
+                if projects_and_pms:
+                    projects_and_pms += ', '
+                pm_un = get_worker_tg_username_by_tg_id(project['pm_tg_id'])
+                if pm_un:
+                    projects_and_pms = projects_and_pms + f"'{project['title']}' (@{pm_un})"
+                else:
+                    projects_and_pms = projects_and_pms + f"'{project['title']}'"        
+
+    return projects_and_pms
+
+
 def get_project_team(project: dict):
     """
     Construct list of project team members.
@@ -352,7 +375,7 @@ def get_worker_oid_from_db_by_tg_id(tg_id):
 
 def get_worker_tg_id_from_db_by_tg_username(tg_username: str):
     '''
-    Search staff collection in DB for given telegram username and return DB-id.
+    Search staff collection in DB for given telegram username and return telegram-id.
     If something went wrong return None (should be checked on calling side)
     '''
 
@@ -369,6 +392,26 @@ def get_worker_tg_id_from_db_by_tg_username(tg_username: str):
             tg_id = result['tg_id']
 
     return tg_id
+
+
+def get_worker_tg_username_by_tg_id(tg_id: str) -> str:
+    '''
+    Search staff collection in DB for given telegram id and return telegram username.
+    If something went wrong return empty string (should be checked on calling side)
+    '''
+    tg_un = ''
+    DB = get_db()
+  
+    try:
+        result = DB.staff.find_one({'tg_id': tg_id})
+    except Exception as e:
+        logger.error(f"There was error getting DB: {e}")
+    else:
+        if (result and type(result) == dict and 
+            'tg_username' in result.keys()):
+            tg_un = result['tg_username']
+
+    return tg_un
 
 
 def save_json(project: dict, PROJECTJSON: str) -> None:

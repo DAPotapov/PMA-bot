@@ -51,6 +51,7 @@ from helpers import (
     get_db, 
     get_job_preset,
     get_project_team,
+    get_projects_and_pms_for_user,
     get_status_on_project,
     get_worker_oid_from_db_by_tg_id,
     get_worker_oid_from_db_by_tg_username, 
@@ -412,6 +413,11 @@ async def naming_project(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
     ''' Function for recognizing name of the project '''
     
     #TODO: Clean input and add check for malicous input    
+    # cases: 
+    # empty string - clean from whitespaces on start and end of string
+    # escape characters?
+    # cursor control characters
+    # Maybe I should limit to Alphanumeric + spaces + punctuation ? 
     global PROJECTTITLE
     PROJECTTITLE = update.message.text
     project = {
@@ -836,14 +842,21 @@ async def stop(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
         if user_oid:
             projects_count = DB.projects.count_documents({"tasks.actioners": {"$elemMatch":{"actioner_id": user_oid}}})
             if projects_count > 0:
-                # TODO add here getting names of projects with their PMs tg_username to contact
-                bot_msg = f"I'm afraid I can't stop informing you of events of other people projects."
+                
+                # Collect names of projects with their PMs tg_username to contact
+                projects_with_PMs = get_projects_and_pms_for_user(user_oid)
+                if projects_with_PMs:
+                    bot_msg = f"I'm afraid I can't stop informing you of events of other people projects: {projects_with_PMs}"
+                else:
+                    bot_msg = f"I'm afraid I can't stop informing you of events of other people projects."
+                    logger.warning(f"Couldn't gather information about projects and PMs where user {update.effective_user.id} participate")
 
         # If he don't participate in any project - be quiet
         if not user_oid or projects_count == 0:
             bot_msg = f"Bot stopped"
         await context.bot.send_message(update.effective_user.id, bot_msg)
         return ConversationHandler.END
+
 
 
 async def stopping(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
@@ -997,8 +1010,8 @@ async def settings(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
                                       {"title": 1, "_id": 0})
         if (result and type(result) == dict and 
             'title' in result.keys() and result['title']):
-            context.user_data['project'] = {}
-            context.user_data['project']['title'] = result['title']
+            context.user_data['project'] = result
+            # context.user_data['project']['title'] = result['title']
         keyboard, bot_msg = get_keybord_and_msg(FIRST_LVL, str(update.message.from_user.id))
         if keyboard == None or bot_msg == None:
             bot_msg = "Some error happened. Unable to show a menu."
