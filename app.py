@@ -1085,11 +1085,13 @@ async def settings_back(update: Update, context: ContextTypes.DEFAULT_TYPE) -> i
 
     # We can return back only if we are not on 1st level
     if context.user_data['level'] > 0:
-        context.user_data['level'] = context.user_data['level'] - 1  
+        context.user_data['level'] = context.user_data['level'] - 1
+        context.user_data['branch'].pop()
+          
 
     # Make keyboard appropriate to a level we are returning to
     if 'branch' in context.user_data.keys() and context.user_data['branch']:
-        keyboard, bot_msg = get_keybord_and_msg(context.user_data['level'], str(update.effective_user.id), context.user_data['branch'])
+        keyboard, bot_msg = get_keybord_and_msg(context.user_data['level'], str(update.effective_user.id), context.user_data['branch'][-1])
     else:
         keyboard, bot_msg = get_keybord_and_msg(context.user_data['level'], str(update.effective_user.id))
 
@@ -1152,8 +1154,11 @@ async def second_lvl_menu(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
     # Call function which create keyboard and generate message to send to user. End conversation if that was unsuccessful.
     if query.data:
         context.user_data['level'] = SECOND_LVL
-        branch = query.data
-        keyboard, bot_msg = get_keybord_and_msg(context.user_data['level'], str(update.effective_user.id), branch)
+        if not 'branch' in context.user_data:
+            context.user_data['branch'] = []
+        context.user_data['branch'].append(query.data)
+        # branch = query.data
+        keyboard, bot_msg = get_keybord_and_msg(context.user_data['level'], str(update.effective_user.id), context.user_data['branch'][-1])
     else:
         # Stay on same level
         keyboard, bot_msg = get_keybord_and_msg(context.user_data['level'], str(update.effective_user.id))
@@ -1222,7 +1227,7 @@ async def allow_status_to_group(update: Update, context: ContextTypes.DEFAULT_TY
                                {"$set": {"settings.ALLOW_POST_STATUS_TO_GROUP": ALLOW_POST_STATUS_TO_GROUP}})
 
     # Call function which create keyboard and generate message to send to user. End conversation if that was unsuccessful.
-    keyboard, bot_msg = get_keybord_and_msg(SECOND_LVL, str(update.effective_user.id), "notifications")
+    keyboard, bot_msg = get_keybord_and_msg(SECOND_LVL, str(update.effective_user.id), "notifications") # !!!
     if keyboard == None or bot_msg == None:
         bot_msg = "Some error happened. Unable to show a menu."
         await update.message.reply_text(bot_msg)
@@ -1320,9 +1325,9 @@ async def reminders_settings_item(update: Update, context: ContextTypes.DEFAULT_
     preset = ''
     if query.data:
         context.user_data['level'] = THIRD_LVL
-        context.user_data['branch'] = query.data
-        keyboard, bot_msg = get_keybord_and_msg(context.user_data['level'], str(update.effective_user.id), context.user_data['branch'])
-        job_id = str(update.effective_user.id) + '_' + context.user_data['project']['title'] + '_' + str(context.user_data['branch'])
+        context.user_data['branch'].append(query.data)
+        keyboard, bot_msg = get_keybord_and_msg(context.user_data['level'], str(update.effective_user.id), context.user_data['branch'][-1])
+        job_id = str(update.effective_user.id) + '_' + context.user_data['project']['title'] + '_' + str(context.user_data['branch'][-1])
         preset = get_job_preset(job_id, context)
     
     # Stay on same level if not
@@ -1449,7 +1454,7 @@ async def reminder_switcher(update: Update, context: ContextTypes.DEFAULT_TYPE) 
     # print(f"Reminder in reminder switcher: {reminder}")
 
     # Find a job by id and pause it if it's enabled or resume if it's paused
-    job_id = str(update.effective_user.id) + '_' + context.user_data['project']['title'] + '_' + str(context.user_data['branch'])
+    job_id = str(update.effective_user.id) + '_' + context.user_data['project']['title'] + '_' + str(context.user_data['branch'][-1])
     job = context.job_queue.scheduler.get_job(job_id)
     if job.next_run_time:
         job = job.pause()
@@ -1484,7 +1489,7 @@ async def reminder_time_pressed(update: Update, context: ContextTypes.DEFAULT_TY
     # reminder = context.user_data['branch']
 
     # Call function to get current preset for reminder
-    job_id = str(update.effective_user.id) + '_' + context.user_data['project']['title'] + '_' + str(context.user_data['branch'])
+    job_id = str(update.effective_user.id) + '_' + context.user_data['project']['title'] + '_' + str(context.user_data['branch'][-1])
     preset = get_job_preset(job_id, context)
 
     # If reminder not set return menu with reminder settings
@@ -1492,7 +1497,7 @@ async def reminder_time_pressed(update: Update, context: ContextTypes.DEFAULT_TY
         text = (f"Seems that reminder doesn't set")
 
         # Call function which create keyboard and generate message to send to user. End conversation if that was unsuccessful.
-        keyboard, bot_msg = get_keybord_and_msg(THIRD_LVL, str(update.effective_user.id), context.user_data['branch'])
+        keyboard, bot_msg = get_keybord_and_msg(THIRD_LVL, str(update.effective_user.id), context.user_data['branch'][-1])
         if keyboard == None or bot_msg == None:
             bot_msg = f"{text}\nSome error happened. Unable to show a menu."
             await query.edit_message_text(bot_msg)
@@ -1523,10 +1528,10 @@ async def reminder_days_pressed(update: Update, context: ContextTypes.DEFAULT_TY
     await query.answer()
 
     # Recall reminder we are working with
-    reminder = context.user_data['branch']
+    # reminder = context.user_data['branch'][-1]
 
     # Call function to get current preset for reminder
-    job_id = str(update.effective_user.id) + '_' + context.user_data['project']['title'] + '_' + reminder
+    job_id = str(update.effective_user.id) + '_' + context.user_data['project']['title'] + '_' + context.user_data['branch'][-1]
     preset = get_job_preset(job_id, context)
 
     # If reminder not set return menu with reminder settings
@@ -1534,7 +1539,7 @@ async def reminder_days_pressed(update: Update, context: ContextTypes.DEFAULT_TY
         text = (f"Seems that reminder doesn't set")
 
         # Call function which create keyboard and generate message to send to user. End conversation if that was unsuccessful.
-        keyboard, bot_msg = get_keybord_and_msg(THIRD_LVL, str(update.effective_user.id), reminder)
+        keyboard, bot_msg = get_keybord_and_msg(THIRD_LVL, str(update.effective_user.id), context.user_data['branch'][-1])
         if keyboard == None or bot_msg == None:
             bot_msg = f"{text}\nSome error happened. Unable to show a menu."
             await query.edit_message_text(bot_msg)
@@ -1563,7 +1568,7 @@ async def reminder_days_pressed(update: Update, context: ContextTypes.DEFAULT_TY
 async def reminder_time_setter(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     """ Handles new time provided by user"""
 
-    reminder = context.user_data['branch']
+    # reminder = context.user_data['branch']
     # print(f"User answer got, query.data = {query.data}")
     bot_msg = (f"Unable to reschedule the reminder")
 
@@ -1577,7 +1582,7 @@ async def reminder_time_setter(update: Update, context: ContextTypes.DEFAULT_TYP
     else:
 
         # Find a job by id for further rescheduling
-        job_id = str(update.effective_user.id) + '_' + context.user_data['project']['title'] + '_' + reminder
+        job_id = str(update.effective_user.id) + '_' + context.user_data['project']['title'] + '_' + context.user_data['branch'][-1]
         job = context.job_queue.scheduler.get_job(job_id)
 
         # Get timezone attribute from current job
@@ -1600,14 +1605,14 @@ async def reminder_time_setter(update: Update, context: ContextTypes.DEFAULT_TYP
                     f"{job.next_run_time}"
                     )       
 
-    # Inform the user how reschedule went
+    # Inform the user how reschedule went #TODO test this!
     await update.message.reply_text(bot_msg)
 
     # Provide keyboard of level 3 menu 
-    keyboard, bot_msg = get_keybord_and_msg(THIRD_LVL, str(update.effective_user.id), reminder)
+    keyboard, bot_msg = get_keybord_and_msg(THIRD_LVL, str(update.effective_user.id), context.user_data['branch'][-1])
 
     # And get current (updated) preset
-    job_id = str(update.effective_user.id) + '_' + context.user_data['project']['title'] + '_' + reminder
+    job_id = str(update.effective_user.id) + '_' + context.user_data['project']['title'] + '_' + context.user_data['branch'][-1]
     preset = get_job_preset(job_id, context)
     if keyboard == None or bot_msg == None:
         bot_msg = "Some error happened. Unable to show a menu."
@@ -1625,20 +1630,21 @@ async def reminder_time_setter(update: Update, context: ContextTypes.DEFAULT_TYP
 async def reminder_days_setter(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     """Handles new days of week provided by user for reminder"""
 
-    reminder = context.user_data['branch']
+    # reminder = context.user_data['branch']
     bot_msg = (f"Unable to reschedule the reminder")
     new_days = []
+
+    # TODO: better use variables for names of days for later translation
     # days_of_week = ['mon','tue','wed','thu','fri','sat','sun']
 
     # Store user input to list, clean from whitespaces, convert to lower case
     if update.message.text:
         user_input = update.message.text.split(',')
-        # TODO: better use variables for names of days for later translation
         for day in user_input:
             day = day.strip().lower()
             if day == 'monday' or day == 'mon' or day == 'понедельник' or day == 'пн':
 
-                # Do not add dubles
+                # Do not add doubles
                 if not 'mon' in new_days:
                     new_days.append('mon')
             if day == 'tuesday' or day == 'tue' or day == 'вторник' or day == 'вт':
@@ -1662,7 +1668,7 @@ async def reminder_days_setter(update: Update, context: ContextTypes.DEFAULT_TYP
         if new_days:
 
             # Find job by id to reschedule
-            job_id = str(update.effective_user.id) + '_' + context.user_data['project']['title'] + '_' + reminder
+            job_id = str(update.effective_user.id) + '_' + context.user_data['project']['title'] + '_' + context.user_data['branch'][-1]
             job = context.job_queue.scheduler.get_job(job_id)
             # Get current parameters of job
             tz = job.trigger.timezone
@@ -1687,9 +1693,9 @@ async def reminder_days_setter(update: Update, context: ContextTypes.DEFAULT_TYP
     await update.message.reply_text(bot_msg)
 
     # Provide keyboard of level 3 menu 
-    keyboard, bot_msg = get_keybord_and_msg(THIRD_LVL, str(update.effective_user.id), reminder)
+    keyboard, bot_msg = get_keybord_and_msg(THIRD_LVL, str(update.effective_user.id), context.user_data['branch'][-1])
     # And get current preset (updated) of the reminder to show to user
-    job_id = str(update.effective_user.id) + '_' + context.user_data['project']['title'] + '_' + reminder
+    job_id = str(update.effective_user.id) + '_' + context.user_data['project']['title'] + '_' + context.user_data['branch'][-1]
     preset = get_job_preset(job_id, context)
     if keyboard == None or bot_msg == None:
         bot_msg = "Some error happened. Unable to show a menu."
