@@ -182,12 +182,12 @@ def get_db():
     return DB
 
 
-def get_job_preset(job_id: str, context: ContextTypes.DEFAULT_TYPE):
+def get_job_preset(job_id: str, context: ContextTypes.DEFAULT_TYPE) -> str:
     '''
     Helper function that returns current reminder preset for given job id
-    Return None if nothing is found or error occured
+    Return empty string if nothing is found or error occured
     '''  
-    preset = None
+    preset = ''
 
     job = context.job_queue.scheduler.get_job(job_id)
     # print(f"Got the job: {job}")
@@ -195,7 +195,7 @@ def get_job_preset(job_id: str, context: ContextTypes.DEFAULT_TYPE):
         hour = job.trigger.fields[job.trigger.FIELD_NAMES.index('hour')]
         minute = f"{job.trigger.fields[job.trigger.FIELD_NAMES.index('minute')]}"
     except:
-        preset = None        
+        preset = ''        
     else:
         if int(minute) < 10:
             time_preset = f"{hour}:0{minute}"
