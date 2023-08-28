@@ -181,17 +181,23 @@ def get_keybord_and_msg(level: int, user_id: str, branch: str = None) -> Tuple[l
 
                         case "projects":
                             # TODO implement
-                            msg = f"You can manage these projects: <to be implemented>"
+                            msg = f"You can manage these projects: "
                             # TODO Get list of projects for user
+                            projects = list(DB.projects.find({"pm_tg_id": str(user_id)}))
                             # for each project make buttons: active(if not active), rename, delete
-                            project = {} # 
-                            action = 'rename'
-                            callback_data = str(project['_id']) + action
-                            keyboard = [
-                                [InlineKeyboardButton(f"{project['title']}", callback_data=callback_data)], 
-                                [InlineKeyboardButton("Back", callback_data='back')],        
-                                [InlineKeyboardButton("Finish settings", callback_data='finish')],  
-                            ]
+                            keyboard = []
+                            for project in projects:
+                                row = [
+                                    InlineKeyboardButton(f"'{project['title']}': rename", callback_data=f"rename_{project['title']}"),
+                                    InlineKeyboardButton(f"Delete", callback_data=f"delete_{project['title']}"),
+                                ]
+                                if project['active'] == False:    
+                                    row.append(InlineKeyboardButton(f"Activate", callback_data=f"activate_{project['title']}"))
+                                keyboard.append(row)
+                            keyboard.extend([
+                                    [InlineKeyboardButton("Back", callback_data='back')],        
+                                    [InlineKeyboardButton("Finish settings", callback_data='finish')]
+                            ]) 
 
                         case "reminders":
                             # TODO: Here I could construct keyboard out of jobs registered for current user,
@@ -1190,10 +1196,6 @@ async def second_lvl_menu(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
         return SECOND_LVL    
 
 
-async def projects_management(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
-    return SECOND_LVL
-
-
 # async def reminders_settings(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
 #     """Menu option 'Reminders settings'"""
     
@@ -1353,17 +1355,32 @@ async def transfer_control(update: Update, context: ContextTypes.DEFAULT_TYPE) -
     
     
 # THIRD LEVEL
-
-async def project_rename(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
-    # Should ask for new name
-    return THIRD_LVL
-
 async def project_activate(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     # Should work as switcher and return keyboard with projects
+    query = update.callback_query
+    await query.answer()
+
+    bot_msg = f"You got to activate project function"
+    await query.edit_message_text(bot_msg)
+
     return SECOND_LVL
+
 
 async def project_delete(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     # Should ask for confirmation
+    query = update.callback_query
+    await query.answer()
+    bot_msg = f"You got to delete project function"
+    await query.edit_message_text(bot_msg)
+    return THIRD_LVL
+
+
+async def project_rename(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    # Should ask for new name
+    query = update.callback_query
+    await query.answer()
+    bot_msg = f"You got to rename project function"
+    await query.edit_message_text(bot_msg)
     return THIRD_LVL
 
 
@@ -1861,9 +1878,9 @@ def main() -> None:
                 # According to docs (https://core.telegram.org/bots/api#user) id should be less than 52 bits: 
                 CallbackQueryHandler(transfer_control, pattern="^\d{6,15}$"),
 
-                CallbackQueryHandler(project_rename, pattern="^rename$"),
-                CallbackQueryHandler(project_activate, pattern="^activate$"),
-                CallbackQueryHandler(project_delete, pattern="^delete$"),
+                CallbackQueryHandler(project_activate, pattern="^activate"),
+                CallbackQueryHandler(project_delete, pattern="^delete"),
+                CallbackQueryHandler(project_rename, pattern="^rename"),
                 CallbackQueryHandler(settings_back, pattern="^back$"),
                 CallbackQueryHandler(finish_settings, pattern="^finish$"),
             ],
