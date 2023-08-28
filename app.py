@@ -126,7 +126,7 @@ def get_keybord_and_msg(level: int, user_id: str, branch: str = None) -> Tuple[l
 
     # Retrieve from DB information about active project and it's settings
     try:
-        project = DB.projects.find_one({"pm_tg_id": str(user_id), "active": True}, {"title": 1, "settings": 1, "_id": 0})
+        project = DB.projects.find_one({"pm_tg_id": str(user_id), "active": True})
     except Exception as e:
         logger.error(f"There was error getting DB: {e}")
     else:
@@ -150,7 +150,7 @@ def get_keybord_and_msg(level: int, user_id: str, branch: str = None) -> Tuple[l
                         [InlineKeyboardButton(f"Change notifications settings", callback_data="notifications")],
                         [InlineKeyboardButton(f"Manage projects", callback_data="projects")],
                         [InlineKeyboardButton(f"Reminders settings", callback_data="reminders")],
-                        [InlineKeyboardButton(f"Transfer control over active project to other user", callback_data=str(FOUR))],
+                        [InlineKeyboardButton(f"Transfer control over active project to other user", callback_data="control")],
                         [InlineKeyboardButton(f"Finish settings", callback_data='finish')],        
                     ]
 
@@ -206,6 +206,24 @@ def get_keybord_and_msg(level: int, user_id: str, branch: str = None) -> Tuple[l
                                 [InlineKeyboardButton("Back", callback_data='back')],        
                                 [InlineKeyboardButton("Finish settings", callback_data='finish')],        
                             ]
+
+                        case "control":
+                            msg = (f"Choose a project team member to transfer control to.")
+
+                            # Get team members names with telegram ids, except PM
+                            # Construct keyboard from that list
+                            # TODO TEST WHat if it's a sole project? Only PM is working?
+                            team = get_project_team(project)
+                            if team:
+                                keyboard = []
+                                for member in team:
+                                    if user_id != member['tg_id']:
+                                        keyboard.append([InlineKeyboardButton(f"{member['name']} (@{member['tg_username']})", callback_data=member['tg_id'])])       
+                                keyboard.extend([
+                                    [InlineKeyboardButton("Back", callback_data='back')],        
+                                    [InlineKeyboardButton("Finish settings", callback_data='finish')]
+                                ])      
+                                
 
                 # Third menu level
                 case 2:
@@ -1049,7 +1067,7 @@ async def settings(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
         # Get active project title and store in user_data 
         # (because now PROJECTTITLE contain default value not associated with project)
         project = DB.projects.find_one({"pm_tg_id": str(update.effective_user.id), "active": True}, 
-                                      {"title": 1, "_id": 0})
+                                      {"title": 1, "pm_tg_id":1, "_id": 0})
         if (project and type(project) == dict and 
             'title' in project.keys() and project['title']):
             context.user_data['project'] = project
@@ -1086,15 +1104,13 @@ async def settings_back(update: Update, context: ContextTypes.DEFAULT_TYPE) -> i
     # We can return back only if we are not on 1st level
     if context.user_data['level'] > 0:
         context.user_data['level'] = context.user_data['level'] - 1
-        context.user_data['branch'].pop()
-          
+        context.user_data['branch'].pop()          
 
     # Make keyboard appropriate to a level we are returning to
     if 'branch' in context.user_data.keys() and context.user_data['branch']:
         keyboard, bot_msg = get_keybord_and_msg(context.user_data['level'], str(update.effective_user.id), context.user_data['branch'][-1])
     else:
         keyboard, bot_msg = get_keybord_and_msg(context.user_data['level'], str(update.effective_user.id))
-
 
     # Call function which create keyboard and generate message to send to user. End conversation if that was unsuccessful.
     if keyboard == None or bot_msg == None:
@@ -1201,10 +1217,6 @@ async def projects_management(update: Update, context: ContextTypes.DEFAULT_TYPE
 #         return SECOND_LVL
 
 
-async def transfer_control(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
-    return SECOND_LVL
-
-
 ### SECOND LEVEL
 
 async def allow_status_to_group(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
@@ -1299,6 +1311,47 @@ async def notify_of_all_projects(update: Update, context: ContextTypes.DEFAULT_T
         await query.edit_message_text(bot_msg, reply_markup=reply_markup)
         return SECOND_LVL
     
+
+async def transfer_control(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    """ Change ownership of current project to given telegram user (id)"""
+    
+    query = update.callback_query
+    await query.answer()
+
+    # Write to DB new owner of project, 
+    # Send message to user and
+    # End conversation because only PM should change settings but current user isn't a PM already 
+    if query.data:
+        result = DB.projects.update_one({
+            "pm_tg_id": str(update.effective_user.id), 
+            "title": context.user_data['project']['title']},
+            {"$set":{"pm_tg_id": query.data}})
+        if result.matched_count > 0 and result.modified_count > 0:
+            bot_msg = f"You successfuly tranfered control over project to other"
+        else:
+            bot_msg = f"Something went wrong while transfering control to choosen project team member. Contact developer to check the logs."
+            logger.error(f"Couldn't change PM in project '{context.user_data['project']['title']}' " 
+                         f"from '{context.user_data['project']['pm_tg_id']}' "
+                         f"to '{query.data}'"
+                         )
+        await query.edit_message_text(bot_msg)
+        return ConversationHandler.END
+    else:
+
+        # If callback data absent somehow - return to same level
+        keyboard, bot_msg = get_keybord_and_msg(context.user_data['level'], str(update.effective_user.id), context.user_data['branch'][-1])
+        
+        # Check if we have message and keyboard and show them to user
+        if keyboard == None or bot_msg == None:
+            bot_msg = "Some error happened. Unable to show a menu."
+            await query.edit_message_text(bot_msg)
+            return ConversationHandler.END
+        else:
+            reply_markup = InlineKeyboardMarkup(keyboard)
+            await query.edit_message_text(bot_msg, reply_markup=reply_markup)
+            return SECOND_LVL      
+    
+    
 # THIRD LEVEL
 
 async def project_rename(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
@@ -1312,7 +1365,6 @@ async def project_activate(update: Update, context: ContextTypes.DEFAULT_TYPE) -
 async def project_delete(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     # Should ask for confirmation
     return THIRD_LVL
-
 
 
 async def reminders_settings_item(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
@@ -1806,6 +1858,9 @@ def main() -> None:
                 # CallbackQueryHandler(day_before_update_item, pattern="^" + str(FOUR) + "$"),
                 # CallbackQueryHandler(morning_update_item, pattern="^" + str(FIVE) + "$"),
                 # CallbackQueryHandler(file_update_item, pattern="^" + str(SIX) + "$"),
+                # According to docs (https://core.telegram.org/bots/api#user) id should be less than 52 bits: 
+                CallbackQueryHandler(transfer_control, pattern="^\d{6,15}$"),
+
                 CallbackQueryHandler(project_rename, pattern="^rename$"),
                 CallbackQueryHandler(project_activate, pattern="^activate$"),
                 CallbackQueryHandler(project_delete, pattern="^delete$"),

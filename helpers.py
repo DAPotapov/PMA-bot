@@ -237,7 +237,7 @@ def get_projects_and_pms_for_user(user_oid: ObjectId) -> str:
     return projects_and_pms
 
 
-def get_project_team(project: dict):
+def get_project_team(project: dict) -> list:
     """
     Construct list of project team members.
     Returns None if it is not possible to achieve or something went wrong.
