@@ -142,7 +142,7 @@ def get_keybord_and_msg(level: int, user_id: str, branch: str = None) -> Tuple[l
 # TODO reconfigure keyboard to new menu structure
                 # First level of menu 
                 case 0:
-                    msg = (f"Manage settings for project: '{project['title']}'")
+                    msg = (f"Manage settings. Active project: '{project['title']}'")
                     keyboard = [        
                         # [InlineKeyboardButton(f"Change notifications settings", callback_data=str(ONE))],
                         # [InlineKeyboardButton(f"Manage projects", callback_data=str(TWO))],
@@ -179,20 +179,21 @@ def get_keybord_and_msg(level: int, user_id: str, branch: str = None) -> Tuple[l
                                         [InlineKeyboardButton("Finish settings", callback_data='finish')],        
                                     ]
 
-                        case "projects":
-                            # TODO implement
+                        case "projects":                            
                             msg = f"You can manage these projects: "
-                            # TODO Get list of projects for user
+                            
+                            # Get list of projects for user
                             projects = list(DB.projects.find({"pm_tg_id": str(user_id)}))
-                            # for each project make buttons: active(if not active), rename, delete
+                            
+                            # For each project make buttons: active(if not active), rename, delete
                             keyboard = []
-                            for project in projects:
+                            for project in projects:                                    
+                                keyboard.append([InlineKeyboardButton(f"Rename: '{project['title']}'", callback_data=f"rename_{project['title']}")])
                                 row = [
-                                    InlineKeyboardButton(f"'{project['title']}': rename", callback_data=f"rename_{project['title']}"),
-                                    InlineKeyboardButton(f"Delete", callback_data=f"delete_{project['title']}"),
+                                    InlineKeyboardButton(f"Delete '{project['title']}'", callback_data=f"delete_{project['title']}"),
                                 ]
                                 if project['active'] == False:    
-                                    row.append(InlineKeyboardButton(f"Activate", callback_data=f"activate_{project['title']}"))
+                                    row.insert(0, InlineKeyboardButton(f"Activate '{project['title']}'", callback_data=f"activate_{project['title']}"))
                                 keyboard.append(row)
                             keyboard.extend([
                                     [InlineKeyboardButton("Back", callback_data='back')],        
