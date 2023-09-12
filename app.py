@@ -1171,8 +1171,8 @@ async def second_lvl_menu(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
 
     query = update.callback_query
     await query.answer()
-    print(f"Type of query: {type(query)}. Query itself: {query}")
-    print(f"What data is here? {query.data}")
+    # print(f"Type of query: {type(query)}. Query itself: {query}")
+    # print(f"What data is here? {query.data}")
 
     # Call function which create keyboard and generate message to send to user. End conversation if that was unsuccessful.
     if query.data:
@@ -1360,11 +1360,42 @@ async def project_activate(update: Update, context: ContextTypes.DEFAULT_TYPE) -
     # Should work as switcher and return keyboard with projects
     query = update.callback_query
     await query.answer()
+    msg = ''
+    
+    # Таке name of the project from query
+    if query.data:
+        new_active = query.data.split("_", 1)[1]
 
-    bot_msg = f"You got to activate project function"
-    await query.edit_message_text(bot_msg)
+    # Make current project inactive
+        make_inactive = DB.projects.update_one({"title": context.user_data['project']['title']}, {"$set": {'active': False}})
+        if make_inactive.modified_count > 0:
 
-    return SECOND_LVL
+    # Make project with remembered name active
+            make_active = DB.projects.update_one({"title": new_active}, {"$set": {"active": True}})
+            if make_active.modified_count > 0:
+                context.user_data['project']['title'] = new_active
+                msg = f"Project '{new_active}' is active project now."
+            else:
+                logger.error(f"Couldn't set project '{new_active}' active")
+        else:
+            logger.error(f"Couldn't set project '{context.user_data['project']['title']}' inactive")
+    else:
+        logger.error(f"Query data is empty when get to activate project function")
+
+    # Return to same level
+    keyboard, bot_msg = get_keybord_and_msg(context.user_data['level'], str(update.effective_user.id), context.user_data['branch'][-1])
+    
+    # Check if we have message and keyboard and show them to user
+    if keyboard == None or bot_msg == None:
+        bot_msg = "Some error happened. Unable to show a menu."
+        await query.edit_message_text(bot_msg)
+        return ConversationHandler.END
+    else:
+        reply_markup = InlineKeyboardMarkup(keyboard)
+        if msg:
+            bot_msg = msg + '\n' + bot_msg
+        await query.edit_message_text(bot_msg, reply_markup=reply_markup)
+        return SECOND_LVL      
 
 
 async def project_delete(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
@@ -1380,6 +1411,7 @@ async def project_rename(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
     # Should ask for new name
     query = update.callback_query
     await query.answer()
+    # TODO 
     bot_msg = f"You got to rename project function"
     await query.edit_message_text(bot_msg)
     return THIRD_LVL
