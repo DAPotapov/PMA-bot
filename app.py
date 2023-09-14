@@ -180,7 +180,7 @@ def get_keybord_and_msg(level: int, user_id: str, branch: str = None) -> Tuple[l
                                     ]
 
                         case "projects":                            
-                            msg = f"You can manage these projects: "
+                            msg = f"You can manage these projects (active project could only be renamed): "
                             
                             # Get list of projects for user
                             projects = list(DB.projects.find({"pm_tg_id": str(user_id)}))
@@ -189,12 +189,13 @@ def get_keybord_and_msg(level: int, user_id: str, branch: str = None) -> Tuple[l
                             keyboard = []
                             for project in projects:                                    
                                 keyboard.append([InlineKeyboardButton(f"Rename: '{project['title']}'", callback_data=f"rename_{project['title']}")])
-                                row = [
+                                
+                                if project['active'] == False: 
+                                    row = [
+                                    InlineKeyboardButton(f"Activate '{project['title']}'", callback_data=f"activate_{project['title']}"),
                                     InlineKeyboardButton(f"Delete '{project['title']}'", callback_data=f"delete_{project['title']}"),
-                                ]
-                                if project['active'] == False:    
-                                    row.insert(0, InlineKeyboardButton(f"Activate '{project['title']}'", callback_data=f"activate_{project['title']}"))
-                                keyboard.append(row)
+                                    ]   
+                                    keyboard.append(row)
                             keyboard.extend([
                                     [InlineKeyboardButton("Back", callback_data='back')],        
                                     [InlineKeyboardButton("Finish settings", callback_data='finish')]
@@ -234,31 +235,39 @@ def get_keybord_and_msg(level: int, user_id: str, branch: str = None) -> Tuple[l
 
                 # Third menu level
                 case 2:
-
-                    # Message contents depend on a branch of menu, return None if nonsense given
-                    match branch:
-                        case 'morning_update':                    
-                            msg = (f"Daily morning reminder has to be set here.\n"
-                                    )
-                        case 'day_before_update':
-                            msg = (f"The day before reminder has to be set here. \n"
-                                    )
-                        case 'file_update':
-                            msg = (f"Reminder for file updates on friday has to be set here. \n"
-                                    )
-                        case _:
-                            msg = '' # Why?? 
-
-                    # Keyboard is the same for different branches (reminders)
-                    keyboard = [        
+                    reminders_kbd = [        
                         [InlineKeyboardButton("Turn on/off", callback_data=str(ONE))],
                         [InlineKeyboardButton("Set time", callback_data=str(TWO))],
                         [InlineKeyboardButton("Set days of week", callback_data=str(THREE))],
                         [InlineKeyboardButton("Back", callback_data='back')],        
                         [InlineKeyboardButton("Finish settings", callback_data='finish')],        
                     ]
-                case _:
-                    keyboard = [] # Why bother???
+                    project_delete_kbd = [
+                        [InlineKeyboardButton("Yes", callback_data='yes')],
+                        [InlineKeyboardButton("No", callback_data='back')],
+                    ]
+                    # Message contents depend on a branch of menu, return None if nonsense given
+                    match branch:
+                        case 'morning_update':                    
+                            msg = (f"Daily morning reminder has to be set here.\n"
+                                    )
+                            keyboard = reminders_kbd
+                        case 'day_before_update':
+                            msg = (f"The day before reminder has to be set here. \n"
+                                    )
+                            keyboard = reminders_kbd
+                        case 'file_update':
+                            msg = (f"Reminder for file updates on friday has to be set here. \n"
+                                    )
+                            keyboard = reminders_kbd
+                        case 'delete':
+                            msg = f"Are you sure?"
+                            keyboard = project_delete_kbd
+                        # case _:
+                        #     msg = '' # Why?? 
+
+                # case _:
+                #     keyboard = [] # Why bother???
 
     return keyboard, msg
 
@@ -948,13 +957,7 @@ async def stopping(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     """
 
     # Find all jobs for current user and remove them
-    current_jobs = context.job_queue.scheduler.get_jobs()   
-    if not current_jobs:
-        pass
-    else:
-        for job in current_jobs:
-            if str(update.effective_user.id) in job.id:
-                job.remove()
+    delete_jobs(str(update.effective_user.id), context)    
 
     # Delete all projects for current user. I don't see necessity for checking result of operation for now.
     result = DB.projects.delete_many({"pm_tg_id": str(update.effective_user.id)})
@@ -962,6 +965,21 @@ async def stopping(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     bot_msg = "Projects deleted. Reminders too. Bot stopped."
     await context.bot.send_message(update.effective_user.id, bot_msg)    
     return ConversationHandler.END
+
+
+def delete_jobs(user_id: str, context: ContextTypes.DEFAULT_TYPE, title: str = None):
+    """ Removes jobs associated with (if) given project for current user"""
+
+    current_jobs = context.job_queue.scheduler.get_jobs()   
+    if not current_jobs:
+        pass
+    else:
+        for job in current_jobs:
+            prefix = user_id
+            if title:
+                prefix = prefix + '_' + title
+            if prefix in job.id:
+                job.remove()
 
 
 async def stop_aborted(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
@@ -1418,13 +1436,67 @@ async def project_activate(update: Update, context: ContextTypes.DEFAULT_TYPE) -
         return SECOND_LVL      
 
 
-async def project_delete(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+async def project_delete_start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     # Should ask for confirmation
     query = update.callback_query
     await query.answer()
-    bot_msg = f"You got to delete project function"
-    await query.edit_message_text(bot_msg)
-    return THIRD_LVL
+
+    if query.data:
+        context.user_data['title_to_delete'] = query.data.split("_", 1)[1]
+        context.user_data['level'] += 1
+        context.user_data['branch'].append(query.data.split("_", 1)[0])
+        
+        # Show confirmation keyboard 
+        keyboard, bot_msg = get_keybord_and_msg(context.user_data['level'], str(update.effective_user.id), context.user_data['branch'][-1])
+        
+        # Check if we have message and keyboard and show them to user
+        if keyboard == None or bot_msg == None:
+            bot_msg = "Some error happened. Unable to show a menu."
+            await query.edit_message_text(bot_msg)
+            return ConversationHandler.END
+        else:
+            reply_markup = InlineKeyboardMarkup(keyboard)
+            bot_msg = f"You are going to delete project '{context.user_data['title_to_delete']}' with all reminders.\n" + bot_msg
+            await query.edit_message_text(bot_msg, reply_markup=reply_markup)
+            return THIRD_LVL 
+
+    else:
+        logger.error(f"Something strange happened while trying to rename chosen project. Context: {context.user_data}")
+        bot_msg = f"Error occured. Contact developer."
+        await query.edit_message_text(bot_msg)
+        return ConversationHandler.END
+
+
+async def project_delete_finish(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    """ Deletes selected project with reminders from database"""
+    query = update.callback_query
+    await query.answer()
+
+    # Delete project from DB and return to projects menu
+    delete_result = DB.projects.delete_one({'title': context.user_data['title_to_delete'], 'pm_tg_id': str(update.effective_user.id)})
+    if delete_result.deleted_count > 0:
+        # TODO Erase reminders as well
+        delete_jobs(str(update.effective_user.id), context, context.user_data['title_to_delete'])
+        msg = f"Project '{context.user_data['title_to_delete']}' successfully deleted"
+    else:
+        msg = f"Unable to delete '{context.user_data['title_to_delete']}' project. Contact the developer."
+
+    # Return to level with projects
+    context.user_data['level'] -= 1
+    context.user_data['branch'].pop()
+    keyboard, bot_msg = get_keybord_and_msg(context.user_data['level'], str(update.effective_user.id), context.user_data['branch'][-1])
+
+    # Check if we have message and keyboard and show them to user
+    if keyboard == None or bot_msg == None:
+        bot_msg = "Some error happened. Unable to show a menu."
+        await query.edit_message_text(bot_msg)
+        return ConversationHandler.END
+    else:
+        reply_markup = InlineKeyboardMarkup(keyboard)
+        bot_msg = msg + '\n' + bot_msg
+        await query.edit_message_text(bot_msg, reply_markup=reply_markup)
+        return SECOND_LVL 
+
 
 
 async def project_rename_start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
@@ -1442,13 +1514,6 @@ async def project_rename_start(update: Update, context: ContextTypes.DEFAULT_TYP
         bot_msg = f"Error occured. Contact developer."
         await query.edit_message_text(bot_msg)
         return ConversationHandler.END
-
-
-async def project_delete_finish(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
-    """ TODO deletes selected project from database"""
-    bot_msg = f"Error occured. Contact developer."
-    await update.message.reply_text(bot_msg)
-    return ConversationHandler.END
 
 
 async def project_rename_finish(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
@@ -1998,7 +2063,7 @@ def main() -> None:
                 CallbackQueryHandler(transfer_control, pattern="^\d{6,15}$"),
 
                 CallbackQueryHandler(project_activate, pattern="^activate"),
-                CallbackQueryHandler(project_delete, pattern="^delete"),
+                CallbackQueryHandler(project_delete_start, pattern="^delete"),
                 CallbackQueryHandler(project_rename_start, pattern="^rename"),
                 CallbackQueryHandler(settings_back, pattern="^back$"),
                 CallbackQueryHandler(finish_settings, pattern="^finish$"),
@@ -2007,6 +2072,7 @@ def main() -> None:
                 CallbackQueryHandler(reminder_switcher, pattern="^" + str(ONE) + "$"),
                 CallbackQueryHandler(reminder_time_pressed, pattern="^" + str(TWO) + "$"),
                 CallbackQueryHandler(reminder_days_pressed, pattern="^" + str(THREE) + "$"),
+                CallbackQueryHandler(project_delete_finish, pattern="^yes$"),
                 CallbackQueryHandler(settings_back, pattern="^back$"),
                 CallbackQueryHandler(finish_settings, pattern="^finish$"),
             ],
