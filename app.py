@@ -1468,16 +1468,16 @@ async def project_rename_finish(update: Update, context: ContextTypes.DEFAULT_TY
         # context.user_data['level'] -= 1 # we already there
 
         # Check if not existing one then change project title in context and in DB
-        prj_id = DB.projects.find_one({"title": new_title, "pm_tg_id": str(update.effective_user)}, {"_id":1})
+        prj_id = DB.projects.find_one({"title": new_title, "pm_tg_id": str(update.effective_user.id)}, {"_id":1})
         print(f"Search for project title returned this: {prj_id}")
         if (prj_id and type(prj_id) == dict and 
-            '_id' in prj_id.keys() and prj_id['id']):
-            bot_msg = f"You already have project with name {new_title}. Try another one."
+            '_id' in prj_id.keys() and prj_id['_id']):
+            bot_msg = f"You already have project with name '{new_title}'. Try another one."
             await update.message.reply_text(bot_msg)
             return SIXTH_LVL
 
         else:# add user id
-            title_update = DB.projects.update_one({'title': context.user_data['title_to_rename']}, {"$set": {'title': new_title}})
+            title_update = DB.projects.update_one({'title': context.user_data['title_to_rename'], "pm_tg_id": str(update.effective_user.id)}, {"$set": {'title': new_title}})
             if title_update.modified_count > 0:
                 bot_msg = f"Got it. '{context.user_data['title_to_rename']}' changed to '{new_title}'"
                 if context.user_data['project']['title'] == context.user_data['title_to_rename']:
