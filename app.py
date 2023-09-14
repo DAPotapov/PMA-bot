@@ -106,7 +106,7 @@ upload_cmd = BotCommand("upload", "загрузка нового файла пр
                         (работает только в личных сообщениях)")
 
 # Stages of settings menu:
-FIRST_LVL, SECOND_LVL, THIRD_LVL, FOURTH_LVL, FIFTH_LVL = range(5)
+FIRST_LVL, SECOND_LVL, THIRD_LVL, FOURTH_LVL, FIFTH_LVL, SIXTH_LVL, SEVENTH_LVL = range(7)
 # Callback data for settings menu
 ONE, TWO, THREE, FOUR, FIVE, SIX = range(6)
 
@@ -484,6 +484,20 @@ async def start(update: Update, context: CallbackContext) -> int:
     return FIRST_LVL
 
 
+def clean_project_title(user_input: str) -> str:
+    """
+    Should clean title typed by user from unnesesary spaces and so on.
+    Should return string
+    If something went wrong raise value error to be managed on calling side
+    """
+    #TODO To implement
+    #TODO move to helpers
+    title = user_input
+    if not title:
+        raise ValueError
+    return title
+
+
 async def naming_project(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     ''' Function for recognizing name of the project '''
     
@@ -494,43 +508,49 @@ async def naming_project(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
     # cursor control characters
     # Maybe I should limit to Alphanumeric + spaces + punctuation ? 
     global PROJECTTITLE
-    PROJECTTITLE = update.message.text
-    project = {
-        'title': PROJECTTITLE,
-        'active': True,
-        'pm_tg_id': str(context.user_data['PM']['tg_id']),
-        'tg_chat_id': '', # TODO store here group chat where project members discuss project
-        'settings': {
-            # TODO decide after user testing whether these settings should be stored in here or in PM's settings
-            'ALLOW_POST_STATUS_TO_GROUP': False,
-            'INFORM_ACTIONERS_OF_MILESTONES': False,
-            },
-        'tasks': [],
-    }
 
-    # Add project data to dictionary in user_data. 
-    # One start = one project. But better keep PM and project separated, 
-    # because they could be written to DB separately
-    context.user_data['project'] = project
-
-    # Check and add PM to staff
-    pm_oid = add_worker_info_to_staff(context.user_data['PM'])
-    if not pm_oid:
-        bot_msg = "There is a problem with database connection. Contact developer or try later."
-        await update.message.reply_text(bot_msg)
-        return ConversationHandler.END   
+    try: 
+        PROJECTTITLE = clean_project_title(update.message.text)
+    except ValueError as e:
+        bot_msg = "Incorrect name"
+        #TODO make another try
     else:
-        prj_id = DB.projects.find_one({"title": project['title'], "pm_tg_id": str(context.user_data['PM']['tg_id'])}, {"_id":1})
-        print(f"Search for project title returned this: {prj_id}")
-        if (prj_id and type(prj_id) == dict and 
-            '_id' in prj_id.keys() and prj_id['id']):
-            bot_msg = f"You've already started project with name {project['title']}. Try another one."
+        project = {
+            'title': PROJECTTITLE,
+            'active': True,
+            'pm_tg_id': str(context.user_data['PM']['tg_id']),
+            'tg_chat_id': '', # TODO store here group chat where project members discuss project
+            'settings': {
+                # TODO decide after user testing whether these settings should be stored in here or in PM's settings
+                'ALLOW_POST_STATUS_TO_GROUP': False,
+                'INFORM_ACTIONERS_OF_MILESTONES': False,
+                },
+            'tasks': [],
+        }
+
+        # Add project data to dictionary in user_data. 
+        # One start = one project. But better keep PM and project separated, 
+        # because they could be written to DB separately
+        context.user_data['project'] = project
+
+        # Check and add PM to staff
+        pm_oid = add_worker_info_to_staff(context.user_data['PM'])
+        if not pm_oid:
+            bot_msg = "There is a problem with database connection. Contact developer or try later."
             await update.message.reply_text(bot_msg)
-            return FIRST_LVL
+            return ConversationHandler.END   
         else:
-            bot_msg = f"Got it. Now you can upload your project file. Supported formats are: .gan (GanttProject), .json, .xml (MS Project)"
-            await update.message.reply_text(bot_msg)
-            return SECOND_LVL
+            prj_id = DB.projects.find_one({"title": project['title'], "pm_tg_id": str(context.user_data['PM']['tg_id'])}, {"_id":1})
+            print(f"Search for project title returned this: {prj_id}")
+            if (prj_id and type(prj_id) == dict and 
+                '_id' in prj_id.keys() and prj_id['id']):
+                bot_msg = f"You've already started project with name {project['title']}. Try another one."
+                await update.message.reply_text(bot_msg)
+                return FIRST_LVL
+            else:
+                bot_msg = f"Got it. Now you can upload your project file. Supported formats are: .gan (GanttProject), .json, .xml (MS Project)"
+                await update.message.reply_text(bot_msg)
+                return SECOND_LVL
 
 
 async def file_recieved(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
@@ -1407,15 +1427,81 @@ async def project_delete(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
     return THIRD_LVL
 
 
-async def project_rename(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+async def project_rename_start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     # Should ask for new name
     query = update.callback_query
     await query.answer()
-    # TODO 
-    bot_msg = f"You got to rename project function"
-    await query.edit_message_text(bot_msg)
-    return THIRD_LVL
+    # Pass project title to rename
+    if query.data:
+        context.user_data['title_to_rename'] = query.data.split("_", 1)[1]
+        bot_msg = f"Type a new title for the project"
+        await query.edit_message_text(bot_msg)
+        return SIXTH_LVL
+    else:
+        logger.error(f"Something strange happened while trying to rename chosen project. Context: {context.user_data}")
+        bot_msg = f"Error occured. Contact developer."
+        await query.edit_message_text(bot_msg)
+        return ConversationHandler.END
 
+
+async def project_delete_finish(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    """ TODO deletes selected project from database"""
+    bot_msg = f"Error occured. Contact developer."
+    await update.message.reply_text(bot_msg)
+    return ConversationHandler.END
+
+
+async def project_rename_finish(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    """ Function to accept and check new project title got from user"""
+
+    try:
+        new_title = clean_project_title(update.message.text) 
+    except ValueError as e:
+        bot_msg = f"Try another name for project. Maybe more human readable this time. {e}"
+
+        # Let user have another try
+        await update.message.reply_text(bot_msg)
+        return SIXTH_LVL
+    else:
+    
+        # Return to second level 
+        # context.user_data['level'] -= 1 # we already there
+
+        # Check if not existing one then change project title in context and in DB
+        prj_id = DB.projects.find_one({"title": new_title, "pm_tg_id": str(update.effective_user)}, {"_id":1})
+        print(f"Search for project title returned this: {prj_id}")
+        if (prj_id and type(prj_id) == dict and 
+            '_id' in prj_id.keys() and prj_id['id']):
+            bot_msg = f"You already have project with name {new_title}. Try another one."
+            await update.message.reply_text(bot_msg)
+            return SIXTH_LVL
+
+        else:# add user id
+            title_update = DB.projects.update_one({'title': context.user_data['title_to_rename']}, {"$set": {'title': new_title}})
+            if title_update.modified_count > 0:
+                bot_msg = f"Got it. '{context.user_data['title_to_rename']}' changed to '{new_title}'"
+                if context.user_data['project']['title'] == context.user_data['title_to_rename']:
+                    context.user_data['project']['title'] = new_title
+                await update.message.reply_text(bot_msg)
+            else:
+                bot_msg = (f"Something went wrong, couldn't change '{context.user_data['title_to_rename']}' to '{new_title}'.\n"
+                           "Maybe try again later")
+                logger.error(f"Something went wrong, couldn't change '{context.user_data['title_to_rename']} to '{new_title}' for user: '{update.effective_user.id}'")
+                await update.message.reply_text(bot_msg)
+
+            # Return to level with projects
+            keyboard, bot_msg = get_keybord_and_msg(context.user_data['level'], str(update.effective_user.id), context.user_data['branch'][-1])
+        
+            # Check if we have message and keyboard and show them to user
+            if keyboard == None or bot_msg == None:
+                bot_msg = "Some error happened. Unable to show a menu."
+                await update.message.reply_text(bot_msg)
+                return ConversationHandler.END
+            else:
+                reply_markup = InlineKeyboardMarkup(keyboard)
+                await update.message.reply_text(bot_msg, reply_markup=reply_markup)
+                return SECOND_LVL 
+    
 
 async def reminders_settings_item(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     """Controls """
@@ -1913,7 +1999,7 @@ def main() -> None:
 
                 CallbackQueryHandler(project_activate, pattern="^activate"),
                 CallbackQueryHandler(project_delete, pattern="^delete"),
-                CallbackQueryHandler(project_rename, pattern="^rename"),
+                CallbackQueryHandler(project_rename_start, pattern="^rename"),
                 CallbackQueryHandler(settings_back, pattern="^back$"),
                 CallbackQueryHandler(finish_settings, pattern="^finish$"),
             ],
@@ -1924,11 +2010,17 @@ def main() -> None:
                 CallbackQueryHandler(settings_back, pattern="^back$"),
                 CallbackQueryHandler(finish_settings, pattern="^finish$"),
             ],
-            FOURTH_LVL:[
+            FOURTH_LVL:[ # TODO change this as below?
                 MessageHandler(filters.TEXT & ~filters.COMMAND, reminder_time_setter),
             ],
-            FIFTH_LVL:[
+            FIFTH_LVL:[ # TODO change this as below?
                 MessageHandler(filters.TEXT & ~filters.COMMAND, reminder_days_setter),
+            ],
+            SIXTH_LVL: [
+                MessageHandler(filters.TEXT & ~filters.COMMAND, project_rename_finish),
+            ],
+            SEVENTH_LVL: [
+                MessageHandler(filters.TEXT & ~filters.COMMAND, project_delete_finish),
             ]
         },
         fallbacks=[CallbackQueryHandler(finish_settings)]
