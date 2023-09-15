@@ -500,7 +500,14 @@ def clean_project_title(user_input: str) -> str:
     If something went wrong raise value error to be managed on calling side
     """
     #TODO To implement
+    #TODO: Clean input and add check for malicous input    
+    # cases: 
+    # empty string - clean from whitespaces on start and end of string
+    # escape characters?
+    # cursor control characters
+    # Maybe I should limit to Alphanumeric + spaces + punctuation ? 
     #TODO move to helpers
+
     title = user_input
     if not title:
         raise ValueError
@@ -510,12 +517,7 @@ def clean_project_title(user_input: str) -> str:
 async def naming_project(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     ''' Function for recognizing name of the project '''
     
-    #TODO: Clean input and add check for malicous input    
-    # cases: 
-    # empty string - clean from whitespaces on start and end of string
-    # escape characters?
-    # cursor control characters
-    # Maybe I should limit to Alphanumeric + spaces + punctuation ? 
+
     global PROJECTTITLE
 
     try: 
@@ -1475,7 +1477,7 @@ async def project_delete_finish(update: Update, context: ContextTypes.DEFAULT_TY
     # Delete project from DB and return to projects menu
     delete_result = DB.projects.delete_one({'title': context.user_data['title_to_delete'], 'pm_tg_id': str(update.effective_user.id)})
     if delete_result.deleted_count > 0:
-        # TODO Erase reminders as well
+        # Erase reminders as well
         delete_jobs(str(update.effective_user.id), context, context.user_data['title_to_delete'])
         msg = f"Project '{context.user_data['title_to_delete']}' successfully deleted"
     else:
@@ -1498,7 +1500,6 @@ async def project_delete_finish(update: Update, context: ContextTypes.DEFAULT_TY
         return SECOND_LVL 
 
 
-
 async def project_rename_start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     # Should ask for new name
     query = update.callback_query
@@ -1506,7 +1507,7 @@ async def project_rename_start(update: Update, context: ContextTypes.DEFAULT_TYP
     # Pass project title to rename
     if query.data:
         context.user_data['title_to_rename'] = query.data.split("_", 1)[1]
-        bot_msg = f"Type a new title for the project"
+        bot_msg = f"Type a new title for the project '{context.user_data['title_to_rename']}': "
         await query.edit_message_text(bot_msg)
         return SIXTH_LVL
     else:
@@ -1541,12 +1542,35 @@ async def project_rename_finish(update: Update, context: ContextTypes.DEFAULT_TY
             await update.message.reply_text(bot_msg)
             return SIXTH_LVL
 
-        else:# add user id
+        else:
             title_update = DB.projects.update_one({'title': context.user_data['title_to_rename'], "pm_tg_id": str(update.effective_user.id)}, {"$set": {'title': new_title}})
             if title_update.modified_count > 0:
                 bot_msg = f"Got it. '{context.user_data['title_to_rename']}' changed to '{new_title}'"
-                if context.user_data['project']['title'] == context.user_data['title_to_rename']:
+                if (context.user_data['project']['title'] == context.user_data['title_to_rename']):
                     context.user_data['project']['title'] = new_title
+
+                # TODO rename jobs ТАк не работает - запись в БД не производится, надо обновить БД 
+                # TODO - id is immutable - надо пересоздать эти jobs с этими же параметрами
+                # Можно ли копировать jobs?
+                # Apscheduler удаляет новые
+                # TODO Нужен другой способ
+                current_jobs = context.job_queue.scheduler.get_jobs() 
+                if not current_jobs:
+                    pass
+                else:
+                    for job in current_jobs:
+                        if (str(update.effective_user.id) in job.id and 
+                            context.user_data['title_to_rename'] in job.id):
+                            # print(f"Args are: {job.args}")
+                            # print(f"kwargs are: {job.kwargs}")
+                            # Construct new id 
+                            suffix = job.id.rsplit(context.user_data['title_to_rename'])[-1]
+                            new_id = str(update.effective_user.id) + '_' + new_title + suffix
+                            new_job = context.job_queue.scheduler.add_job(job.func, args=job.args, kwargs=job.kwargs, id=new_id, name = suffix[1:])
+                            new_job.args[0].data['project_title'] = new_title
+                            print(new_job.id)
+                            # job.remove()
+ 
                 await update.message.reply_text(bot_msg)
             else:
                 bot_msg = (f"Something went wrong, couldn't change '{context.user_data['title_to_rename']}' to '{new_title}'.\n"

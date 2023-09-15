@@ -28,7 +28,7 @@ def add_user_id_to_db(user: User):
     '''
     output = None
     DB = get_db()
-    print(f"user is {user}")
+    # print(f"user is {user}")
 
     # Fill record with absent id with current one
     # For now I assume that users don't switch their usernames and such situation is force-major
@@ -183,24 +183,40 @@ def get_db():
 
 
 def get_job_preset(job_id: str, context: ContextTypes.DEFAULT_TYPE) -> str:
+    """ Returns current preset of job in text format to add to messages """
+    #TODO Better make this a method of a job-class (maybe reminder class) evolved from base job-class
+
+    presets_dict = get_job_preset_dict(job_id, context)
+    if presets_dict:
+        if int(str(presets_dict['minute'])) < 10:
+            time_preset = f"{presets_dict['hour']}:0{presets_dict['minute']}"
+        else:
+            time_preset = f"{presets_dict['hour']}:{presets_dict['minute']}"
+        preset = f"{presets_dict['state']} {time_preset}, {presets_dict['day_of_week']}"
+    else:
+        preset = ''
+
+    return preset
+
+
+def get_job_preset_dict(job_id: str, context: ContextTypes.DEFAULT_TYPE) -> dict:
     '''
     Helper function that returns current reminder preset for given job id
-    Return empty string if nothing is found or error occured
+    Returns empty dict if nothing is found or error occured
     '''  
-    preset = ''
+    #TODO Better make this a method of a job-class (maybe reminder class) evolved from base job-class
+    
+    preset = {}
 
     job = context.job_queue.scheduler.get_job(job_id)
-    # print(f"Got the job: {job}")
     try:
         hour = job.trigger.fields[job.trigger.FIELD_NAMES.index('hour')]
-        minute = f"{job.trigger.fields[job.trigger.FIELD_NAMES.index('minute')]}"
+        # TODO WHY string?
+        minute = job.trigger.fields[job.trigger.FIELD_NAMES.index('minute')]
+        days_preset = job.trigger.fields[job.trigger.FIELD_NAMES.index('day_of_week')]
     except:
-        preset = ''        
+        preset = {}       
     else:
-        if int(minute) < 10:
-            time_preset = f"{hour}:0{minute}"
-        else:
-            time_preset = f"{hour}:{minute}"
 
         # Determine if job is on or off
         if job.next_run_time:
@@ -208,9 +224,13 @@ def get_job_preset(job_id: str, context: ContextTypes.DEFAULT_TYPE) -> str:
         else:
             state = 'OFF'
         
-        days_preset = job.trigger.fields[job.trigger.FIELD_NAMES.index('day_of_week')]
-        preset = f"{state} {time_preset}, {days_preset}"
-        # pprint(preset)        
+        preset = {
+            'hour': hour,
+            'minute': minute,
+            'day_of_week': days_preset,
+            'state': state
+        }
+   
     return preset
 
 
@@ -418,7 +438,7 @@ def get_worker_tg_username_by_tg_id(tg_id: str) -> str:
     except Exception as e:
         logger.error(f"There was error getting DB: {e}")
     else:
-        if (result and type(result) == dict and 
+        if (result and type(result) == dict and
             'tg_username' in result.keys()):
             tg_un = result['tg_username']
 
@@ -426,8 +446,8 @@ def get_worker_tg_username_by_tg_id(tg_id: str) -> str:
 
 
 def save_json(project: dict, PROJECTJSON: str) -> None:
-    ''' 
-    Saves project in JSON format and returns 
+    '''
+    Saves project in JSON format and returns
     '''
 
     json_fh = open(PROJECTJSON, 'w', encoding='utf-8')
@@ -435,5 +455,3 @@ def save_json(project: dict, PROJECTJSON: str) -> None:
     json_fh.close()
 
     return bot_msg
-
-
