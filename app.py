@@ -51,6 +51,7 @@ from helpers import (
     get_assignees,
     get_db, 
     get_job_preset,
+    get_job_preset_dict,
     get_project_team,
     get_projects_and_pms_for_user,
     get_status_on_project,
@@ -1566,10 +1567,46 @@ async def project_rename_finish(update: Update, context: ContextTypes.DEFAULT_TY
                             # Construct new id 
                             suffix = job.id.rsplit(context.user_data['title_to_rename'])[-1]
                             new_id = str(update.effective_user.id) + '_' + new_title + suffix
-                            new_job = context.job_queue.scheduler.add_job(job.func, args=job.args, kwargs=job.kwargs, id=new_id, name = suffix[1:])
-                            new_job.args[0].data['project_title'] = new_title
+                            preset = get_job_preset_dict(job.id, context)
+                            time2check = time(preset['hour'], preset['minute'])
+                            days_of_week = []
+                            for day in preset['day_of_week'].split(','):
+                                if day == 'sun':
+                                    days_of_week.append(0)
+                                if day == 'mon':
+                                    days_of_week.append(1)
+                                if day == 'tue':
+                                    days_of_week.append(2)
+                                if day == 'wed':
+                                    days_of_week.append(3)
+                                if day == 'thu':
+                                    days_of_week.append(4)
+                                if day == 'fri':
+                                    days_of_week.append(5)
+                                if day == 'sat':
+                                    days_of_week.append(6)
+                            days = tuple(days_of_week)
+                            data = {
+                                "project_title": new_title,
+                                "pm_tg_id": str(update.effective_user.id)
+                            }
+                            job_kwargs = {'id': new_id, 'replace_existing': True}
+                            print(job.func)
+                            new_job = context.job_queue.run_daily(job.func, 
+                                                                  user_id=update.effective_user.id,
+                                                                  time=time2check,
+                                                                  days=days,
+                                                                  data=data,
+                                                                  job_kwargs=job_kwargs)
+                            if preset['state'] == 'ON':
+                                new_job.enabled = True
+                            else:
+                                new_job.job.pause()
+                            # new_job = context.job_queue.scheduler.add_job(job.func, args=job.args, kwargs=job.kwargs, id=new_id, name = suffix[1:])
+                            # new_job.args[0].data['project_title'] = new_title
                             print(new_job.id)
-                            # job.remove()
+                            job.remove()
+                            
  
                 await update.message.reply_text(bot_msg)
             else:

@@ -188,7 +188,7 @@ def get_job_preset(job_id: str, context: ContextTypes.DEFAULT_TYPE) -> str:
 
     presets_dict = get_job_preset_dict(job_id, context)
     if presets_dict:
-        if int(str(presets_dict['minute'])) < 10:
+        if presets_dict['minute'] < 10:
             time_preset = f"{presets_dict['hour']}:0{presets_dict['minute']}"
         else:
             time_preset = f"{presets_dict['hour']}:{presets_dict['minute']}"
@@ -213,7 +213,8 @@ def get_job_preset_dict(job_id: str, context: ContextTypes.DEFAULT_TYPE) -> dict
         hour = job.trigger.fields[job.trigger.FIELD_NAMES.index('hour')]
         # TODO WHY string?
         minute = job.trigger.fields[job.trigger.FIELD_NAMES.index('minute')]
-        days_preset = job.trigger.fields[job.trigger.FIELD_NAMES.index('day_of_week')]
+        days_preset = str(job.trigger.fields[job.trigger.FIELD_NAMES.index('day_of_week')])
+        # days_list = list(job.trigger.fields[job.trigger.FIELD_NAMES.index('day_of_week')])
     except:
         preset = {}       
     else:
@@ -225,8 +226,8 @@ def get_job_preset_dict(job_id: str, context: ContextTypes.DEFAULT_TYPE) -> dict
             state = 'OFF'
         
         preset = {
-            'hour': hour,
-            'minute': minute,
+            'hour': int(str(hour)),
+            'minute': int(str(minute)),
             'day_of_week': days_preset,
             'state': state
         }
