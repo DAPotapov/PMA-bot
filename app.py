@@ -140,14 +140,10 @@ def get_keybord_and_msg(level: int, user_id: str, branch: str = None) -> Tuple[l
             # Configure keyboard and construct message depending of menu level
             match level:
 
-# TODO reconfigure keyboard to new menu structure
                 # First level of menu 
                 case 0:
                     msg = (f"Manage settings. Active project: '{project['title']}'")
                     keyboard = [        
-                        # [InlineKeyboardButton(f"Change notifications settings", callback_data=str(ONE))],
-                        # [InlineKeyboardButton(f"Manage projects", callback_data=str(TWO))],
-                        # [InlineKeyboardButton(f"Reminders settings", callback_data=str(THREE))],
                         [InlineKeyboardButton(f"Change notifications settings", callback_data="notifications")],
                         [InlineKeyboardButton(f"Manage projects", callback_data="projects")],
                         [InlineKeyboardButton(f"Reminders settings", callback_data="reminders")],
@@ -193,8 +189,8 @@ def get_keybord_and_msg(level: int, user_id: str, branch: str = None) -> Tuple[l
                                 
                                 if project['active'] == False: 
                                     row = [
-                                    InlineKeyboardButton(f"Activate '{project['title']}'", callback_data=f"activate_{project['title']}"),
-                                    InlineKeyboardButton(f"Delete '{project['title']}'", callback_data=f"delete_{project['title']}"),
+                                        InlineKeyboardButton(f"Activate '{project['title']}'", callback_data=f"activate_{project['title']}"),
+                                        InlineKeyboardButton(f"Delete '{project['title']}'", callback_data=f"delete_{project['title']}"),
                                     ]   
                                     keyboard.append(row)
                             keyboard.extend([
