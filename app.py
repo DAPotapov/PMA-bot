@@ -714,6 +714,7 @@ def schedule_jobs(context: ContextTypes.DEFAULT_TYPE):
             
             # and enable it.
             morning_update_job.enabled = True 
+            print(morning_update_job.callback)
             print(f"Next time: {morning_update_job.next_t}, is it on? {morning_update_job.enabled}")      
             
     # 2nd - daily on the eve of task reminder
@@ -1551,7 +1552,10 @@ async def project_rename_finish(update: Update, context: ContextTypes.DEFAULT_TY
                 # Можно ли копировать jobs?
                 # Apscheduler удаляет новые
                 # TODO Нужен другой способ
-                current_jobs = context.job_queue.scheduler.get_jobs() 
+                # current_jobs = context.job_queue.scheduler.get_jobs() 
+                for job in context.job_queue.get_jobs_by_name(*):
+                    print(job.callback)
+
                 if not current_jobs:
                     pass
                 else:
@@ -1588,6 +1592,7 @@ async def project_rename_finish(update: Update, context: ContextTypes.DEFAULT_TY
                             }
                             job_kwargs = {'id': new_id, 'replace_existing': True}
                             print(job.func)
+                            print(job.callback)
                             new_job = context.job_queue.run_daily(job.func, 
                                                                   user_id=update.effective_user.id,
                                                                   time=time2check,
