@@ -43,6 +43,7 @@ from telegram.ext import (
                             filters)
 from typing import Tuple
 from urllib.parse import quote_plus
+from uuid import uuid4
 from ptbcontrib.ptb_jobstores import PTBMongoDBJobStore
 from helpers import (
     add_user_id_to_db,
@@ -116,6 +117,7 @@ def get_keybord_and_msg(level: int, user_id: str, branch: str = None) -> Tuple[l
     '''
     Helper function to provide specific keyboard on different levels of settings menu
     '''
+    # TODO consider taking project and user as input and not go to DB each time when menu item clicked
 
     keyboard = []
     msg = ''
@@ -279,6 +281,8 @@ async def day_before_update(context: ContextTypes.DEFAULT_TYPE) -> None:
 
     # print(f"Contents of user_data: {context.user_data}") # empty, because not saved to DB
     print(f"Job data: {context.job.data}") # exist
+
+    # TODO job.data not needed, search by job.id
 
     # Get project from DB
     try:
@@ -533,6 +537,7 @@ async def naming_project(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
                 'ALLOW_POST_STATUS_TO_GROUP': False,
                 'INFORM_ACTIONERS_OF_MILESTONES': False,
                 },
+            'reminders':{},
             'tasks': [],
         }
 
@@ -577,6 +582,18 @@ async def file_recieved(update: Update, context: ContextTypes.DEFAULT_TYPE) -> i
             # Add tasks to user data dictionary in context
             context.user_data['project']['tasks'] = tasks
 
+            # Schedule jobs and store corresponding ids in project dict
+            context.user_data['project']['reminders'] = schedule_jobs(context)
+            if not context.user_data['project']['reminders']:
+                bot_msg = bot_msg + "\nCouldn't create reminders. Contact developer."
+                logger.error(f"Couldn't create reminders for project '{context.user_data['project']}'")
+            else:
+                bot_msg = (bot_msg + f"\nReminders were created: on the day before event ({ONTHEEVE}),"
+                        f" in the morning of event ({MORNING}) and reminder for friday file update ({FRIDAY}). "
+                        f"You can change them or turn off in /settings."
+                        f"\nAlso you can update the schedule by uploading new file via /upload command."
+                        f"\nRemember that you can /start a new project anytime.")
+
             # Save project to DB
             try:
                 prj_oid = DB.projects.insert_one(context.user_data['project'])
@@ -587,10 +604,10 @@ async def file_recieved(update: Update, context: ContextTypes.DEFAULT_TYPE) -> i
                 return ConversationHandler.END
             else:
 
-                # If succeed call function to create Jobs
+                # If succeed make other projects inactive
                 if prj_oid and prj_oid.inserted_id:
-                    bot_msg = (bot_msg + f"\nProject added to database.")
-                    print(f"can i get just here? {prj_oid}")
+                    bot_msg = (bot_msg + f"\nProject added to database.\nProject initialization complete.")
+                    # print(f"can i get just here? {prj_oid}")
 
                     # Since new project added successfully and it's active, 
                     # lets make other projects inactive (actually there should be just one, but just in case)
@@ -606,17 +623,7 @@ async def file_recieved(update: Update, context: ContextTypes.DEFAULT_TYPE) -> i
                         if result.acknowledged and result.modified_count == 0:
                             # TODO consider to create new type of error derived from some base class
                             raise ValueError("Attempt to update database was unsuccessful. Records maybe corrupted. Contact developer.")
-                    if schedule_jobs(context):
-                        bot_msg = (bot_msg + f"\nReminders were created: on the day before event ({ONTHEEVE}),"
-                                             f" in the morning of event ({MORNING}) and reminder for friday file update ({FRIDAY}). "
-                                             f"You can change them or turn off in /settings."
-                                             f"\nProject initialization complete."
-                                             f"\nAlso you can update the schedule by uploading new file via /upload command."
-                                             f"\nRemember that you can /start a new project anytime."
-                        )
-                    else:
-                        bot_msg = (bot_msg + "\nSomething went wrong while scheduling reminders."
-                                            "\nPlease, contact bot developer to check the logs.")
+                    
             finally:
                 await update.message.reply_text(bot_msg)
                 return ConversationHandler.END       
@@ -675,101 +682,114 @@ def schedule_jobs(context: ContextTypes.DEFAULT_TYPE):
     Schedule jobs for main reminders. Return false if not succeded
     TODO v2: When custom reminders functionality will be added this function must be revised
     '''    
-    
+
     morning_update_job, day_before_update_job, file_update_job = None, None, None
 
     # Create jobs in mongdb in apsheduler collection
     # Configure id for job from PM id, project title and type of reminder    
-    job_id = str(context.user_data['PM']['tg_id']) + '_' + context.user_data['project']['title'] + '_' + 'morning_update'
-    
+    # job_id = str(context.user_data['PM']['tg_id']) + '_' + context.user_data['project']['title'] + '_' + 'morning_update'
+    # job_id = uuid4()
+
     # Construct additinal information to store in job.data to be available when job runs
     data = {"project_title": context.user_data['project']['title'], 
             "pm_tg_id": str(context.user_data['PM']['tg_id'])}
     
     # Check if already present
-    preset = get_job_preset(job_id, context)
-    print(f"Job '{job_id}' scheduled with preset: '{preset}'")    
-    if not preset:
+    # preset = get_job_preset(str(job_id), context)
+    # print(f"Job '{job_id}' scheduled with preset: '{preset}'")    
+    # if not preset:
 
-        # Use default values from constants
-        try:
-            hour, minute = map(int, MORNING.split(":"))                    
-            time2check = time(hour, minute, tzinfo=datetime.now().astimezone().tzinfo)
-        except ValueError as e:
-            logger.error(f'Error while parsing time: {e}')
+    # Use default values from constants
+    try:
+        hour, minute = map(int, MORNING.split(":"))                    
+        time2check = time(hour, minute, tzinfo=datetime.now().astimezone().tzinfo)
+    except ValueError as e:
+        logger.error(f'Error while parsing time: {e}')
 
-        # Set job schedule 
-        else:
-            
-            ''' To persistence to work job must have explicit ID and 'replace_existing' must be True
-            or a new copy of the job will be created every time application restarts! '''
-            # print(f"When writing to data what type of user id? {type(context.user_data['PM']['tg_id'])}")
+    # Set job schedule 
+    else:
+        
+        ''' To persistence to work job must have explicit ID and 'replace_existing' must be True
+        or a new copy of the job will be created every time application restarts! '''
+        # TODO but what happened if I use automaticaly created id?
 
-            job_kwargs = {'id': job_id, 'replace_existing': True}
-            morning_update_job = context.job_queue.run_daily(morning_update, 
-                                                             user_id=str(context.user_data['PM']['tg_id']), 
-                                                             time=time2check, 
-                                                             data=data, 
-                                                             job_kwargs=job_kwargs)
-            
-            # and enable it.
-            morning_update_job.enabled = True 
-            print(morning_update_job.callback)
-            print(f"Next time: {morning_update_job.next_t}, is it on? {morning_update_job.enabled}")      
+        # print(f"When writing to data what type of user id? {type(context.user_data['PM']['tg_id'])}")
+
+        # job_kwargs = {'id': job_id, 'replace_existing': True}
+        job_kwargs = {'replace_existing': True}
+
+        morning_update_job = context.job_queue.run_daily(morning_update, 
+                                                            user_id=str(context.user_data['PM']['tg_id']), 
+                                                            time=time2check, 
+                                                            data=data, 
+                                                            job_kwargs=job_kwargs)
+        
+        # and enable it.
+        morning_update_job.enabled = True 
+        print(f"{morning_update_job.job.id} of type: {type(morning_update_job.job.id)}")
+        # print(morning_update_job.callback)
+        print(f"Next time: {morning_update_job.next_t}, is it on? {morning_update_job.enabled}")      
             
     # 2nd - daily on the eve of task reminder
-    job_id = str(context.user_data['PM']['tg_id']) + '_' + context.user_data['project']['title'] + '_' + 'day_before_update'
-    print(job_id)
-    preset = get_job_preset(job_id, context)
-    if not preset:                    
-        try:
-            hour, minute = map(int, ONTHEEVE.split(":"))                    
-            time2check = time(hour, minute, tzinfo=datetime.now().astimezone().tzinfo)
-        except ValueError as e:
-            logger.error(f'Error while parsing time: {e}')
-        
-        # Add job to queue and enable it
-        else:                            
-            job_kwargs = {'id': job_id, 'replace_existing': True}
-            day_before_update_job = context.job_queue.run_daily(day_before_update, 
-                                                                user_id=str(context.user_data['PM']['tg_id']), 
-                                                                time=time2check, 
-                                                                data=data, 
-                                                                job_kwargs=job_kwargs)
-            day_before_update_job.enabled = True
+    # job_id = str(context.user_data['PM']['tg_id']) + '_' + context.user_data['project']['title'] + '_' + 'day_before_update'
+    # print(job_id)
+    # preset = get_job_preset(str(job_id), context)
+    # if not preset:                    
+    try:
+        hour, minute = map(int, ONTHEEVE.split(":"))                    
+        time2check = time(hour, minute, tzinfo=datetime.now().astimezone().tzinfo)
+    except ValueError as e:
+        logger.error(f'Error while parsing time: {e}')
+    
+    # Add job to queue and enable it
+    else:                            
+        # job_kwargs = {'id': job_id, 'replace_existing': True}
+        job_kwargs = {'replace_existing': True}
+        day_before_update_job = context.job_queue.run_daily(day_before_update, 
+                                                            user_id=str(context.user_data['PM']['tg_id']), 
+                                                            time=time2check, 
+                                                            data=data, 
+                                                            job_kwargs=job_kwargs)
+        day_before_update_job.enabled = True
             # print(f"Next time: {day_before_update_job.next_t}, is it on? {day_before_update_job.enabled}")   
 
     # Register friday reminder
-    job_id = str(context.user_data['PM']['tg_id']) + '_' + context.user_data['project']['title'] + '_' + 'file_update'
-    preset = get_job_preset(job_id, context)
-    if not preset:   
-        try:
-            hour, minute = map(int, FRIDAY.split(":"))                    
-            time2check = time(hour, minute, tzinfo=datetime.now().astimezone().tzinfo)
-        except ValueError as e:
-            logger.error(f'Error while parsing time: {e}')
-        
-        # Add job to queue and enable it
-        else:
-            job_kwargs = {'id': job_id, 'replace_existing': True}
-            file_update_job = context.job_queue.run_daily(file_update, 
-                                                          user_id=str(context.user_data['PM']['tg_id']), 
-                                                          time=time2check, 
-                                                          days=(5,), 
-                                                          data=data, 
-                                                          job_kwargs=job_kwargs)
-            file_update_job.enabled = True
+    # job_id = str(context.user_data['PM']['tg_id']) + '_' + context.user_data['project']['title'] + '_' + 'file_update'
+    # preset = get_job_preset(job_id, context)
+    # if not preset:   
+    try:
+        hour, minute = map(int, FRIDAY.split(":"))                    
+        time2check = time(hour, minute, tzinfo=datetime.now().astimezone().tzinfo)
+    except ValueError as e:
+        logger.error(f'Error while parsing time: {e}')
+    
+    # Add job to queue and enable it
+    else:
+        # job_kwargs = {'id': job_id, 'replace_existing': True}
+        job_kwargs = {'replace_existing': True}
+
+        file_update_job = context.job_queue.run_daily(file_update, 
+                                                        user_id=str(context.user_data['PM']['tg_id']), 
+                                                        time=time2check, 
+                                                        days=(5,), 
+                                                        data=data, 
+                                                        job_kwargs=job_kwargs)
+        file_update_job.enabled = True
             # print(f"Next time: {file_update_job.next_t}, is it on? {file_update_job.enabled}") 
 
-    print("On the exit of job creation function we have:")        
-    pprint(morning_update_job)
-    pprint(day_before_update_job)
-    pprint(file_update_job)
+    # print("On the exit of job creation function we have:")        
+    # pprint(morning_update_job)
+    # pprint(day_before_update_job)
+    # pprint(file_update_job)
 
     if morning_update_job and day_before_update_job and file_update_job:
-        return True
+        return {                                 
+            "morning_update": morning_update_job.id,
+            "day_before_update": day_before_update_job.id,
+            "friday_update": file_update_job.id,
+        }
     else:
-        return False
+        return {}
 ######### END OF START SECTION ###########
 
 
@@ -1112,7 +1132,7 @@ async def settings(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
         # Get active project title and store in user_data 
         # (because now PROJECTTITLE contain default value not associated with project)
         project = DB.projects.find_one({"pm_tg_id": str(update.effective_user.id), "active": True}, 
-                                      {"title": 1, "pm_tg_id":1, "_id": 0})
+                                      {"title": 1, "pm_tg_id":1, "reminders":1, "_id": 0}) # TODO consider adding settings here not calling DB another time
         if (project and type(project) == dict and 
             'title' in project.keys() and project['title']):
             context.user_data['project'] = project
@@ -1581,7 +1601,8 @@ async def reminders_settings_item(update: Update, context: ContextTypes.DEFAULT_
         context.user_data['level'] = THIRD_LVL
         context.user_data['branch'].append(query.data)
         keyboard, bot_msg = get_keybord_and_msg(context.user_data['level'], str(update.effective_user.id), context.user_data['branch'][-1])
-        job_id = str(update.effective_user.id) + '_' + context.user_data['project']['title'] + '_' + str(context.user_data['branch'][-1])
+        # job_id = str(update.effective_user.id) + '_' + context.user_data['project']['title'] + '_' + str(context.user_data['branch'][-1])
+        job_id = context.user_data['project']['reminders'][str(context.user_data['branch'][-1])]
         preset = get_job_preset(job_id, context)
     
     # Stay on same level if not
@@ -1708,7 +1729,9 @@ async def reminder_switcher(update: Update, context: ContextTypes.DEFAULT_TYPE) 
     # print(f"Reminder in reminder switcher: {reminder}")
 
     # Find a job by id and pause it if it's enabled or resume if it's paused
-    job_id = str(update.effective_user.id) + '_' + context.user_data['project']['title'] + '_' + str(context.user_data['branch'][-1])
+    # job_id = str(update.effective_user.id) + '_' + context.user_data['project']['title'] + '_' + str(context.user_data['branch'][-1])
+    job_id = context.user_data['project']['reminders'][str(context.user_data['branch'][-1])]
+    
     job = context.job_queue.scheduler.get_job(job_id)
     if job.next_run_time:
         job = job.pause()
@@ -1743,7 +1766,8 @@ async def reminder_time_pressed(update: Update, context: ContextTypes.DEFAULT_TY
     # reminder = context.user_data['branch']
 
     # Call function to get current preset for reminder
-    job_id = str(update.effective_user.id) + '_' + context.user_data['project']['title'] + '_' + str(context.user_data['branch'][-1])
+    # job_id = str(update.effective_user.id) + '_' + context.user_data['project']['title'] + '_' + str(context.user_data['branch'][-1])
+    job_id = context.user_data['project']['reminders'][str(context.user_data['branch'][-1])]
     preset = get_job_preset(job_id, context)
 
     # If reminder not set return menu with reminder settings
@@ -1785,7 +1809,8 @@ async def reminder_days_pressed(update: Update, context: ContextTypes.DEFAULT_TY
     # reminder = context.user_data['branch'][-1]
 
     # Call function to get current preset for reminder
-    job_id = str(update.effective_user.id) + '_' + context.user_data['project']['title'] + '_' + context.user_data['branch'][-1]
+    # job_id = str(update.effective_user.id) + '_' + context.user_data['project']['title'] + '_' + context.user_data['branch'][-1]
+    job_id = context.user_data['project']['reminders'][str(context.user_data['branch'][-1])]
     preset = get_job_preset(job_id, context)
 
     # If reminder not set return menu with reminder settings
@@ -1836,7 +1861,8 @@ async def reminder_time_setter(update: Update, context: ContextTypes.DEFAULT_TYP
     else:
 
         # Find a job by id for further rescheduling
-        job_id = str(update.effective_user.id) + '_' + context.user_data['project']['title'] + '_' + context.user_data['branch'][-1]
+        # job_id = str(update.effective_user.id) + '_' + context.user_data['project']['title'] + '_' + context.user_data['branch'][-1]
+        job_id = context.user_data['project']['reminders'][str(context.user_data['branch'][-1])]
         job = context.job_queue.scheduler.get_job(job_id)
 
         # Get timezone attribute from current job
@@ -1866,7 +1892,8 @@ async def reminder_time_setter(update: Update, context: ContextTypes.DEFAULT_TYP
     keyboard, bot_msg = get_keybord_and_msg(THIRD_LVL, str(update.effective_user.id), context.user_data['branch'][-1])
 
     # And get current (updated) preset
-    job_id = str(update.effective_user.id) + '_' + context.user_data['project']['title'] + '_' + context.user_data['branch'][-1]
+    # job_id = str(update.effective_user.id) + '_' + context.user_data['project']['title'] + '_' + context.user_data['branch'][-1]
+    job_id = context.user_data['project']['reminders'][str(context.user_data['branch'][-1])]
     preset = get_job_preset(job_id, context)
     if keyboard == None or bot_msg == None:
         bot_msg = "Some error happened. Unable to show a menu."
@@ -1949,7 +1976,8 @@ async def reminder_days_setter(update: Update, context: ContextTypes.DEFAULT_TYP
     # Provide keyboard of level 3 menu 
     keyboard, bot_msg = get_keybord_and_msg(THIRD_LVL, str(update.effective_user.id), context.user_data['branch'][-1])
     # And get current preset (updated) of the reminder to show to user
-    job_id = str(update.effective_user.id) + '_' + context.user_data['project']['title'] + '_' + context.user_data['branch'][-1]
+    # job_id = str(update.effective_user.id) + '_' + context.user_data['project']['title'] + '_' + context.user_data['branch'][-1]
+    job_id = context.user_data['project']['reminders'][str(context.user_data['branch'][-1])]
     preset = get_job_preset(job_id, context)
     if keyboard == None or bot_msg == None:
         bot_msg = "Some error happened. Unable to show a menu."
