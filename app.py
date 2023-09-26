@@ -1541,74 +1541,13 @@ async def project_rename_finish(update: Update, context: ContextTypes.DEFAULT_TY
             return SIXTH_LVL
 
         else:
+            # Change title in DB
             title_update = DB.projects.update_one({'title': context.user_data['title_to_rename'], "pm_tg_id": str(update.effective_user.id)}, {"$set": {'title': new_title}})
             if title_update.modified_count > 0:
                 bot_msg = f"Got it. '{context.user_data['title_to_rename']}' changed to '{new_title}'"
+                # And in context
                 if (context.user_data['project']['title'] == context.user_data['title_to_rename']):
                     context.user_data['project']['title'] = new_title
-
-                # TODO rename jobs ТАк не работает - запись в БД не производится, надо обновить БД 
-                # TODO - id is immutable - надо пересоздать эти jobs с этими же параметрами
-                # Можно ли копировать jobs?
-                # Apscheduler удаляет новые
-                # TODO Нужен другой способ
-                # current_jobs = context.job_queue.scheduler.get_jobs() 
-                for job in context.job_queue.get_jobs_by_name(*):
-                    print(job.callback)
-
-                if not current_jobs:
-                    pass
-                else:
-                    for job in current_jobs:
-                        if (str(update.effective_user.id) in job.id and 
-                            context.user_data['title_to_rename'] in job.id):
-                            # print(f"Args are: {job.args}")
-                            # print(f"kwargs are: {job.kwargs}")
-                            # Construct new id 
-                            suffix = job.id.rsplit(context.user_data['title_to_rename'])[-1]
-                            new_id = str(update.effective_user.id) + '_' + new_title + suffix
-                            preset = get_job_preset_dict(job.id, context)
-                            time2check = time(preset['hour'], preset['minute'])
-                            days_of_week = []
-                            for day in preset['day_of_week'].split(','):
-                                if day == 'sun':
-                                    days_of_week.append(0)
-                                if day == 'mon':
-                                    days_of_week.append(1)
-                                if day == 'tue':
-                                    days_of_week.append(2)
-                                if day == 'wed':
-                                    days_of_week.append(3)
-                                if day == 'thu':
-                                    days_of_week.append(4)
-                                if day == 'fri':
-                                    days_of_week.append(5)
-                                if day == 'sat':
-                                    days_of_week.append(6)
-                            days = tuple(days_of_week)
-                            data = {
-                                "project_title": new_title,
-                                "pm_tg_id": str(update.effective_user.id)
-                            }
-                            job_kwargs = {'id': new_id, 'replace_existing': True}
-                            print(job.func)
-                            print(job.callback)
-                            new_job = context.job_queue.run_daily(job.func, 
-                                                                  user_id=update.effective_user.id,
-                                                                  time=time2check,
-                                                                  days=days,
-                                                                  data=data,
-                                                                  job_kwargs=job_kwargs)
-                            if preset['state'] == 'ON':
-                                new_job.enabled = True
-                            else:
-                                new_job.job.pause()
-                            # new_job = context.job_queue.scheduler.add_job(job.func, args=job.args, kwargs=job.kwargs, id=new_id, name = suffix[1:])
-                            # new_job.args[0].data['project_title'] = new_title
-                            print(new_job.id)
-                            job.remove()
-                            
- 
                 await update.message.reply_text(bot_msg)
             else:
                 bot_msg = (f"Something went wrong, couldn't change '{context.user_data['title_to_rename']}' to '{new_title}'.\n"

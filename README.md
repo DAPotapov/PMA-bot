@@ -49,6 +49,11 @@ First of all: the project file sent to bot should contain field 'tg_username' co
         "active": True,                                 # Is this an active project? Controlled via settings and used in /status command
         "pm_tg_id": '',                                 # Telegram id of PM  
         "tg_chat_id": '',                               # store here group chat where project members discuss project
+        "reminders": {                                  # Dict to store ids of apcheduler jobs for 
+            "morning_update": id,                       # reminders
+            "day_before_update": id,
+            "friday_update": id,
+        }
         "settings": {
             'ALLOW_POST_STATUS_TO_GROUP': False,        # This option controls whether /status command from group chat 
                                                         # will send message  to group chat or directly to user
