@@ -49,6 +49,7 @@ from helpers import (
     add_user_id_to_db,
     add_user_info_to_db,
     add_worker_info_to_staff, 
+    delete_jobs,
     get_assignees,
     get_db, 
     get_job_preset,
@@ -953,21 +954,6 @@ async def stopping(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     bot_msg = "Projects deleted. Reminders too. Bot stopped."
     await context.bot.send_message(update.effective_user.id, bot_msg)    
     return ConversationHandler.END
-
-
-def delete_jobs(user_id: str, context: ContextTypes.DEFAULT_TYPE, title: str = None):
-    """ Removes jobs associated with (if) given project for current user"""
-
-    current_jobs = context.job_queue.scheduler.get_jobs()   
-    if not current_jobs:
-        pass
-    else:
-        for job in current_jobs:
-            prefix = user_id
-            if title:
-                prefix = prefix + '_' + title
-            if prefix in job.id:
-                job.remove()
 
 
 async def stop_aborted(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:

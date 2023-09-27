@@ -128,6 +128,21 @@ def add_worker_info_to_staff(worker: dict):
     return worker_id
 
 
+def delete_jobs(user_id: str, context: ContextTypes.DEFAULT_TYPE, title: str = None):
+    """ Removes jobs associated with (if) given project for current user"""
+
+    current_jobs = context.job_queue.scheduler.get_jobs()   
+    if not current_jobs:
+        pass
+    else:
+        for job in current_jobs:
+            prefix = user_id
+            if title:
+                prefix = prefix + '_' + title
+            if prefix in job.id:
+                job.remove()
+                
+
 def get_assignees(task: dict):
     '''
     Helper function for getting names and telegram usernames
