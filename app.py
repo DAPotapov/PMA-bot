@@ -678,7 +678,7 @@ def file_to_dict(fp):
         return tasks
 
 
-def schedule_jobs(context: ContextTypes.DEFAULT_TYPE):
+def schedule_jobs(context: ContextTypes.DEFAULT_TYPE) -> dict:
     ''' 
     Schedule jobs for main reminders. Return false if not succeded
     TODO v2: When custom reminders functionality will be added this function must be revised
@@ -686,20 +686,14 @@ def schedule_jobs(context: ContextTypes.DEFAULT_TYPE):
 
     morning_update_job, day_before_update_job, file_update_job = None, None, None
 
-    # Create jobs in mongdb in apsheduler collection
-    # Configure id for job from PM id, project title and type of reminder    
-    # job_id = str(context.user_data['PM']['tg_id']) + '_' + context.user_data['project']['title'] + '_' + 'morning_update'
-    # job_id = uuid4()
-
     # Construct additinal information to store in job.data to be available when job runs
     data = {"project_title": context.user_data['project']['title'], 
             "pm_tg_id": str(context.user_data['PM']['tg_id'])}
     
-    # Check if already present
-    # preset = get_job_preset(str(job_id), context)
-    # print(f"Job '{job_id}' scheduled with preset: '{preset}'")    
-    # if not preset:
-
+    ''' To persistence to work job must have explicit ID and 'replace_existing' must be True
+        or a new copy of the job will be created every time application restarts! '''
+    job_kwargs = {'replace_existing': True}
+    
     # Use default values from constants
     try:
         hour, minute = map(int, MORNING.split(":"))                    
@@ -708,17 +702,9 @@ def schedule_jobs(context: ContextTypes.DEFAULT_TYPE):
         logger.error(f'Error while parsing time: {e}')
 
     # Set job schedule 
-    else:
-        
-        ''' To persistence to work job must have explicit ID and 'replace_existing' must be True
-        or a new copy of the job will be created every time application restarts! '''
-        # TODO but what happened if I use automaticaly created id?
+    else:        
 
-        # print(f"When writing to data what type of user id? {type(context.user_data['PM']['tg_id'])}")
-
-        # job_kwargs = {'id': job_id, 'replace_existing': True}
-        job_kwargs = {'replace_existing': True}
-
+        # Create job with configured parameters
         morning_update_job = context.job_queue.run_daily(morning_update, 
                                                             user_id=str(context.user_data['PM']['tg_id']), 
                                                             time=time2check, 
@@ -727,15 +713,10 @@ def schedule_jobs(context: ContextTypes.DEFAULT_TYPE):
         
         # and enable it.
         morning_update_job.enabled = True 
-        print(f"{morning_update_job.job.id} of type: {type(morning_update_job.job.id)}")
-        # print(morning_update_job.callback)
-        print(f"Next time: {morning_update_job.next_t}, is it on? {morning_update_job.enabled}")      
+        # print(f"{morning_update_job.job.id} of type: {type(morning_update_job.job.id)}")
+        # print(f"Next time: {morning_update_job.next_t}, is it on? {morning_update_job.enabled}")      
             
-    # 2nd - daily on the eve of task reminder
-    # job_id = str(context.user_data['PM']['tg_id']) + '_' + context.user_data['project']['title'] + '_' + 'day_before_update'
-    # print(job_id)
-    # preset = get_job_preset(str(job_id), context)
-    # if not preset:                    
+    # 2nd - daily on the eve of task reminder               
     try:
         hour, minute = map(int, ONTHEEVE.split(":"))                    
         time2check = time(hour, minute, tzinfo=datetime.now().astimezone().tzinfo)
@@ -744,20 +725,14 @@ def schedule_jobs(context: ContextTypes.DEFAULT_TYPE):
     
     # Add job to queue and enable it
     else:                            
-        # job_kwargs = {'id': job_id, 'replace_existing': True}
-        job_kwargs = {'replace_existing': True}
         day_before_update_job = context.job_queue.run_daily(day_before_update, 
                                                             user_id=str(context.user_data['PM']['tg_id']), 
                                                             time=time2check, 
                                                             data=data, 
                                                             job_kwargs=job_kwargs)
         day_before_update_job.enabled = True
-            # print(f"Next time: {day_before_update_job.next_t}, is it on? {day_before_update_job.enabled}")   
 
     # Register friday reminder
-    # job_id = str(context.user_data['PM']['tg_id']) + '_' + context.user_data['project']['title'] + '_' + 'file_update'
-    # preset = get_job_preset(job_id, context)
-    # if not preset:   
     try:
         hour, minute = map(int, FRIDAY.split(":"))                    
         time2check = time(hour, minute, tzinfo=datetime.now().astimezone().tzinfo)
@@ -766,9 +741,6 @@ def schedule_jobs(context: ContextTypes.DEFAULT_TYPE):
     
     # Add job to queue and enable it
     else:
-        # job_kwargs = {'id': job_id, 'replace_existing': True}
-        job_kwargs = {'replace_existing': True}
-
         file_update_job = context.job_queue.run_daily(file_update, 
                                                         user_id=str(context.user_data['PM']['tg_id']), 
                                                         time=time2check, 
@@ -776,13 +748,8 @@ def schedule_jobs(context: ContextTypes.DEFAULT_TYPE):
                                                         data=data, 
                                                         job_kwargs=job_kwargs)
         file_update_job.enabled = True
-            # print(f"Next time: {file_update_job.next_t}, is it on? {file_update_job.enabled}") 
 
-    # print("On the exit of job creation function we have:")        
-    # pprint(morning_update_job)
-    # pprint(day_before_update_job)
-    # pprint(file_update_job)
-
+    # Check if jobs created and make output dictionary
     if morning_update_job and day_before_update_job and file_update_job:
         return {                                 
             "morning_update": morning_update_job.id,
