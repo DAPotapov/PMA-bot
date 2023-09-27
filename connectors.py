@@ -241,6 +241,9 @@ def compose_tasks_list(tasks, task, allocations, resources, property_id):
             # Type of link (depend_type): Values are 0=FF, 1=FS, 2=SF and 3=SS (docs at https://learn.microsoft.com/en-us/office-project/xml-data-interchange/xml-schema-for-the-tasks-element?view=project-client-2016)
             # GanttProject type values: 0 = none, 1 = start-start SS, 2 = finish-start FS, 3 - finish-finish FF, 4 - start-finish SF (usually not used)
             depend_type = 1 # FS - most common
+            # TODO refactor to use list:
+            # types = [3, 1, 0, 2]
+            # depend_type = types[int(follower['type'])-1] 
             match follower['type']:
                 case '1':
                     depend_type = 3

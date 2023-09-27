@@ -281,6 +281,7 @@ async def day_before_update(context: ContextTypes.DEFAULT_TYPE) -> None:
 
     # print(f"Contents of user_data: {context.user_data}") # empty, because not saved to DB
     print(f"Job data: {context.job.data}") # exist
+    #print(f"Job id: {context.job.id}") # not exist
 
     # TODO job.data not needed, search by job.id
 
@@ -1379,7 +1380,7 @@ async def transfer_control(update: Update, context: ContextTypes.DEFAULT_TYPE) -
     query = update.callback_query
     await query.answer()
 
-    # Write to DB new owner of project, 
+    # Write to DB new owner of project and update corresponding jobs
     # Send message to user and
     # End conversation because only PM should change settings but current user isn't a PM already 
     if query.data:
@@ -1388,7 +1389,18 @@ async def transfer_control(update: Update, context: ContextTypes.DEFAULT_TYPE) -
             "title": context.user_data['project']['title']},
             {"$set":{"pm_tg_id": query.data}})
         if result.matched_count > 0 and result.modified_count > 0:
-            bot_msg = f"You successfuly tranfered control over project to other"
+            # On success update corresponding jobs
+            reminders = DB.projects.find_one({'title':context.user_data['project']['title'], "pm_tg_id": query.data}, {'reminders':1, '_id':0})
+            if (reminders and type(reminders) == dict and
+                'reminders' in reminders.keys() and reminders['reminders']):
+                for id in reminders['reminders'].values():
+                    job = context.job_queue.scheduler.get_job(id)
+                    if job:
+                        args = job.args
+                        args[0].data['pm_tg_id'] = query.data
+                        job = job.modify(args=args)
+            bot_msg = f"You successfuly transfered control over project to other"
+            # TODO inform reciever that he is in control now
         else:
             bot_msg = f"Something went wrong while transfering control to choosen project team member. Contact developer to check the logs."
             logger.error(f"Couldn't change PM in project '{context.user_data['project']['title']}' " 
@@ -1553,7 +1565,7 @@ async def project_rename_finish(update: Update, context: ContextTypes.DEFAULT_TY
 
         # Check if not existing one then change project title in context and in DB
         prj_id = DB.projects.find_one({"title": new_title, "pm_tg_id": str(update.effective_user.id)}, {"_id":1})
-        print(f"Search for project title returned this: {prj_id}")
+        # print(f"Search for project title returned this: {prj_id}")
         if (prj_id and type(prj_id) == dict and 
             '_id' in prj_id.keys() and prj_id['_id']):
             bot_msg = f"You already have project with name '{new_title}'. Try another one."
@@ -1565,9 +1577,21 @@ async def project_rename_finish(update: Update, context: ContextTypes.DEFAULT_TY
             title_update = DB.projects.update_one({'title': context.user_data['title_to_rename'], "pm_tg_id": str(update.effective_user.id)}, {"$set": {'title': new_title}})
             if title_update.modified_count > 0:
                 bot_msg = f"Got it. '{context.user_data['title_to_rename']}' changed to '{new_title}'"
-                # And in context
+                
+                # Change title in context if needed
                 if (context.user_data['project']['title'] == context.user_data['title_to_rename']):
                     context.user_data['project']['title'] = new_title
+                
+                # Get jobs id from reminders dict, get each job by id and change title in job_data in apscheduler DB
+                reminders = DB.projects.find_one({'title':context.user_data['project']['title'], "pm_tg_id": str(update.effective_user.id)}, {'reminders':1, '_id':0})
+                if (reminders and type(reminders) == dict and
+                    'reminders' in reminders.keys() and reminders['reminders']):
+                    for id in reminders['reminders'].values():
+                        job = context.job_queue.scheduler.get_job(id)
+                        if job:
+                            args = job.args
+                            args[0].data['project_title'] = new_title
+                            job = job.modify(args=args)
                 await update.message.reply_text(bot_msg)
             else:
                 bot_msg = (f"Something went wrong, couldn't change '{context.user_data['title_to_rename']}' to '{new_title}'.\n"
