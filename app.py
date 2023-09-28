@@ -1455,27 +1455,28 @@ async def project_delete_start(update: Update, context: ContextTypes.DEFAULT_TYP
 
 
 async def project_delete_finish(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
-    """ Deletes selected project with reminders from database"""
+    """ Deletes selected project with reminders from database and returns to projects menu"""
     query = update.callback_query
     await query.answer()
 
-    # Delete project from DB and return to projects menu
-    delete_result = DB.projects.delete_one({'title': context.user_data['title_to_delete'], 'pm_tg_id': str(update.effective_user.id)})
-    if delete_result.deleted_count > 0:
-        # Erase reminders as well
-        delete_jobs(str(update.effective_user.id), context, context.user_data['title_to_delete'])
-        msg = f"Project '{context.user_data['title_to_delete']}' successfully deleted"
-    else:
-        msg = f"Unable to delete '{context.user_data['title_to_delete']}' project. Contact the developer."
+    # Delete project and associated jobs from DB 
+    reminders = DB.projects.find_one_and_delete({
+        'title': context.user_data['title_to_delete'], 
+        'pm_tg_id': str(update.effective_user.id)}, 
+        {'reminders': 1, '_id':0})
+    for id in reminders['reminders'].values():
+        context.job_queue.scheduler.get_job(id).remove()
 
-    # Return to level with projects
+    msg = f"Project '{context.user_data['title_to_delete']}' successfully deleted"
+
+    # Return to projects menu level
     context.user_data['level'] -= 1
     context.user_data['branch'].pop()
     keyboard, bot_msg = get_keybord_and_msg(context.user_data['level'], str(update.effective_user.id), context.user_data['branch'][-1])
 
     # Check if we have message and keyboard and show them to user
     if keyboard == None or bot_msg == None:
-        bot_msg = "Some error happened. Unable to show a menu."
+        bot_msg = msg + '\n' + "Some error happened. Unable to show a menu."
         await query.edit_message_text(bot_msg)
         return ConversationHandler.END
     else:
