@@ -49,7 +49,6 @@ from helpers import (
     add_user_id_to_db,
     add_user_info_to_db,
     add_worker_info_to_staff, 
-    delete_jobs,
     get_assignees,
     get_db, 
     get_job_preset,

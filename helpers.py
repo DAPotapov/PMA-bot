@@ -129,33 +129,6 @@ def add_worker_info_to_staff(worker: dict):
     return worker_id
 
 
-def delete_jobs(user_id: str, scheduler: AsyncIOScheduler, title: str = None):
-    """ Removes jobs associated with (if) given project for current user"""
-    # TODO should remove jobs from list with ids
-
-    DB = get_db()
-
-    if DB == None:
-        logger.error(f"There was error getting DB.")
-    else:
-        records = []
-        if title:
-            try:
-                records = list(DB.projects.find({'title': title, 'pm_tg_id': user_id}, {'reminders':1, '_id':0}))
-            except Exception as e:
-                logger.error(f"Couldn't get records from DB for user: '{user_id}' for project '{title}'")
-        else:
-            try:
-                records = list(DB.projects.find({'pm_tg_id': user_id}, {'reminders':1, '_id':0}))
-            except Exception as e:
-                logger.error(f"Couldn't get records from DB for user: '{user_id}'")
-        for record in records:
-            for reminder in record['reminders'].values():
-                job = scheduler.get_job(reminder)
-                if job:
-                    job.remove()
-
-
 def get_assignees(task: dict):
     '''
     Helper function for getting names and telegram usernames
