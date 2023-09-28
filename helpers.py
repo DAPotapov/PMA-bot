@@ -96,7 +96,7 @@ def add_worker_info_to_staff(worker: dict):
     Adds given worker to staff collection if not exist already.
     Fill empty fields in case worker already present in staff (for ex. PM is actioner in other project)
     '''
-
+    
     worker_id = None
     DB = get_db()
 

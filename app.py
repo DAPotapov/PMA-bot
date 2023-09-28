@@ -113,160 +113,168 @@ FIRST_LVL, SECOND_LVL, THIRD_LVL, FOURTH_LVL, FIFTH_LVL, SIXTH_LVL, SEVENTH_LVL 
 ONE, TWO, THREE, FOUR, FIVE, SIX = range(6)
 
 
-def get_keybord_and_msg(level: int, user_id: str, branch: str = None) -> Tuple[list, str]:
+def get_keybord_and_msg(level: int, user_id: str, project: dict, branch: str = None) -> Tuple[list, str]:
     '''
     Helper function to provide specific keyboard on different levels of settings menu
     '''
     # TODO consider taking project and user as input and not go to DB each time when menu item clicked
-
+    global DB
     keyboard = []
     msg = ''
 
-    # Better safe than sorry
-    global DB
-    if DB == None:
-        DB = get_db()
 
-    # Retrieve from DB information about active project and it's settings
-    try:
-        project = DB.projects.find_one({"pm_tg_id": str(user_id), "active": True})
-    except Exception as e:
-        logger.error(f"There was error getting DB: {e}")
-    else:
 
-        # Check returned data to prevent from exceptions
-        if (project and type(project) == dict and 
-            'title' in project.keys() and 'settings' in project.keys() and 
-            project['title'] and project['settings']):
-            
-            # Configure keyboard and construct message depending of menu level
-            match level:
+    # # Retrieve from DB information about active project and it's settings
+    # try:
+    #     project = DB.projects.find_one({"pm_tg_id": str(user_id), "active": True})
+    # except Exception as e:
+    #     logger.error(f"There was error getting DB: {e}")
+    # else:
 
-                # First level of menu 
-                case 0:
-                    msg = (f"Manage settings. Active project: '{project['title']}'")
-                    keyboard = [        
-                        [InlineKeyboardButton(f"Change notifications settings", callback_data="notifications")],
-                        [InlineKeyboardButton(f"Manage projects", callback_data="projects")],
-                        [InlineKeyboardButton(f"Reminders settings", callback_data="reminders")],
-                        [InlineKeyboardButton(f"Transfer control over active project to other user", callback_data="control")],
-                        [InlineKeyboardButton(f"Finish settings", callback_data='finish')],        
-                    ]
+        # Check returned data to prevent exceptions
+        # if (project and type(project) == dict and  # TODO obsolete - I already declared type of argument
+    if ('title' in project.keys() and 'settings' in project.keys() and 
+        'reminders' in project.keys() and
+        project['title'] and project['settings']):
+        
+        # Configure keyboard and construct message depending of menu level
+        match level:
 
-                # Second level of menu
-                case 1:
+            # First level of menu 
+            case 0:
+                msg = (f"Manage settings. Active project: '{project['title']}'")
+                keyboard = [        
+                    [InlineKeyboardButton(f"Change notifications settings", callback_data="notifications")],
+                    [InlineKeyboardButton(f"Manage projects", callback_data="projects")],
+                    [InlineKeyboardButton(f"Reminders settings", callback_data="reminders")],
+                    [InlineKeyboardButton(f"Transfer control over active project to other user", callback_data="control")],
+                    [InlineKeyboardButton(f"Finish settings", callback_data='finish')],        
+                ]
 
-                    match branch:
+            # Second level of menu
+            case 1:
 
-                        case "notifications":
-                            try:
-                                pm_settings = DB.staff.find_one({"tg_id": str(user_id)}, {"settings":1, "_id":0})
-                            except Exception as e:
-                                logger.error(f"There was error getting DB: {e}")
-                            else:
-                                if (pm_settings and 
-                                    type(pm_settings) == dict and
-                                    'settings' in pm_settings.keys() and
-                                    'INFORM_OF_ALL_PROJECTS' in pm_settings['settings'].keys()):
+                match branch:
 
-                                    msg = f"Manage notification settings:"
-                                    keyboard = [        
-                                        [InlineKeyboardButton(f"Allow status update in group chat: {'On' if project['settings']['ALLOW_POST_STATUS_TO_GROUP'] == True else 'Off'}", callback_data=str(ONE))],
-                                        [InlineKeyboardButton(f"Users get anounces about milestones: {'On' if project['settings']['INFORM_ACTIONERS_OF_MILESTONES'] == True else 'Off'}", callback_data=str(TWO))],
-                                        [InlineKeyboardButton(f"/status command notify PM of all projects (not only active): {'On' if pm_settings['settings']['INFORM_OF_ALL_PROJECTS'] == True else 'Off'}", callback_data=str(THREE))],
-                                        [InlineKeyboardButton("Back", callback_data='back')], 
-                                        [InlineKeyboardButton("Finish settings", callback_data='finish')],        
-                                    ]
+                    case "notifications":
+                        # Better safe than sorry 
+                        # TODO use this check in any other place
+                        if DB == None:
+                            DB = get_db()
 
-                        case "projects":                            
-                            msg = f"You can manage these projects (active project could only be renamed): "
+                        try:
+                            pm_settings = DB.staff.find_one({"tg_id": str(user_id)}, {"settings":1, "_id":0})
+                        except Exception as e:
+                            logger.error(f"There was error getting DB: {e}")
+                        else:
+                            if (pm_settings and 
+                                type(pm_settings) == dict and
+                                'settings' in pm_settings.keys() and
+                                'INFORM_OF_ALL_PROJECTS' in pm_settings['settings'].keys()):
+
+                                msg = f"Manage notification settings:"
+                                keyboard = [        
+                                    [InlineKeyboardButton(f"Allow status update in group chat: {'On' if project['settings']['ALLOW_POST_STATUS_TO_GROUP'] == True else 'Off'}", callback_data=str(ONE))],
+                                    [InlineKeyboardButton(f"Users get anounces about milestones: {'On' if project['settings']['INFORM_ACTIONERS_OF_MILESTONES'] == True else 'Off'}", callback_data=str(TWO))],
+                                    [InlineKeyboardButton(f"/status command notify PM of all projects (not only active): {'On' if pm_settings['settings']['INFORM_OF_ALL_PROJECTS'] == True else 'Off'}", callback_data=str(THREE))],
+                                    [InlineKeyboardButton("Back", callback_data='back')], 
+                                    [InlineKeyboardButton("Finish settings", callback_data='finish')],        
+                                ]
+
+                    case "projects":                            
+                        msg = f"You can manage these projects (active project could only be renamed): "
+                        
+                        # Better safe than sorry 
+                        # TODO use this check in any other place
+                        # global DB
+                        if DB == None:
+                            DB = get_db()
+
+                        # Get list of projects for user
+                        projects = list(DB.projects.find({"pm_tg_id": str(user_id)}))
+                        
+                        # For each project make buttons: active(if not active), rename, delete
+                        keyboard = []
+                        for project in projects:                                    
+                            keyboard.append([InlineKeyboardButton(f"Rename: '{project['title']}'", callback_data=f"rename_{project['title']}")])
                             
-                            # Get list of projects for user
-                            projects = list(DB.projects.find({"pm_tg_id": str(user_id)}))
-                            
-                            # For each project make buttons: active(if not active), rename, delete
-                            keyboard = []
-                            for project in projects:                                    
-                                keyboard.append([InlineKeyboardButton(f"Rename: '{project['title']}'", callback_data=f"rename_{project['title']}")])
-                                
-                                if project['active'] == False: 
-                                    row = [
-                                        InlineKeyboardButton(f"Activate '{project['title']}'", callback_data=f"activate_{project['title']}"),
-                                        InlineKeyboardButton(f"Delete '{project['title']}'", callback_data=f"delete_{project['title']}"),
-                                    ]   
-                                    keyboard.append(row)
-                            keyboard.extend([
-                                    [InlineKeyboardButton("Back", callback_data='back')],        
-                                    [InlineKeyboardButton("Finish settings", callback_data='finish')]
-                            ]) 
-
-                        case "reminders":
-                            # TODO: Here I could construct keyboard out of jobs registered for current user,
-                            # but this will need of passing composite callback_data,
-                            # first part of which will be checked by pattern parameter of CallbackQueryHandler
-                            # and second used inside universal reminder function
-                            msg = (f"You can customize reminders here.")
-                            keyboard = [        
-                                [InlineKeyboardButton("Reminder on day before", callback_data='day_before_update')],
-                                [InlineKeyboardButton("Everyday morning reminder", callback_data='morning_update')],
-                                [InlineKeyboardButton("Friday reminder of project files update", callback_data='friday_update')],
+                            if project['active'] == False: 
+                                row = [
+                                    InlineKeyboardButton(f"Activate '{project['title']}'", callback_data=f"activate_{project['title']}"),
+                                    InlineKeyboardButton(f"Delete '{project['title']}'", callback_data=f"delete_{project['title']}"),
+                                ]   
+                                keyboard.append(row)
+                        keyboard.extend([
                                 [InlineKeyboardButton("Back", callback_data='back')],        
-                                [InlineKeyboardButton("Finish settings", callback_data='finish')],        
-                            ]
+                                [InlineKeyboardButton("Finish settings", callback_data='finish')]
+                        ]) 
 
-                        case "control":
-                            msg = (f"Choose a project team member to transfer control to.")
+                    case "reminders":
+                        # TODO: Here I could construct keyboard out of jobs registered for current user and active project,
+                        # but this will need of passing composite callback_data,
+                        # first part of which will be checked by pattern parameter of CallbackQueryHandler
+                        # and second used inside universal reminder function
+                        msg = (f"You can customize reminders here.")
+                        keyboard = [        
+                            [InlineKeyboardButton("Reminder on day before", callback_data='day_before_update')],
+                            [InlineKeyboardButton("Everyday morning reminder", callback_data='morning_update')],
+                            [InlineKeyboardButton("Friday reminder of project files update", callback_data='friday_update')],
+                            [InlineKeyboardButton("Back", callback_data='back')],        
+                            [InlineKeyboardButton("Finish settings", callback_data='finish')],        
+                        ]
 
-                            # Get team members names with telegram ids, except PM
-                            # Construct keyboard from that list
-                            # TODO TEST WHat if it's a sole project? Only PM is working?
-                            team = get_project_team(project)
-                            if team:
-                                keyboard = []
-                                for member in team:
-                                    if user_id != member['tg_id']:
-                                        keyboard.append([InlineKeyboardButton(f"{member['name']} (@{member['tg_username']})", callback_data=member['tg_id'])])       
-                                keyboard.extend([
-                                    [InlineKeyboardButton("Back", callback_data='back')],        
-                                    [InlineKeyboardButton("Finish settings", callback_data='finish')]
-                                ])      
-                                
+                    case "control":
+                        msg = (f"Choose a project team member to transfer control to.")
 
-                # Third menu level
-                case 2:
-                    reminders_kbd = [        
-                        [InlineKeyboardButton("Turn on/off", callback_data=str(ONE))],
-                        [InlineKeyboardButton("Set time", callback_data=str(TWO))],
-                        [InlineKeyboardButton("Set days of week", callback_data=str(THREE))],
-                        [InlineKeyboardButton("Back", callback_data='back')],        
-                        [InlineKeyboardButton("Finish settings", callback_data='finish')],        
-                    ]
-                    project_delete_kbd = [
-                        [InlineKeyboardButton("Yes", callback_data='yes')],
-                        [InlineKeyboardButton("No", callback_data='back')],
-                    ]
-                    # Message contents depend on a branch of menu, return None if nonsense given
-                    match branch:
-                        case 'morning_update':                    
-                            msg = (f"Daily morning reminder has to be set here.\n"
-                                    )
-                            keyboard = reminders_kbd
-                        case 'day_before_update':
-                            msg = (f"The day before reminder has to be set here. \n"
-                                    )
-                            keyboard = reminders_kbd
-                        case 'file_update':
-                            msg = (f"Reminder for file updates on friday has to be set here. \n"
-                                    )
-                            keyboard = reminders_kbd
-                        case 'delete':
-                            msg = f"Are you sure?"
-                            keyboard = project_delete_kbd
-                        # case _:
-                        #     msg = '' # Why?? 
+                        # Get team members names with telegram ids, except PM
+                        # Construct keyboard from that list
+                        # TODO TEST WHat if it's a sole project? Only PM is working?
+                        team = get_project_team(project)
+                        if team:
+                            keyboard = []
+                            for member in team:
+                                if user_id != member['tg_id']:
+                                    keyboard.append([InlineKeyboardButton(f"{member['name']} (@{member['tg_username']})", callback_data=member['tg_id'])])       
+                            keyboard.extend([
+                                [InlineKeyboardButton("Back", callback_data='back')],        
+                                [InlineKeyboardButton("Finish settings", callback_data='finish')]
+                            ])                                
 
-                # case _:
-                #     keyboard = [] # Why bother???
+            # Third menu level
+            case 2:
+                reminders_kbd = [        
+                    [InlineKeyboardButton("Turn on/off", callback_data=str(ONE))],
+                    [InlineKeyboardButton("Set time", callback_data=str(TWO))],
+                    [InlineKeyboardButton("Set days of week", callback_data=str(THREE))],
+                    [InlineKeyboardButton("Back", callback_data='back')],        
+                    [InlineKeyboardButton("Finish settings", callback_data='finish')],        
+                ]
+                project_delete_kbd = [
+                    [InlineKeyboardButton("Yes", callback_data='yes')],
+                    [InlineKeyboardButton("No", callback_data='back')],
+                ]
+                # Message contents depend on a branch of menu, return None if nonsense given
+                match branch:
+                    case 'morning_update':                    
+                        msg = (f"Daily morning reminder has to be set here.\n"
+                                )
+                        keyboard = reminders_kbd
+                    case 'day_before_update':
+                        msg = (f"The day before reminder has to be set here. \n"
+                                )
+                        keyboard = reminders_kbd
+                    case 'file_update':
+                        msg = (f"Reminder for file updates on friday has to be set here. \n"
+                                )
+                        keyboard = reminders_kbd
+                    case 'delete':
+                        msg = f"Are you sure?"
+                        keyboard = project_delete_kbd
+                    # case _:
+                    #     msg = '' # Why?? 
+
+            # case _:
+            #     keyboard = [] # Why bother???
 
     return keyboard, msg
 
@@ -1082,17 +1090,18 @@ async def settings(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     # Check if current user is acknowledged PM then proceed otherwise suggest to start a new project
     docs_count = DB.projects.count_documents({"pm_tg_id": str(update.effective_user.id)})
     if docs_count > 0:
-
+        keyboard = []
+        bot_msg = ''
         # Check if command called in chat
         # Get active project title and store in user_data 
         # (because now PROJECTTITLE contain default value not associated with project)
-        project = DB.projects.find_one({"pm_tg_id": str(update.effective_user.id), "active": True}, 
-                                      {"title": 1, "pm_tg_id":1, "reminders":1, "_id": 0}) # TODO consider adding settings here not calling DB another time
+        project = DB.projects.find_one({"pm_tg_id": str(update.effective_user.id), "active": True}) 
+                                    #   ,{"tasks":0, "_id": 0}) # TODO consider adding settings here not calling DB another time
         if (project and type(project) == dict and 
             'title' in project.keys() and project['title']):
             context.user_data['project'] = project
             # context.user_data['project']['title'] = result['title']
-        keyboard, bot_msg = get_keybord_and_msg(FIRST_LVL, str(update.message.from_user.id))
+            keyboard, bot_msg = get_keybord_and_msg(FIRST_LVL, str(update.message.from_user.id), context.user_data['project'])
         if keyboard == None or bot_msg == None:
             bot_msg = "Some error happened. Unable to show a menu."
             await update.message.reply_text(bot_msg)
@@ -1128,9 +1137,9 @@ async def settings_back(update: Update, context: ContextTypes.DEFAULT_TYPE) -> i
 
     # Make keyboard appropriate to a level we are returning to
     if 'branch' in context.user_data.keys() and context.user_data['branch']:
-        keyboard, bot_msg = get_keybord_and_msg(context.user_data['level'], str(update.effective_user.id), context.user_data['branch'][-1])
+        keyboard, bot_msg = get_keybord_and_msg(context.user_data['level'], str(update.effective_user.id), context.user_data['project'], context.user_data['branch'][-1])
     else:
-        keyboard, bot_msg = get_keybord_and_msg(context.user_data['level'], str(update.effective_user.id))
+        keyboard, bot_msg = get_keybord_and_msg(context.user_data['level'], str(update.effective_user.id), context.user_data['project'])
 
     # Call function which create keyboard and generate message to send to user. End conversation if that was unsuccessful.
     if keyboard == None or bot_msg == None:
@@ -1194,10 +1203,10 @@ async def second_lvl_menu(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
             context.user_data['branch'] = []
         context.user_data['branch'].append(query.data)
         # branch = query.data
-        keyboard, bot_msg = get_keybord_and_msg(context.user_data['level'], str(update.effective_user.id), context.user_data['branch'][-1])
+        keyboard, bot_msg = get_keybord_and_msg(context.user_data['level'], str(update.effective_user.id), context.user_data['project'], context.user_data['branch'][-1])
     else:
         # Stay on same level
-        keyboard, bot_msg = get_keybord_and_msg(context.user_data['level'], str(update.effective_user.id))
+        keyboard, bot_msg = get_keybord_and_msg(context.user_data['level'], str(update.effective_user.id), context.user_data['project'])
 
     # Check if we have message and keyboard and show them to user
     if keyboard == None or bot_msg == None:
@@ -1255,7 +1264,7 @@ async def allow_status_to_group(update: Update, context: ContextTypes.DEFAULT_TY
                                {"$set": {"settings.ALLOW_POST_STATUS_TO_GROUP": ALLOW_POST_STATUS_TO_GROUP}})
 
     # Call function which create keyboard and generate message to send to user. End conversation if that was unsuccessful.
-    keyboard, bot_msg = get_keybord_and_msg(SECOND_LVL, str(update.effective_user.id), "notifications") # !!!
+    keyboard, bot_msg = get_keybord_and_msg(SECOND_LVL, str(update.effective_user.id), context.user_data['project'], "notifications") # !!! TODO branch! here and below
     if keyboard == None or bot_msg == None:
         bot_msg = "Some error happened. Unable to show a menu."
         await update.message.reply_text(bot_msg)
@@ -1286,7 +1295,7 @@ async def milestones_anounce(update: Update, context: ContextTypes.DEFAULT_TYPE)
                                {"$set": {"settings.INFORM_ACTIONERS_OF_MILESTONES": INFORM_ACTIONERS_OF_MILESTONES}})
 
     # Call function which create keyboard and generate message to send to user. End conversation if that was unsuccessful.
-    keyboard, bot_msg = get_keybord_and_msg(SECOND_LVL, str(update.effective_user.id), "notifications")
+    keyboard, bot_msg = get_keybord_and_msg(SECOND_LVL, str(update.effective_user.id), context.user_data['project'], "notifications")
     if keyboard == None or bot_msg == None:
         bot_msg = "Some error happened. Unable to show a menu."
         await update.message.reply_text(bot_msg)
@@ -1317,7 +1326,7 @@ async def notify_of_all_projects(update: Update, context: ContextTypes.DEFAULT_T
                                {"$set": {"settings.INFORM_OF_ALL_PROJECTS": INFORM_OF_ALL_PROJECTS}})
 
     # Call function which create keyboard and generate message to send to user. End conversation if that was unsuccessful.
-    keyboard, bot_msg = get_keybord_and_msg(SECOND_LVL, str(update.effective_user.id), "notifications")
+    keyboard, bot_msg = get_keybord_and_msg(SECOND_LVL, str(update.effective_user.id), context.user_data['project'], "notifications")
     if keyboard == None or bot_msg == None:
         bot_msg = "Some error happened. Unable to show a menu."
         await update.message.reply_text(bot_msg)
@@ -1366,7 +1375,7 @@ async def transfer_control(update: Update, context: ContextTypes.DEFAULT_TYPE) -
     else:
 
         # If callback data absent somehow - return to same level
-        keyboard, bot_msg = get_keybord_and_msg(context.user_data['level'], str(update.effective_user.id), context.user_data['branch'][-1])
+        keyboard, bot_msg = get_keybord_and_msg(context.user_data['level'], str(update.effective_user.id), context.user_data['project'], context.user_data['branch'][-1])
         
         # Check if we have message and keyboard and show them to user
         if keyboard == None or bot_msg == None:
@@ -1407,7 +1416,7 @@ async def project_activate(update: Update, context: ContextTypes.DEFAULT_TYPE) -
         logger.error(f"Query data is empty when get to activate project function")
 
     # Return to same level
-    keyboard, bot_msg = get_keybord_and_msg(context.user_data['level'], str(update.effective_user.id), context.user_data['branch'][-1])
+    keyboard, bot_msg = get_keybord_and_msg(context.user_data['level'], str(update.effective_user.id), context.user_data['project'], context.user_data['branch'][-1])
     
     # Check if we have message and keyboard and show them to user
     if keyboard == None or bot_msg == None:
@@ -1433,7 +1442,7 @@ async def project_delete_start(update: Update, context: ContextTypes.DEFAULT_TYP
         context.user_data['branch'].append(query.data.split("_", 1)[0])
         
         # Show confirmation keyboard 
-        keyboard, bot_msg = get_keybord_and_msg(context.user_data['level'], str(update.effective_user.id), context.user_data['branch'][-1])
+        keyboard, bot_msg = get_keybord_and_msg(context.user_data['level'], str(update.effective_user.id), context.user_data['project'], context.user_data['branch'][-1])
         
         # Check if we have message and keyboard and show them to user
         if keyboard == None or bot_msg == None:
@@ -1471,7 +1480,7 @@ async def project_delete_finish(update: Update, context: ContextTypes.DEFAULT_TY
     # Return to projects menu level
     context.user_data['level'] -= 1
     context.user_data['branch'].pop()
-    keyboard, bot_msg = get_keybord_and_msg(context.user_data['level'], str(update.effective_user.id), context.user_data['branch'][-1])
+    keyboard, bot_msg = get_keybord_and_msg(context.user_data['level'], str(update.effective_user.id), context.user_data['project'], context.user_data['branch'][-1])
 
     # Check if we have message and keyboard and show them to user
     if keyboard == None or bot_msg == None:
@@ -1555,7 +1564,7 @@ async def project_rename_finish(update: Update, context: ContextTypes.DEFAULT_TY
                 await update.message.reply_text(bot_msg)
 
             # Return to level with projects
-            keyboard, bot_msg = get_keybord_and_msg(context.user_data['level'], str(update.effective_user.id), context.user_data['branch'][-1])
+            keyboard, bot_msg = get_keybord_and_msg(context.user_data['level'], str(update.effective_user.id), context.user_data['project'], context.user_data['branch'][-1])
         
             # Check if we have message and keyboard and show them to user
             if keyboard == None or bot_msg == None:
@@ -1579,14 +1588,14 @@ async def reminders_settings_item(update: Update, context: ContextTypes.DEFAULT_
     if query.data:
         context.user_data['level'] = THIRD_LVL
         context.user_data['branch'].append(query.data)
-        keyboard, bot_msg = get_keybord_and_msg(context.user_data['level'], str(update.effective_user.id), context.user_data['branch'][-1])
+        keyboard, bot_msg = get_keybord_and_msg(context.user_data['level'], str(update.effective_user.id), context.user_data['project'], context.user_data['branch'][-1])
         # job_id = str(update.effective_user.id) + '_' + context.user_data['project']['title'] + '_' + str(context.user_data['branch'][-1])
         job_id = context.user_data['project']['reminders'][str(context.user_data['branch'][-1])]
         preset = get_job_preset(job_id, context)
     
     # Stay on same level if not
     else:
-        keyboard, bot_msg = get_keybord_and_msg(context.user_data['level'], str(update.effective_user.id))
+        keyboard, bot_msg = get_keybord_and_msg(context.user_data['level'], str(update.effective_user.id), context.user_data['project'])
 
     if keyboard == None or bot_msg == None:
         bot_msg = "Some error happened. Unable to show a menu."
@@ -1721,7 +1730,7 @@ async def reminder_switcher(update: Update, context: ContextTypes.DEFAULT_TYPE) 
     # Call function which create keyboard and generate message to send to user. 
     # Call function which get current preset of reminder, to inform user.
     # End conversation if that was unsuccessful. 
-    keyboard, bot_msg = get_keybord_and_msg(THIRD_LVL, str(update.effective_user.id), context.user_data['branch'])
+    keyboard, bot_msg = get_keybord_and_msg(THIRD_LVL, str(update.effective_user.id), context.user_data['project'], context.user_data['branch'])
     preset = get_job_preset(job_id, context)
     if keyboard == None or bot_msg == None:
         bot_msg = "Some error happened. Unable to show a menu."
@@ -1754,7 +1763,7 @@ async def reminder_time_pressed(update: Update, context: ContextTypes.DEFAULT_TY
         text = (f"Seems that reminder doesn't set")
 
         # Call function which create keyboard and generate message to send to user. End conversation if that was unsuccessful.
-        keyboard, bot_msg = get_keybord_and_msg(THIRD_LVL, str(update.effective_user.id), context.user_data['branch'][-1])
+        keyboard, bot_msg = get_keybord_and_msg(THIRD_LVL, str(update.effective_user.id), context.user_data['project'], context.user_data['branch'][-1])
         if keyboard == None or bot_msg == None:
             bot_msg = f"{text}\nSome error happened. Unable to show a menu."
             await query.edit_message_text(bot_msg)
@@ -1797,7 +1806,7 @@ async def reminder_days_pressed(update: Update, context: ContextTypes.DEFAULT_TY
         text = (f"Seems that reminder doesn't set")
 
         # Call function which create keyboard and generate message to send to user. End conversation if that was unsuccessful.
-        keyboard, bot_msg = get_keybord_and_msg(THIRD_LVL, str(update.effective_user.id), context.user_data['branch'][-1])
+        keyboard, bot_msg = get_keybord_and_msg(THIRD_LVL, str(update.effective_user.id), context.user_data['project'], context.user_data['branch'][-1])
         if keyboard == None or bot_msg == None:
             bot_msg = f"{text}\nSome error happened. Unable to show a menu."
             await query.edit_message_text(bot_msg)
@@ -1868,7 +1877,7 @@ async def reminder_time_setter(update: Update, context: ContextTypes.DEFAULT_TYP
     await update.message.reply_text(bot_msg)
 
     # Provide keyboard of level 3 menu 
-    keyboard, bot_msg = get_keybord_and_msg(THIRD_LVL, str(update.effective_user.id), context.user_data['branch'][-1])
+    keyboard, bot_msg = get_keybord_and_msg(THIRD_LVL, str(update.effective_user.id), context.user_data['project'], context.user_data['branch'][-1])
 
     # And get current (updated) preset
     # job_id = str(update.effective_user.id) + '_' + context.user_data['project']['title'] + '_' + context.user_data['branch'][-1]
@@ -1928,7 +1937,8 @@ async def reminder_days_setter(update: Update, context: ContextTypes.DEFAULT_TYP
         if new_days:
 
             # Find job by id to reschedule
-            job_id = str(update.effective_user.id) + '_' + context.user_data['project']['title'] + '_' + context.user_data['branch'][-1]
+            # job_id = str(update.effective_user.id) + '_' + context.user_data['project']['title'] + '_' + context.user_data['branch'][-1]
+            job_id = context.user_data['project']['reminders'][context.user_data['branch'][-1]]
             job = context.job_queue.scheduler.get_job(job_id)
             # Get current parameters of job
             tz = job.trigger.timezone
@@ -1953,7 +1963,7 @@ async def reminder_days_setter(update: Update, context: ContextTypes.DEFAULT_TYP
     await update.message.reply_text(bot_msg)
 
     # Provide keyboard of level 3 menu 
-    keyboard, bot_msg = get_keybord_and_msg(THIRD_LVL, str(update.effective_user.id), context.user_data['branch'][-1])
+    keyboard, bot_msg = get_keybord_and_msg(THIRD_LVL, str(update.effective_user.id), context.user_data['project'], context.user_data['branch'][-1])
     # And get current preset (updated) of the reminder to show to user
     # job_id = str(update.effective_user.id) + '_' + context.user_data['project']['title'] + '_' + context.user_data['branch'][-1]
     job_id = context.user_data['project']['reminders'][str(context.user_data['branch'][-1])]
