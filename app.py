@@ -946,7 +946,9 @@ async def stopping(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     """
 
     # Find all jobs for current user and remove them
-    delete_jobs(str(update.effective_user.id), context)    
+    for project in DB.projects.find({"pm_tg_id": str(update.effective_user.id)}):
+        for id in project['reminders'].values():
+            context.job_queue.scheduler.get_job(id).remove()
 
     # Delete all projects for current user. I don't see necessity for checking result of operation for now.
     result = DB.projects.delete_many({"pm_tg_id": str(update.effective_user.id)})

@@ -7,6 +7,7 @@ import logging
 import pymongo
 import os
 
+from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from bson import ObjectId
 from datetime import date
 from dotenv import load_dotenv
@@ -128,20 +129,32 @@ def add_worker_info_to_staff(worker: dict):
     return worker_id
 
 
-def delete_jobs(user_id: str, context: ContextTypes.DEFAULT_TYPE, title: str = None):
+def delete_jobs(user_id: str, scheduler: AsyncIOScheduler, title: str = None):
     """ Removes jobs associated with (if) given project for current user"""
+    # TODO should remove jobs from list with ids
 
-    current_jobs = context.job_queue.scheduler.get_jobs()   
-    if not current_jobs:
-        pass
+    DB = get_db()
+
+    if DB == None:
+        logger.error(f"There was error getting DB.")
     else:
-        for job in current_jobs:
-            prefix = user_id
-            if title:
-                prefix = prefix + '_' + title
-            if prefix in job.id:
-                job.remove()
-                
+        records = []
+        if title:
+            try:
+                records = list(DB.projects.find({'title': title, 'pm_tg_id': user_id}, {'reminders':1, '_id':0}))
+            except Exception as e:
+                logger.error(f"Couldn't get records from DB for user: '{user_id}' for project '{title}'")
+        else:
+            try:
+                records = list(DB.projects.find({'pm_tg_id': user_id}, {'reminders':1, '_id':0}))
+            except Exception as e:
+                logger.error(f"Couldn't get records from DB for user: '{user_id}'")
+        for record in records:
+            for reminder in record['reminders'].values():
+                job = scheduler.get_job(reminder)
+                if job:
+                    job.remove()
+
 
 def get_assignees(task: dict):
     '''
