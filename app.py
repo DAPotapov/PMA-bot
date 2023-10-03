@@ -220,7 +220,7 @@ def get_keybord_and_msg(level: int, user_id: str, project: dict, branch: str = N
                         # Get team members names with telegram ids, except PM
                         # Construct keyboard from that list
                         # TODO TEST WHat if it's a sole project? Only PM is working?
-                        team = get_project_team(project)
+                        team = get_project_team(project, DB)
                         if team:
                             keyboard = []
                             for member in team:
@@ -281,7 +281,7 @@ async def day_before_update(context: ContextTypes.DEFAULT_TYPE) -> None:
         if project and type(project) == dict:            
 
             # Add PM username
-            pm_username = get_worker_tg_username_by_tg_id(str(context.job.data['pm_tg_id']))
+            pm_username = get_worker_tg_username_by_tg_id(str(context.job.data['pm_tg_id']), DB)
             if pm_username:
                 project['tg_username'] = pm_username
             else:
@@ -335,7 +335,7 @@ async def echo(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     logger.info(f'{user.id} ({user.username}): {text}')
 
     # TODO I can use it to gather id from chat members and add them to project
-    result = add_user_info_to_db(user)
+    result = add_user_info_to_db(user, DB)
     pprint(result)
     if not result:
         logger.warning(f"User id ({user.id}) of {user.username} was not added to DB (maybe already present).")
@@ -375,13 +375,13 @@ async def file_update(context: ContextTypes.DEFAULT_TYPE) -> None:
         if project and type(project) == dict:                
 
             # Add PM username
-            pm_username = get_worker_tg_username_by_tg_id(str(context.job.data['pm_tg_id']))
+            pm_username = get_worker_tg_username_by_tg_id(str(context.job.data['pm_tg_id']), DB)
             if pm_username:
                 project['tg_username'] = pm_username
             else:
                 logger.error(f"PM (with tg_id: {str(context.job.data['pm_tg_id'])}) was not found in db.staff!")
             
-            team = get_project_team(project)
+            team = get_project_team(project, DB)
             if team:
                 for member in team:
                     if member['tg_id']:
@@ -429,12 +429,12 @@ async def morning_update(context: ContextTypes.DEFAULT_TYPE) -> None:
         if project and type(project) == dict:            
 
             # Get project team to inform
-            team = get_project_team(project)
+            team = get_project_team(project, DB)
             if team:
 
                 # For each member compose status update on project and send
                 for member in team:
-                    bot_msg = get_status_on_project(project, member['_id'])
+                    bot_msg = get_status_on_project(project, member['_id'], DB)
                     await context.bot.send_message(member['tg_id'], bot_msg)
 
                     # Send such update to PM too if it was not sent already like to an actioner
@@ -505,7 +505,6 @@ def clean_project_title(user_input: str) -> str:
 async def naming_project(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     ''' Function for recognizing name of the project '''
     
-
     global PROJECTTITLE
 
     try: 
@@ -534,7 +533,7 @@ async def naming_project(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
         context.user_data['project'] = project
 
         # Check and add PM to staff
-        pm_oid = add_worker_info_to_staff(context.user_data['PM'])
+        pm_oid = add_worker_info_to_staff(context.user_data['PM'], DB)
         if not pm_oid:
             bot_msg = "There is a problem with database connection. Contact developer or try later."
             await update.message.reply_text(bot_msg)
@@ -599,7 +598,7 @@ async def file_recieved(update: Update, context: ContextTypes.DEFAULT_TYPE) -> i
                                                           {"$set": {"active": False}})
                         
                         # If other project didn't switched to inactive state raise an error, 
-                        # because later bot couldn't comprehend which priject to use
+                        # because later bot couldn't comprehend which project to use
                         if result.acknowledged and result.modified_count == 0:
                             # TODO consider to create new type of error derived from some base class
                             raise ValueError("Attempt to update database was unsuccessful. Records maybe corrupted. Contact developer.")
@@ -748,10 +747,12 @@ async def status(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     bot_msg = "Should print status to user"
 
     user_id = str(update.effective_user.id)
+    # TODO add user_id if not yet (see bug below)
     user_name = update.effective_user.username
 
     # Read setting for effective user if there is connection to database
-    if is_db(DB):    
+    if is_db(DB):  
+        # TODO fix bug: if participant call /status before his id added to DB - this will return nothing  
         record = DB.staff.find_one({"tg_id": user_id}, {"settings.INFORM_OF_ALL_PROJECTS":1, "_id": 0})
         if (record and type(record) == dict and
             'settings' in record.keys() and record['settings']):
@@ -790,24 +791,24 @@ async def status(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
 
                                 # Check dates and compose message including information about human resurces
                                 if delta_start.days == 0:
-                                    people, user_ids = get_assignees(task)
+                                    people, user_ids = get_assignees(task, DB)
                                     if not people:
                                         people = "can't say, better check assignments in project file."
 
                                     # TODO: I can compose not only message here but also a keyboard to send to user to interact with
                                     msg = msg + f"\nTask {task['id']} '{task['name']}' started today. Assigned to: {people}"
                                 elif delta_start.days > 0  and delta_end.days < 0:
-                                    people, user_ids = get_assignees(task)
+                                    people, user_ids = get_assignees(task, DB)
                                     if not people:
                                         people = "can't say, better check assignments in project file."
                                     msg = msg + f"\nTask {task['id']} '{task['name']}' is intermidiate. Due date is {task['enddate']}. Assigned to: {people}"
                                 elif delta_end.days == 0:
-                                    people, user_ids = get_assignees(task)
+                                    people, user_ids = get_assignees(task, DB)
                                     if not people:
                                         people = "can't say, better check assignments in project file."
                                     msg = msg + f"\nTask {task['id']}  '{task['name']}' must be completed today! Assigned to: {people}"
                                 elif delta_start.days > 0 and delta_end.days > 0:         
-                                    people, user_ids = get_assignees(task)
+                                    people, user_ids = get_assignees(task, DB)
                                     if not people:
                                         people = "can't say, better check assignments in project file."                              
                                     msg = msg + f"\nTask {task['id']} '{task['name']}' is overdue! (had to be completed on {task['enddate']}). Assigned to: {people}"
@@ -833,10 +834,10 @@ async def status(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
                 # If current user not found in project managers 
                 # then just search him by his ObjectId in all records and inform about events
                 # if nothing found - Suggest him to start a project
-                user_oid = get_worker_oid_from_db_by_tg_id(user_id)
+                user_oid = get_worker_oid_from_db_by_tg_id(user_id, DB)
                 # print(f"Looking object id by tg_id: {user_oid}")
                 if not user_oid:
-                    user_oid = get_worker_oid_from_db_by_tg_username(user_name)
+                    user_oid = get_worker_oid_from_db_by_tg_username(user_name, DB)
                     # print(f"Looking object id by tg_username: {user_oid}")
                 if not user_oid:
                     bot_msg = ("No information found about you in database.\n"
@@ -855,7 +856,7 @@ async def status(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
                         for project in projects:
 
                             # Compose message from tasks of the project and send to user
-                            bot_msg = get_status_on_project(project, user_oid)
+                            bot_msg = get_status_on_project(project, user_oid, DB)
                             await context.bot.send_message(user_id, bot_msg)
 
                     # Inform user if he is in staff, but not in any project participants
@@ -896,14 +897,14 @@ async def stop(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
         else:
 
             # If he is an actioner
-            user_oid = get_worker_oid_from_db_by_tg_id(str(update.effective_user.id))
+            user_oid = get_worker_oid_from_db_by_tg_id(str(update.effective_user.id), DB)
             projects_count = 0
             if user_oid:
                 projects_count = DB.projects.count_documents({"tasks.actioners": {"$elemMatch":{"actioner_id": user_oid}}})
                 if projects_count > 0:
 
                     # Collect names of projects with their PMs tg_username to contact
-                    projects_with_PMs = get_projects_and_pms_for_user(user_oid)
+                    projects_with_PMs = get_projects_and_pms_for_user(user_oid, DB)
                     if projects_with_PMs:
                         bot_msg = f"I'm afraid I can't stop informing you of events of other people projects: {projects_with_PMs}"
                     else:
@@ -982,7 +983,7 @@ async def upload(update: Update, context: CallbackContext) -> int:
 
         # If user is not PM at least add his id in DB (if his telegram username is there)
         else:
-            add_user_info_to_db(update.effective_user)
+            add_user_info_to_db(update.effective_user, DB)
             bot_msg = f"Change in project can be made only after starting one: use /start command to start a project."
             await update.message.reply_text(bot_msg)
             return ConversationHandler.END
@@ -1056,7 +1057,7 @@ async def settings(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     # + Time of daily update of starting and deadline tasks, and days too
 
     # Check if current user is acknowledged PM then proceed otherwise suggest to start a new project
-    if is_db(DB):
+    if is_db(DB): #  and DB != None: could be added to silence pylance (see below)
         docs_count = DB.projects.count_documents({"pm_tg_id": str(update.effective_user.id)})
         if docs_count > 0:
             keyboard = []
@@ -1081,7 +1082,7 @@ async def settings(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
         else:
 
             # If user is not PM at least add his id in DB (if his telegram username is there)
-            add_user_info_to_db(update.effective_user)
+            add_user_info_to_db(update.effective_user, DB)
             bot_msg = f"Settings available after starting a project: use /start command for a new one."
             await update.message.reply_text(bot_msg)
             return ConversationHandler.END
