@@ -158,11 +158,11 @@ def get_keybord_and_msg(level: int, user_id: str, project: dict, branch: str = N
 
                     case "notifications":
                         # Better safe than sorry 
-                        # TODO use this check in any other place
+                        # TODO use this check in any other place; add try except to catch absent DB
                         if DB == None:
                             DB = get_db()
 
-                        try:
+                        try: #TODO consider get this setting outside keyboard function
                             pm_settings = DB.staff.find_one({"tg_id": str(user_id)}, {"settings":1, "_id":0})
                         except Exception as e:
                             logger.error(f"There was error getting DB: {e}")
@@ -1193,8 +1193,6 @@ async def second_lvl_menu(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
 
     query = update.callback_query
     await query.answer()
-    # print(f"Type of query: {type(query)}. Query itself: {query}")
-    # print(f"What data is here? {query.data}")
 
     # Call function which create keyboard and generate message to send to user. End conversation if that was unsuccessful.
     if query.data:
@@ -1203,10 +1201,17 @@ async def second_lvl_menu(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
             context.user_data['branch'] = []
         context.user_data['branch'].append(query.data)
         # branch = query.data
-        keyboard, bot_msg = get_keybord_and_msg(context.user_data['level'], str(update.effective_user.id), context.user_data['project'], context.user_data['branch'][-1])
+        keyboard, bot_msg = get_keybord_and_msg(
+            context.user_data['level'], 
+            str(update.effective_user.id), 
+            context.user_data['project'], 
+            context.user_data['branch'][-1])
     else:
         # Stay on same level
-        keyboard, bot_msg = get_keybord_and_msg(context.user_data['level'], str(update.effective_user.id), context.user_data['project'])
+        keyboard, bot_msg = get_keybord_and_msg(
+            context.user_data['level'], 
+            str(update.effective_user.id), 
+            context.user_data['project'])
 
     # Check if we have message and keyboard and show them to user
     if keyboard == None or bot_msg == None:
@@ -1247,24 +1252,31 @@ async def second_lvl_menu(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
 async def allow_status_to_group(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     """Switch for menu option 'Allow status update in group chat'"""
     query = update.callback_query
-    # print(f"Allow status to group function, query.data = {query.data}")
-    # print(f"Current level is: {context.user_data['level']}")
     await query.answer()
 
-    # Read parameter and switch it
-    result = DB.projects.find_one({"pm_tg_id": str(update.effective_user.id), "title": context.user_data['project']['title']}, 
-                                  {"settings.ALLOW_POST_STATUS_TO_GROUP": 1, "_id": 0})
-    if (result and type(result) == dict and 
-        'settings' in result.keys() and result['settings']):
-        ALLOW_POST_STATUS_TO_GROUP = result['settings']['ALLOW_POST_STATUS_TO_GROUP']
-        ALLOW_POST_STATUS_TO_GROUP = False if ALLOW_POST_STATUS_TO_GROUP else True
+    # Switch parameter in context
+    context.user_data['project']['settings']['ALLOW_POST_STATUS_TO_GROUP'] = False if context.user_data['project']['settings']['ALLOW_POST_STATUS_TO_GROUP'] else True
+    # result = DB.projects.find_one({"pm_tg_id": str(update.effective_user.id), "title": context.user_data['project']['title']}, 
+    #                               {"settings.ALLOW_POST_STATUS_TO_GROUP": 1, "_id": 0})
+    # if (result and type(result) == dict and 
+    #     'settings' in result.keys() and result['settings']):
+    #     ALLOW_POST_STATUS_TO_GROUP = result['settings']['ALLOW_POST_STATUS_TO_GROUP']
+    #     ALLOW_POST_STATUS_TO_GROUP = False if ALLOW_POST_STATUS_TO_GROUP else True
         
-        # No need to check for success, let app proceed
-        DB.projects.update_one({"pm_tg_id": str(update.effective_user.id), "title": context.user_data['project']['title']}, 
-                               {"$set": {"settings.ALLOW_POST_STATUS_TO_GROUP": ALLOW_POST_STATUS_TO_GROUP}})
+    # Update DB. No need to check for success, let app proceed
+    DB.projects.update_one({
+        "pm_tg_id": str(update.effective_user.id), 
+        "title": context.user_data['project']['title']}, 
+        {"$set": {
+            "settings.ALLOW_POST_STATUS_TO_GROUP": context.user_data['project']['settings']['ALLOW_POST_STATUS_TO_GROUP']
+            }})
 
     # Call function which create keyboard and generate message to send to user. End conversation if that was unsuccessful.
-    keyboard, bot_msg = get_keybord_and_msg(SECOND_LVL, str(update.effective_user.id), context.user_data['project'], "notifications") # !!! TODO branch! here and below
+    keyboard, bot_msg = get_keybord_and_msg(
+        SECOND_LVL, 
+        str(update.effective_user.id), 
+        context.user_data['project'], 
+        context.user_data['branch'][-1]) 
     if keyboard == None or bot_msg == None:
         bot_msg = "Some error happened. Unable to show a menu."
         await update.message.reply_text(bot_msg)
@@ -1278,24 +1290,34 @@ async def allow_status_to_group(update: Update, context: ContextTypes.DEFAULT_TY
 async def milestones_anounce(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     """Switch for menu option 'Users get anounces about milestones'"""
     query = update.callback_query
-    # print(f"Milestones function, query.data = {query.data}")
-    # print(f"Current level is: {context.user_data['level']}")
     await query.answer()
 
     # Read parameter and switch it
-    result = DB.projects.find_one({"pm_tg_id": str(update.effective_user.id), "title": context.user_data['project']['title']}, 
-                                  {"settings.INFORM_ACTIONERS_OF_MILESTONES": 1, "_id": 0})
-    if (result and type(result) == dict and 
-        'settings' in result.keys() and result['settings']):
-        INFORM_ACTIONERS_OF_MILESTONES = result['settings']['INFORM_ACTIONERS_OF_MILESTONES']
-        INFORM_ACTIONERS_OF_MILESTONES = False if INFORM_ACTIONERS_OF_MILESTONES else True
+    # result = DB.projects.find_one({"pm_tg_id": str(update.effective_user.id), "title": context.user_data['project']['title']}, 
+    #                               {"settings.INFORM_ACTIONERS_OF_MILESTONES": 1, "_id": 0})
+    # if (result and type(result) == dict and 
+    #     'settings' in result.keys() and result['settings']):
+    #     INFORM_ACTIONERS_OF_MILESTONES = result['settings']['INFORM_ACTIONERS_OF_MILESTONES']
+    #     INFORM_ACTIONERS_OF_MILESTONES = False if INFORM_ACTIONERS_OF_MILESTONES else True
 
-        # No need to check for success, let app proceed
-        DB.projects.update_one({"pm_tg_id": str(update.effective_user.id), "title": context.user_data['project']['title']}, 
-                               {"$set": {"settings.INFORM_ACTIONERS_OF_MILESTONES": INFORM_ACTIONERS_OF_MILESTONES}})
+    # Switch parameter in context
+    context.user_data['project']['settings']['INFORM_ACTIONERS_OF_MILESTONES'] = False if context.user_data['project']['settings']['INFORM_ACTIONERS_OF_MILESTONES'] else True
+    
+    # No need to check for success, let app proceed
+    DB.projects.update_one({
+        "pm_tg_id": str(update.effective_user.id), 
+        "title": context.user_data['project']['title']}, 
+        {"$set": {
+            "settings.INFORM_ACTIONERS_OF_MILESTONES": context.user_data['project']['settings']['INFORM_ACTIONERS_OF_MILESTONES']
+            }})
 
     # Call function which create keyboard and generate message to send to user. End conversation if that was unsuccessful.
-    keyboard, bot_msg = get_keybord_and_msg(SECOND_LVL, str(update.effective_user.id), context.user_data['project'], "notifications")
+    keyboard, bot_msg = get_keybord_and_msg(
+        SECOND_LVL, 
+        str(update.effective_user.id), 
+        context.user_data['project'], 
+        context.user_data['branch'][-1]
+        ) 
     if keyboard == None or bot_msg == None:
         bot_msg = "Some error happened. Unable to show a menu."
         await update.message.reply_text(bot_msg)
@@ -1309,8 +1331,6 @@ async def milestones_anounce(update: Update, context: ContextTypes.DEFAULT_TYPE)
 async def notify_of_all_projects(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     """Switch for menu option '/status command notify PM of all projects (not only active)'"""
     query = update.callback_query
-    # print(f"Notify of all projects function, query.data = {query.data}")
-    # print(f"Current level is: {context.user_data['level']}")
     await query.answer()
 
     # Read parameter and switch it
@@ -1326,7 +1346,12 @@ async def notify_of_all_projects(update: Update, context: ContextTypes.DEFAULT_T
                                {"$set": {"settings.INFORM_OF_ALL_PROJECTS": INFORM_OF_ALL_PROJECTS}})
 
     # Call function which create keyboard and generate message to send to user. End conversation if that was unsuccessful.
-    keyboard, bot_msg = get_keybord_and_msg(SECOND_LVL, str(update.effective_user.id), context.user_data['project'], "notifications")
+    keyboard, bot_msg = get_keybord_and_msg(
+        SECOND_LVL, 
+        str(update.effective_user.id), 
+        context.user_data['project'], 
+        context.user_data['branch'][-1]
+        ) 
     if keyboard == None or bot_msg == None:
         bot_msg = "Some error happened. Unable to show a menu."
         await update.message.reply_text(bot_msg)
@@ -1352,6 +1377,7 @@ async def transfer_control(update: Update, context: ContextTypes.DEFAULT_TYPE) -
             "title": context.user_data['project']['title']},
             {"$set":{"pm_tg_id": query.data}})
         if result.matched_count > 0 and result.modified_count > 0:
+            
             # On success update corresponding jobs
             reminders = DB.projects.find_one({'title':context.user_data['project']['title'], "pm_tg_id": query.data}, {'reminders':1, '_id':0})
             if (reminders and type(reminders) == dict and

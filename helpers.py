@@ -160,7 +160,7 @@ def get_assignees(task: dict):
 
 def get_db():
     """
-    Establish connection to database and returns database instance
+    Establish connection to database and returns database instance. Raises exception if not succeed.
     """
     load_dotenv()
     BOT_NAME = os.environ.get('BOT_NAME')
@@ -170,7 +170,7 @@ def get_db():
     # DB_URI = f"mongodb://{BOT_NAME}:{BOT_PASS}@localhost:27017/admin?retryWrites=true&w=majority"
     DB_NAME = os.environ.get("DB_NAME", "database")
     host = '127.0.0.1:27017'
-    DB = None
+    # DB = None
     try:
         uri = "mongodb://%s:%s@%s" % (quote_plus(BOT_NAME), quote_plus(BOT_PASS), host)
         # client = pymongo.MongoClient(f"mongodb://{BOT_NAME}:{BOT_PASS}@localhost:27017/admin?retryWrites=true&w=majority")
@@ -180,7 +180,10 @@ def get_db():
         logger.error(f"There is problem with connecting to db '{DB_NAME}': {e}")   
     except Exception as e:
         logger.error(f"Error occurred: {e}")
-    return DB
+    else:
+        if DB == None:
+            raise Exception # TODO make it other
+        return DB
 
 
 def get_job_preset(job_id: str, context: ContextTypes.DEFAULT_TYPE) -> str:
