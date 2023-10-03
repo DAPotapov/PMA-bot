@@ -16,6 +16,7 @@ import asyncio
 import re
 import connectors
 import pymongo
+import sys
 
 from dotenv import load_dotenv
 from datetime import datetime, date, time
@@ -93,7 +94,10 @@ BOT_PASS = os.environ.get('BOT_PASS')
 DB_URI = f"mongodb://{BOT_NAME}:{BOT_PASS}@localhost:27017/admin?retryWrites=true&w=majority"
 
 # Make connection to database
-DB = get_db()
+try:
+    DB = get_db()
+except ConnectionError as e:
+    sys.exit(f"Couldn't connect to DB.\n {e}\nCan't work without it.")
 
 # Set list of commands
 help_cmd = BotCommand("help","выводит данное описание")
@@ -1755,7 +1759,7 @@ async def reminder_time_setter(update: Update, context: ContextTypes.DEFAULT_TYP
                     f"{job.next_run_time}"
                     )       
 
-    # Inform the user how reschedule went #TODO test this!
+    # Inform the user how reschedule went
     await update.message.reply_text(bot_msg)
 
     # Provide keyboard of level 3 menu 
