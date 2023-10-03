@@ -60,6 +60,7 @@ from helpers import (
     get_worker_oid_from_db_by_tg_id,
     get_worker_oid_from_db_by_tg_username, 
     get_worker_tg_username_by_tg_id,
+    is_db,
     save_json)
 
 # For testing purposes
@@ -93,7 +94,7 @@ BOT_NAME = os.environ.get('BOT_NAME')
 BOT_PASS = os.environ.get('BOT_PASS')
 DB_URI = f"mongodb://{BOT_NAME}:{BOT_PASS}@localhost:27017/admin?retryWrites=true&w=majority"
 
-# Make connection to database
+# Make connection to database # TODO use similar check in other places
 try:
     DB = get_db()
 except ConnectionError as e:
@@ -122,7 +123,7 @@ def get_keybord_and_msg(level: int, user_id: str, project: dict, branch: str = N
     Helper function to provide specific keyboard on different levels of settings menu
     '''
     # TODO consider taking project and user as input and not go to DB each time when menu item clicked
-    global DB
+    # global DB
     keyboard = []
     msg = ''
 
@@ -152,8 +153,8 @@ def get_keybord_and_msg(level: int, user_id: str, project: dict, branch: str = N
                     case "notifications":
                         # Better safe than sorry 
                         # TODO use this check in any other place; add try except to catch absent DB
-                        if DB == None:
-                            DB = get_db()
+                        # if DB == None:
+                            # DB = get_db()
 
                         try: #TODO consider get this setting outside keyboard function
                             pm_settings = DB.staff.find_one({"tg_id": str(user_id)}, {"settings":1, "_id":0})
@@ -175,35 +176,32 @@ def get_keybord_and_msg(level: int, user_id: str, project: dict, branch: str = N
                                 ]
 
                     case "projects":                            
-                        msg = f"You can manage these projects (active project could only be renamed): "
                         
                         # Better safe than sorry 
-                        # TODO use this check in any other place
-                        # global DB
-                        if DB == None:
-                            DB = get_db()
-
-                        # Get list of projects for user
-                        projects = list(DB.projects.find({"pm_tg_id": str(user_id)}))
-                        
-                        # For each project make buttons: active(if not active), rename, delete
-                        keyboard = []
-                        for project in projects:                                    
-                            keyboard.append([InlineKeyboardButton(f"Rename: '{project['title']}'", callback_data=f"rename_{project['title']}")])
+                        if is_db(DB):
+                            msg = f"You can manage these projects (active project could only be renamed): "
+                            # Get list of projects for user
+                            projects = list(DB.projects.find({"pm_tg_id": str(user_id)}))
                             
-                            if project['active'] == False: 
-                                row = [
-                                    InlineKeyboardButton(f"Activate '{project['title']}'", callback_data=f"activate_{project['title']}"),
-                                    InlineKeyboardButton(f"Delete '{project['title']}'", callback_data=f"delete_{project['title']}"),
-                                ]   
-                                keyboard.append(row)
-                        keyboard.extend([
-                                [InlineKeyboardButton("Back", callback_data='back')],        
-                                [InlineKeyboardButton("Finish settings", callback_data='finish')]
-                        ]) 
+                            # For each project make buttons: active(if not active), rename, delete
+                            keyboard = []
+                            for project in projects:                                    
+                                keyboard.append([InlineKeyboardButton(f"Rename: '{project['title']}'", callback_data=f"rename_{project['title']}")])
+                                
+                                if project['active'] == False: 
+                                    row = [
+                                        InlineKeyboardButton(f"Activate '{project['title']}'", callback_data=f"activate_{project['title']}"),
+                                        InlineKeyboardButton(f"Delete '{project['title']}'", callback_data=f"delete_{project['title']}"),
+                                    ]   
+                                    keyboard.append(row)
+                            keyboard.extend([
+                                    [InlineKeyboardButton("Back", callback_data='back')],        
+                                    [InlineKeyboardButton("Finish settings", callback_data='finish')]
+                            ])                         
 
                     case "reminders":
                         # TODO: Here I could construct keyboard out of jobs registered for current user and active project,
+                        # similar to project list above.
                         # but this will need of passing composite callback_data,
                         # first part of which will be checked by pattern parameter of CallbackQueryHandler
                         # and second used inside universal reminder function
@@ -275,18 +273,9 @@ async def day_before_update(context: ContextTypes.DEFAULT_TYPE) -> None:
     # TODO how to make observation of project a standalone function to be called elsewhere?
     # because every reminder function load project from file and looks through it
 
-    # print(f"Contents of user_data: {context.user_data}") # empty, because not saved to DB
-    print(f"Job data: {context.job.data}") # exist
-    #print(f"Job id: {context.job.id}") # not exist
-
-    # TODO job.data not needed, search by job.id
-
-    # Get project from DB
-    try:
+    if is_db(DB):
+        # Get project from DB
         project = DB.projects.find_one({"pm_tg_id": str(context.job.data['pm_tg_id']), "title": context.job.data['project_title']})
-    except Exception as e:
-        logger.error(f"There was error getting DB: {e}")
-    else:
 
         # Check type of return if it is dictionary, don't bother to check every expected field
         if project and type(project) == dict:            
@@ -330,6 +319,9 @@ async def day_before_update(context: ContextTypes.DEFAULT_TYPE) -> None:
                         
                         # And inform PM
                         await context.bot.send_message(project['pm_tg_id'], bot_msg)
+    else:
+        bot_msg = f"Error ocurred while accessing database. Try again later or contact developer."
+        await context.bot.send_message(context.job.data['pm_tg_id'], bot_msg)
 
 
 # TURNED OFF because conflicting with handlers which use input from user (naming project in /start, for example)
@@ -364,7 +356,7 @@ async def feedback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
 
 async def feedback_answer(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     """ Gather information user provided and answer user"""
-    # TODO Maybe add handling of file or screenshot (PHOTO) recieving from user?
+    # TODO Maybe add handling of file or screenshot (PHOTO) recieving from user? - in next version
     logger.warning(f'FEEDBACK from {update.message.from_user.username} ({update.message.from_user.id}): {update.message.text}')
     bot_msg = "Feedback sent to developer."
     await update.message.reply_text(bot_msg)
@@ -377,12 +369,9 @@ async def file_update(context: ContextTypes.DEFAULT_TYPE) -> None:
     This function is a reminder for team members that common files should be updated in the end of the week
     '''
 
-    # Get project from DB
-    try:
+    if is_db(DB):
+        # Get project from DB
         project = DB.projects.find_one({"pm_tg_id": str(context.job.data['pm_tg_id']), "title": context.job.data['project_title']})
-    except Exception as e:
-        logger.error(f"There was error getting DB: {e}")
-    else:
         if project and type(project) == dict:                
 
             # Add PM username
@@ -400,6 +389,9 @@ async def file_update(context: ContextTypes.DEFAULT_TYPE) -> None:
                                 f"Other team members should have actual information!"
                         )
                         await context.bot.send_message(member['tg_id'], bot_msg)
+    else:
+        bot_msg = f"Error ocurred while accessing database. Try again later or contact developer."
+        await context.bot.send_message(context.job.data['pm_tg_id'], bot_msg)
 
 
 async def help(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -412,6 +404,7 @@ async def help(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     await update.message.reply_text(bot_msg)
 
     bot_commands = await context.bot.getMyCommands()
+    
     # Build message about commands not repeating /help command
     bot_msg = ''
     for command in bot_commands:
@@ -430,15 +423,9 @@ async def morning_update(context: ContextTypes.DEFAULT_TYPE) -> None:
     # because status function load project from file and looks through it
     # Use gen_team
 
-    # print(f"Contents of user_data: {context.user_data}") # empty, because not saved to DB
-    print(f"Job data: {context.job.data}") # exist
-
-    # Get project from DB
-    try:
+    if is_db(DB):
+        # Get project from DB
         project = DB.projects.find_one({"pm_tg_id": str(context.job.data['pm_tg_id']), "title": context.job.data['project_title']})
-    except Exception as e:
-        logger.error(f"There was error getting DB: {e}")
-    else:
         if project and type(project) == dict:            
 
             # Get project team to inform
@@ -458,6 +445,9 @@ async def morning_update(context: ContextTypes.DEFAULT_TYPE) -> None:
             else:
                 bot_msg = f"Project has no team or something is wrong with database - consult developer."
                 await context.bot.send_message(str(context.job.data['pm_tg_id']), bot_msg)
+    else:
+        bot_msg = f"Error ocurred while accessing database. Try again later or contact developer."
+        await context.bot.send_message(context.job.data['pm_tg_id'], bot_msg)
 
 
 ######### START section ########################
@@ -592,19 +582,12 @@ async def file_recieved(update: Update, context: ContextTypes.DEFAULT_TYPE) -> i
                         f"\nRemember that you can /start a new project anytime.")
 
             # Save project to DB
-            try:
+            if is_db(DB):
                 prj_oid = DB.projects.insert_one(context.user_data['project'])
-            except Exception as e:
-                logger.error(f"There was error getting DB: {e}")
-                bot_msg = (bot_msg + f"There is a problem with database connection. Contact developer or try later.")
-                await update.message.reply_text(bot_msg)
-                return ConversationHandler.END
-            else:
 
                 # If succeed make other projects inactive
                 if prj_oid and prj_oid.inserted_id:
                     bot_msg = (bot_msg + f"\nProject added to database.\nProject initialization complete.")
-                    # print(f"can i get just here? {prj_oid}")
 
                     # Since new project added successfully and it's active, 
                     # lets make other projects inactive (actually there should be just one, but just in case)
@@ -620,10 +603,11 @@ async def file_recieved(update: Update, context: ContextTypes.DEFAULT_TYPE) -> i
                         if result.acknowledged and result.modified_count == 0:
                             # TODO consider to create new type of error derived from some base class
                             raise ValueError("Attempt to update database was unsuccessful. Records maybe corrupted. Contact developer.")
-                    
-            finally:
+            else:
+                bot_msg = (bot_msg + f"There is a problem with database connection. Contact developer or try later.")
                 await update.message.reply_text(bot_msg)
-                return ConversationHandler.END       
+                return ConversationHandler.END        
+  
         else:
             bot_msg = (f"Couldn't process given file.\n"
                         f"Supported formats are: .gan (GanttProject), .json, .xml (MS Project)\n"
@@ -637,7 +621,7 @@ async def file_recieved(update: Update, context: ContextTypes.DEFAULT_TYPE) -> i
 
 async def start_ended(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     ''' Fallback function of start routine'''
-    # TODO change this message to more meaningful
+
     bot_msg = "Procedure of starting new project aborted."
     logger.warning(f"User: {update.message.from_user.username} ({update.message.from_user.id}) wrote: {update.message.text}")
     await update.message.reply_text(bot_msg)
@@ -669,8 +653,7 @@ def file_to_dict(fp):
                 logger.warning(f"Someone tried to load '{fp.suffix}' file.")                
     except Exception as e:
         logger.error(f'{e}')
-        return None    
-    else:
+    finally:
         return tasks
 
 
@@ -764,16 +747,12 @@ async def status(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     # Dummy message 
     bot_msg = "Should print status to user"
 
-    # PPP
     user_id = str(update.effective_user.id)
     user_name = update.effective_user.username
 
-    # Read setting for effective user
-    try:
+    # Read setting for effective user if there is connection to database
+    if is_db(DB):    
         record = DB.staff.find_one({"tg_id": user_id}, {"settings.INFORM_OF_ALL_PROJECTS":1, "_id": 0})
-    except Exception as e:
-        logger.error(f"There was error getting DB: {e}")
-    else:
         if (record and type(record) == dict and
             'settings' in record.keys() and record['settings']):
 
@@ -886,6 +865,9 @@ async def status(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
                                     "Or consider to /start a new project by yourself."
                         )            
                         await context.bot.send_message(user_id, bot_msg)
+    else:
+        bot_msg = f"Error ocurred while accessing database. Try again later or contact developer."
+        await context.bot.send_message(user_id, bot_msg)
 
 
 async def stop(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
@@ -898,38 +880,43 @@ async def stop(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     bot_msg = ''
 
     # Check if user is PM, if not it is not for him to decide about reminders of project events
-    docs_count = DB.projects.count_documents({"pm_tg_id": str(update.effective_user.id)})
-    if docs_count > 0:
-        bot_msg = (f"Are you sure? This will delete all of your projects from bot." 
-                    "You can disable reminders in /settings if they are bothering you"
-                        " (but this will made bot pointless)")
-        keyboard = [        
-                [InlineKeyboardButton("Yes, delete all, I could start again any moment", callback_data=str(ONE))],
-                [InlineKeyboardButton("No, I want to keep data and bot running", callback_data=str(TWO))],
-        ]
-        reply_markup = InlineKeyboardMarkup(keyboard)
-        await context.bot.send_message(update.effective_user.id, bot_msg, reply_markup=reply_markup)
-        return FIRST_LVL
+    if is_db(DB): 
+        docs_count = DB.projects.count_documents({"pm_tg_id": str(update.effective_user.id)})
+        if docs_count > 0:
+            bot_msg = (f"Are you sure? This will delete all of your projects from bot." 
+                        "You can disable reminders in /settings if they are bothering you"
+                            " (but this will made bot pointless)")
+            keyboard = [        
+                    [InlineKeyboardButton("Yes, delete all, I could start again any moment", callback_data=str(ONE))],
+                    [InlineKeyboardButton("No, I want to keep data and bot running", callback_data=str(TWO))],
+            ]
+            reply_markup = InlineKeyboardMarkup(keyboard)
+            await context.bot.send_message(update.effective_user.id, bot_msg, reply_markup=reply_markup)
+            return FIRST_LVL
+        else:
+
+            # If he is an actioner
+            user_oid = get_worker_oid_from_db_by_tg_id(str(update.effective_user.id))
+            projects_count = 0
+            if user_oid:
+                projects_count = DB.projects.count_documents({"tasks.actioners": {"$elemMatch":{"actioner_id": user_oid}}})
+                if projects_count > 0:
+
+                    # Collect names of projects with their PMs tg_username to contact
+                    projects_with_PMs = get_projects_and_pms_for_user(user_oid)
+                    if projects_with_PMs:
+                        bot_msg = f"I'm afraid I can't stop informing you of events of other people projects: {projects_with_PMs}"
+                    else:
+                        bot_msg = f"I'm afraid I can't stop informing you of events of other people projects."
+                        logger.warning(f"Couldn't gather information about projects and PMs where user {update.effective_user.id} participate")
+
+            # If he don't participate in any project - be quiet
+            if not user_oid or projects_count == 0:
+                bot_msg = f"Bot stopped"
+            await context.bot.send_message(update.effective_user.id, bot_msg)
+            return ConversationHandler.END
     else:
-
-        # If he is an actioner
-        user_oid = get_worker_oid_from_db_by_tg_id(str(update.effective_user.id))
-        projects_count = 0
-        if user_oid:
-            projects_count = DB.projects.count_documents({"tasks.actioners": {"$elemMatch":{"actioner_id": user_oid}}})
-            if projects_count > 0:
-
-                # Collect names of projects with their PMs tg_username to contact
-                projects_with_PMs = get_projects_and_pms_for_user(user_oid)
-                if projects_with_PMs:
-                    bot_msg = f"I'm afraid I can't stop informing you of events of other people projects: {projects_with_PMs}"
-                else:
-                    bot_msg = f"I'm afraid I can't stop informing you of events of other people projects."
-                    logger.warning(f"Couldn't gather information about projects and PMs where user {update.effective_user.id} participate")
-
-        # If he don't participate in any project - be quiet
-        if not user_oid or projects_count == 0:
-            bot_msg = f"Bot stopped"
+        bot_msg = f"Error ocurred while accessing database. Try again later or contact developer."
         await context.bot.send_message(update.effective_user.id, bot_msg)
         return ConversationHandler.END
 
@@ -966,39 +953,44 @@ async def upload(update: Update, context: CallbackContext) -> int:
     '''
 
     # Check if user is PM and remember what project to update
-    docs_count = DB.projects.count_documents({"pm_tg_id": str(update.effective_user.id)})
-    if docs_count > 0:
+    if is_db(DB):
+        docs_count = DB.projects.count_documents({"pm_tg_id": str(update.effective_user.id)})
+        if docs_count > 0:
 
-        # Get active project title and store in user_data (because now PROJECTTITLE contain default value not associated with project)
-        result = DB.projects.find_one({"pm_tg_id": str(update.effective_user.id), "active": True}, {"title": 1, "_id": 0})
-        if (result and type(result) == dict and 
-            'title' in result.keys() and result['title']):
-            project = {
-                "title" : result['title']
-            }
-            context.user_data['project'] = project
+            # Get active project title and store in user_data (because now PROJECTTITLE contain default value not associated with project)
+            result = DB.projects.find_one({"pm_tg_id": str(update.effective_user.id), "active": True}, {"title": 1, "_id": 0})
+            if (result and type(result) == dict and 
+                'title' in result.keys() and result['title']):
+                project = {
+                    "title" : result['title']
+                }
+                context.user_data['project'] = project
 
-            # Message to return to user
-            bot_msg = (f"This function will replace existing schedule for '{result['title']}' project. Reminders will not change.\n"
-                       "If you are sure just upload file with new schedule.\n"
-                        "If you changed your mind press a button")
-            cancel_btn = InlineKeyboardButton("Cancel", callback_data=str(ONE))
-            kbd = InlineKeyboardMarkup([[cancel_btn]])
-            await update.message.reply_text(bot_msg, reply_markup=kbd)#InlineKeyboardMarkup.from_button(cancel_btn))
-            return FIRST_LVL
+                # Message to return to user
+                bot_msg = (f"This function will replace existing schedule for '{result['title']}' project. Reminders will not change.\n"
+                        "If you are sure just upload file with new schedule.\n"
+                            "If you changed your mind press a button")
+                cancel_btn = InlineKeyboardButton("Cancel", callback_data=str(ONE))
+                kbd = InlineKeyboardMarkup([[cancel_btn]])
+                await update.message.reply_text(bot_msg, reply_markup=kbd)#InlineKeyboardMarkup.from_button(cancel_btn))
+                return FIRST_LVL
+            else:
+                logger.error(f"User '{update.effective_user.id}' has projects, but none of them active. Check the DB.")
+                bot_msg = "Houston, we have a problems. Contact the developer."
+                await update.message.reply_text(bot_msg)
+                return ConversationHandler.END
+
+        # If user is not PM at least add his id in DB (if his telegram username is there)
         else:
-            logger.error(f"User '{update.effective_user.id}' has projects, but none of them active. Check the DB.")
-            bot_msg = "Houston, we have a problems. Contact the developer."
+            add_user_info_to_db(update.effective_user)
+            bot_msg = f"Change in project can be made only after starting one: use /start command to start a project."
             await update.message.reply_text(bot_msg)
             return ConversationHandler.END
-
-    # If user is not PM at least add his id in DB (if his telegram username is there)
     else:
-        add_user_info_to_db(update.effective_user)
-        bot_msg = f"Change in project can be made only after starting one: use /start command to start a project."
-        await update.message.reply_text(bot_msg)
+        bot_msg = f"Error ocurred while accessing database. Try again later or contact developer."
+        await context.bot.send_message(update.effective_user.id, bot_msg)
         return ConversationHandler.END
-    
+
 
 async def upload_file_recieved(update: Update, context: CallbackContext) -> int:
     """Function to proceed uploaded new project file and updating corresponding record in DB"""
@@ -1064,33 +1056,38 @@ async def settings(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     # + Time of daily update of starting and deadline tasks, and days too
 
     # Check if current user is acknowledged PM then proceed otherwise suggest to start a new project
-    docs_count = DB.projects.count_documents({"pm_tg_id": str(update.effective_user.id)})
-    if docs_count > 0:
-        keyboard = []
-        bot_msg = ''
-        # TODO Check if command called in chat
-        # Get active project and store in user_data to further use
-        project = DB.projects.find_one({"pm_tg_id": str(update.effective_user.id), "active": True}) 
-        if (project and type(project) == dict and 
-            'title' in project.keys() and project['title']):
-            context.user_data['project'] = project
-            keyboard, bot_msg = get_keybord_and_msg(FIRST_LVL, str(update.message.from_user.id), context.user_data['project'])
-        if keyboard == None or bot_msg == None:
-            bot_msg = "Some error happened. Unable to show a menu."
-            await update.message.reply_text(bot_msg)
+    if is_db(DB):
+        docs_count = DB.projects.count_documents({"pm_tg_id": str(update.effective_user.id)})
+        if docs_count > 0:
+            keyboard = []
+            bot_msg = ''
+            # TODO Check if command called in chat
+            # Get active project and store in user_data to further use
+            project = DB.projects.find_one({"pm_tg_id": str(update.effective_user.id), "active": True}) 
+            if (project and type(project) == dict and 
+                'title' in project.keys() and project['title']):
+                context.user_data['project'] = project
+                keyboard, bot_msg = get_keybord_and_msg(FIRST_LVL, str(update.message.from_user.id), context.user_data['project'])
+            if keyboard == None or bot_msg == None:
+                bot_msg = "Some error happened. Unable to show a menu."
+                await update.message.reply_text(bot_msg)
+            else:
+
+                # Let's control which level of settings we are at any given moment
+                context.user_data['level'] = FIRST_LVL
+                reply_markup = InlineKeyboardMarkup(keyboard)
+                await update.message.reply_text(bot_msg, reply_markup=reply_markup)
+            return FIRST_LVL
         else:
 
-            # Let's control which level of settings we are at any given moment
-            context.user_data['level'] = FIRST_LVL
-            reply_markup = InlineKeyboardMarkup(keyboard)
-            await update.message.reply_text(bot_msg, reply_markup=reply_markup)
-        return FIRST_LVL
+            # If user is not PM at least add his id in DB (if his telegram username is there)
+            add_user_info_to_db(update.effective_user)
+            bot_msg = f"Settings available after starting a project: use /start command for a new one."
+            await update.message.reply_text(bot_msg)
+            return ConversationHandler.END
     else:
-
-        # If user is not PM at least add his id in DB (if his telegram username is there)
-        add_user_info_to_db(update.effective_user)
-        bot_msg = f"Settings available after starting a project: use /start command for a new one."
-        await update.message.reply_text(bot_msg)
+        bot_msg = f"Error ocurred while accessing database. Try again later or contact developer."
+        await context.bot.send_message(update.effective_user.id, bot_msg)
         return ConversationHandler.END
 
 

@@ -12,6 +12,7 @@ from bson import ObjectId
 from datetime import date
 from dotenv import load_dotenv
 from pprint import pprint
+from pymongo.errors import ConnectionFailure, ServerSelectionTimeoutError
 from telegram import User
 from telegram.ext import ContextTypes
 from urllib.parse import quote_plus
@@ -160,7 +161,7 @@ def get_assignees(task: dict):
 
 def get_db():
     """
-    Get database from mongodb clietn and returns database instance. Raises exception if not succeed.
+    Creates connection to mongo server and returns database instance. Raises exception if not succeed.
     """
     load_dotenv()
     BOT_NAME = os.environ.get('BOT_NAME')
@@ -174,20 +175,21 @@ def get_db():
     # DB = None
     try:
         # client = pymongo.MongoClient(f"mongodb://{BOT_NAME}:{BOT_PASS}@localhost:27017/admin?retryWrites=true&w=majority")
-        client = pymongo.MongoClient(uri, serverSelectionTimeoutMS=1000)    # TODO decrease timeout
+        client = pymongo.MongoClient(uri, serverSelectionTimeoutMS=1000) 
     except ConnectionError as e:
         logger.error(f"There is problem with connecting to db '{DB_NAME}': {e}")   
     else:
+
+        # Check for connection
         try:
-            client.admin.command('ping')
-        except pymongo.errors.ConnectionFailure as e:
-            raise ConnectionError(e)
-        except pymongo.errors.ServerSelectionTimeoutError as e:
+            # client.admin.command('ping')
+            # client.admin.command('ismaster')
+            client.server_info()
+        except (ServerSelectionTimeoutError, ConnectionFailure) as e:
             raise ConnectionError(e)
         else:
             DB = client[DB_NAME]
-            return DB
-        
+            return DB        
 
 
 def get_job_preset(job_id: str, context: ContextTypes.DEFAULT_TYPE) -> str:
@@ -453,6 +455,16 @@ def get_worker_tg_username_by_tg_id(tg_id: str) -> str:
 
     return tg_un
 
+
+def is_db(db):
+    try:
+        db.command('ping')
+    except (AttributeError, ServerSelectionTimeoutError) as e:
+        logger.error(f"There was error getting DB: {e}")
+        return False
+    else:
+        return True
+    
 
 def save_json(project: dict, PROJECTJSON: str) -> None:
     '''
