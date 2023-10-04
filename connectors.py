@@ -8,6 +8,8 @@ from helpers import add_worker_info_to_staff, get_worker_oid_from_db_by_tg_usern
 from numpy import busday_offset, busday_count, floor, datetime64
 # For testing purposes
 from pprint import pprint
+from pymongo.database import Database
+
 
 # Configure logging
 logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s', level=logging.INFO)
@@ -55,7 +57,7 @@ def main():
     return
 
 
-def load_gan(fp):
+def load_gan(fp, db: Database):
     '''
     This is a connector from GanttProject format (.gan) to inner format.
     Get file pointer on input
@@ -125,7 +127,7 @@ def load_gan(fp):
 
             # Add record to DB and see result
             try:
-                if not add_worker_info_to_staff(worker):
+                if not add_worker_info_to_staff(worker, db):
                     logger.warning("Something went wrong while adding worker to staff collection")
             except ValueError as e:
                 logger.error(f"{e}")
@@ -141,13 +143,13 @@ def load_gan(fp):
             
                 # pprint(f' Tasks list before function call: {tasks}')
                 # pprint(f"This task will be send to function: {task['name']}")
-                tasks = compose_tasks_list(tasks, task, allocations, resources, property_id)
+                tasks = compose_tasks_list(tasks, task, allocations, resources, property_id, db)
                 # pprint(f" .. and after function: {tasks}")
                 # if task has subtask retreive data from it too
                 if 'task' in task:
                     for subtask in task.task:
                         # pprint(f' Tasks list before function call: {tasks}')
-                        tasks = compose_tasks_list(tasks, subtask, allocations, resources, property_id)
+                        tasks = compose_tasks_list(tasks, subtask, allocations, resources, property_id, db)
                         # pprint(f' .. and after: {tasks}')
 
     else:
@@ -205,7 +207,7 @@ def get_tg_un_from_xml_resources(resource_id, resources, property_id):
     return tg_username
 
 
-def compose_tasks_list(tasks, task, allocations, resources, property_id):
+def compose_tasks_list(tasks, task, allocations, resources, property_id, db: Database):
     ''' Function to append to list of tasks information of one task or subtask'''
 
     # Dictionary of id of actioners and their last reaction
@@ -218,7 +220,7 @@ def compose_tasks_list(tasks, task, allocations, resources, property_id):
             # Memo: GanntProject starts numeration of resources from 0, MS Project - from 1
             tg_username = get_tg_un_from_gan_resources(allocation['resource-id'], resources, property_id)
             if tg_username:
-                actioner_id = get_worker_oid_from_db_by_tg_username(tg_username)
+                actioner_id = get_worker_oid_from_db_by_tg_username(tg_username, db)
                 if actioner_id:
                     actioners.append({
                         'actioner_id': actioner_id, # Now this field stores id of document in staff collection
@@ -323,7 +325,7 @@ def load_json(fp):
     return tasks
 
 
-def load_xml(fp):
+def load_xml(fp, db: Database):
     """ 
     Function to import from MS Project XML file 
     Get file pointer on input
@@ -397,7 +399,7 @@ def load_xml(fp):
 
             # Add record to DB and see result
             try:
-                if not add_worker_info_to_staff(worker):
+                if not add_worker_info_to_staff(worker, db):
                     logger.warning("Something went wrong while adding worker to staff collection")
             except ValueError as e:
                 logger.error(f"{e}")
@@ -430,7 +432,7 @@ def load_xml(fp):
                     if int(allocation.ResourceUID.cdata) > 0:
                         tg_username = get_tg_un_from_xml_resources(allocation.ResourceUID.cdata, resources, property_id)
                         if tg_username:
-                            actioner_id = get_worker_oid_from_db_by_tg_username(tg_username)
+                            actioner_id = get_worker_oid_from_db_by_tg_username(tg_username, db)
                             if actioner_id:
                                 actioners.append({
                                     # Memo: GanntProject starts numeration of resources from 0, MS Project - from 1

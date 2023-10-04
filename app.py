@@ -639,13 +639,13 @@ def file_to_dict(fp):
     try:
         match fp.suffix:
             case '.gan':
-                tasks = connectors.load_gan(fp)
+                tasks = connectors.load_gan(fp, DB)
 
             case '.json':
-                tasks = connectors.load_json(fp)
+                tasks = connectors.load_json(fp, DB)
 
             case '.xml':
-                tasks = connectors.load_xml(fp)
+                tasks = connectors.load_xml(fp, DB)
 
         # else log what was tried to be loaded
             case _:

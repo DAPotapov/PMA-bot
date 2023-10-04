@@ -103,11 +103,11 @@ def add_worker_info_to_staff(worker: dict, db: Database):
 
     # Check DB if worker already present via telegram id
     if worker['tg_id']:
-        worker_id = get_worker_oid_from_db_by_tg_id(worker['tg_id'])
+        worker_id = get_worker_oid_from_db_by_tg_id(worker['tg_id'], db)
 
     # Otherwise via telegram username
     elif worker['tg_username']:
-        worker_id = get_worker_oid_from_db_by_tg_username(worker['tg_username'])
+        worker_id = get_worker_oid_from_db_by_tg_username(worker['tg_username'], db)
     else:
         raise ValueError(f"Not enough information about worker provided: neither tg_id nor tg_username. Provided dict:\n{worker}")
     
