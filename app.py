@@ -49,6 +49,7 @@ from helpers import (
     add_user_id_to_db,
     add_user_info_to_db,
     add_worker_info_to_staff, 
+    clean_project_title,
     get_assignees,
     get_db, 
     get_job_preset,
@@ -345,40 +346,18 @@ async def start(update: Update, context: CallbackContext) -> int:
     return FIRST_LVL
 
 
-def clean_project_title(user_input: str) -> str:
-    """
-    Should clean title typed by user from unnesesary spaces and so on.
-    Should return string
-    If something went wrong raise value error to be managed on calling side
-    """
-    #TODO To implement
-    #TODO: Clean input and add check for malicous input    
-    # cases: 
-    # empty string - clean from whitespaces on start and end of string
-    # escape characters?
-    # cursor control characters
-    # Maybe I should limit to Alphanumeric + spaces + punctuation ? 
-    #TODO move to helpers
-
-    title = user_input
-    if not title:
-        raise ValueError
-    return title
-
-
 async def naming_project(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     ''' Function for recognizing name of the project '''
     
-    global PROJECTTITLE
-
     try: 
-        PROJECTTITLE = clean_project_title(update.message.text)
+        title = clean_project_title(update.message.text)
     except ValueError as e:
-        bot_msg = "Incorrect name"
-        #TODO make another try
+        bot_msg = "Title is not very suitable for human reading. {e}"
+        await update.message.reply_text(bot_msg)
+        return FIRST_LVL
     else:
         project = {
-            'title': PROJECTTITLE,
+            'title': title,
             'active': True,
             'pm_tg_id': str(context.user_data['PM']['tg_id']),
             'tg_chat_id': '', # TODO store here group chat where project members discuss project

@@ -119,6 +119,31 @@ def add_worker_info_to_staff(worker: dict, db: Database):
     return worker_id
 
 
+def clean_project_title(user_input: str) -> str:
+    """
+    Clean title typed by user from unnesesary spaces and so on.
+    Imagine someone copy-pasted project title here, what can be improved?
+    Should return string.
+    If something went wrong raise value error to be managed on calling side.
+    """
+    #TODO To implement
+    #TODO: Clean input and add check for malicous input    
+    # cases: 
+    # empty string - clean from whitespaces on start and end of string
+    # TODO Convert whitespaces to spaces
+    # TODO multiple spaces convert to single
+    # escape characters? try insert them first
+    # cursor control characters - try insert them first
+    # Maybe I should limit to Alphanumeric + spaces + punctuation ? 
+    # TODO look up restrictions: telegram.error.BadRequest: Button_data_invalid
+    # Length limit?
+
+    title = user_input.strip()
+    if not title:
+        raise ValueError("Text absent")
+    return title
+
+
 def get_assignees(task: dict, db: Database):
     '''
     Helper function for getting names and telegram usernames
