@@ -622,13 +622,11 @@ async def status(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     bot_msg = "Should print status to user"
 
     user_id = str(update.effective_user.id)
-    # TODO add user_id if not yet (see bug below)
     user_name = update.effective_user.username
 
     # Read setting for effective user if there is connection to database
     if DB != None and is_db(DB):  
-        # TODO fix bug: if participant call /status before his id added to DB - this will return nothing  
-        record = DB.staff.find_one({"tg_id": user_id}, {"settings.INFORM_OF_ALL_PROJECTS":1, "_id": 0})
+        record = DB.staff.find_one({"tg_username": user_name}, {"settings.INFORM_OF_ALL_PROJECTS":1, "_id": 0})
         if (record and type(record) == dict and
             'settings' in record.keys() and record['settings']):
 
@@ -710,10 +708,12 @@ async def status(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
                 # then just search him by his ObjectId in all records and inform about events
                 # if nothing found - Suggest him to start a project
                 user_oid = get_worker_oid_from_db_by_tg_id(user_id, DB)
-                # print(f"Looking object id by tg_id: {user_oid}")
-                if not user_oid:
+                if not user_oid and user_name:
                     user_oid = get_worker_oid_from_db_by_tg_username(user_name, DB)
-                    # print(f"Looking object id by tg_username: {user_oid}")
+                    
+                    # Add his id to DB since there is none
+                    add_user_id_to_db(update.effective_user, DB)
+
                 if not user_oid:
                     bot_msg = ("No information found about you in database.\n"
                                 "If you think it's a mistake contact your project manager.\n"
@@ -721,7 +721,6 @@ async def status(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
                     )            
                     await context.bot.send_message(user_id, bot_msg)
                 else:
-                    # print(f"type of object id: {type(user_oid)} and is {user_oid}")
 
                     # Get all documents where user mentioned, cast cursor object to list to check if smth returned
                     projects = list(DB.projects.find({"tasks.actioners": {"$elemMatch":{"actioner_id": user_oid}}}))
@@ -741,6 +740,12 @@ async def status(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
                                     "Or consider to /start a new project by yourself."
                         )            
                         await context.bot.send_message(user_id, bot_msg)
+        else:
+            bot_msg = (f"Seems like you don't participate in any project.\n"
+            "If you think it's a mistake contact your project manager.\n"
+            "Or consider to /start a new project by yourself."
+            )            
+            await context.bot.send_message(user_id, bot_msg)
     else:
         bot_msg = f"Error occured while accessing database. Try again later or contact developer."
         logger.error(f"Error occured while accessing database.")
@@ -1920,7 +1925,6 @@ def main() -> None:
                 CallbackQueryHandler(reminders_settings_item, pattern="^day_before_update$|^morning_update$|^friday_update$"),
                 # According to docs (https://core.telegram.org/bots/api#user) id should be less than 52 bits: 
                 CallbackQueryHandler(transfer_control, pattern="^\d{6,15}$"),
-
                 CallbackQueryHandler(project_activate, pattern="^activate"),
                 CallbackQueryHandler(project_delete_start, pattern="^delete"),
                 CallbackQueryHandler(project_rename_start, pattern="^rename"),

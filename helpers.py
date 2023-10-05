@@ -27,28 +27,20 @@ logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s
 logger = logging.getLogger(__name__)
 
 
-def add_user_id_to_db(user: User, db: Database):
+def add_user_id_to_db(user: User, db: Database) -> str:
     ''' 
     Helper function to add telegram id of username provided to DB. 
-    Returns None if telegram username not found in staff collection, did't updated or something went wrong.
+    Returns empty string if telegram username not found in staff collection, did't updated or something went wrong.
     Returns ObjectId if record updated
     '''
-    output = None
-    # DB = get_db()
-    # print(f"user is {user}")
+    output = ''
 
     # Fill record with absent id with current one
     # For now I assume that users don't switch their usernames and such situation is force-major
-    try:
-        record = db.staff.find_one({"tg_username": user.username}, {"tg_id": 1})
-        # print(f"record is {record}")
-    except Exception as e:
-        logger.error(f"There was error getting DB: {e}")
-    else:
+    record = db.staff.find_one({"tg_username": user.username}, {"tg_id": 1})
 
-        # TODO refactor such part in any other places where key error may occur, check in temp.py what is better
-        if (record and type(record) == dict and 
-            'tg_id' in record.keys() and not record['tg_id']):            
+    if (record and type(record) == dict and 
+        'tg_id' in record.keys() and not record['tg_id']):            
 
             # Remember: for update_one matched_count will not be more than one
             result = db.staff.update_one({"tg_username": user.username}, {"$set": {"tg_id": str(user.id)}})
@@ -67,30 +59,27 @@ def add_user_info_to_db(user: User, db: Database):
     output = ''
 
     # Get user from DB
-    try:
-        db_user = db.staff.find_one({"tg_username": user.username})
-    except Exception as e:
-        logger.error(f"There was error getting DB: {e}")
-    else:
+
+    db_user = db.staff.find_one({"tg_username": user.username})
 
     # Check if field is empty and fill it with corresponding field from User
-        if (db_user and type(db_user) == dict and 
-            'tg_id' in db_user.keys() and 'name' in db_user.keys()) :
-            dict2update = {}
-            if not db_user['tg_id']:
-                dict2update['tg_id'] = str(user.id)
-            if not db_user['name']:
-                if user.first_name:
-                    dict2update['name'] = user.first_name
-                elif user.name:
-                    dict2update['name'] = user.name
+    if (db_user and type(db_user) == dict and 
+        'tg_id' in db_user.keys() and 'name' in db_user.keys()) :
+        dict2update = {}
+        if not db_user['tg_id']:
+            dict2update['tg_id'] = str(user.id)
+        if not db_user['name']:
+            if user.first_name:
+                dict2update['name'] = user.first_name
+            elif user.name:
+                dict2update['name'] = user.name
 
-            # Make update in DB using list of collected list of should be modified fields converted to tuple
-            if dict2update:
-                result = db.staff.update_one({"tg_username": user.username}, {"$set": dict2update})
-                
-                if result.modified_count > 0:    
-                    output = db_user['_id']
+        # Make update in DB using list of collected list of should be modified fields converted to tuple
+        if dict2update:
+            result = db.staff.update_one({"tg_username": user.username}, {"$set": dict2update})
+            
+            if result.modified_count > 0:    
+                output = db_user['_id']
 
     return output
 
@@ -103,7 +92,6 @@ def add_worker_info_to_staff(worker: dict, db: Database):
     '''
     
     worker_id = None
-    # DB = get_db()
 
     # Check DB if worker already present via telegram id
     if worker['tg_id']:
@@ -141,7 +129,6 @@ def get_assignees(task: dict, db: Database):
 
     people = ""
     user_ids = []
-    # DB = get_db()
 
     for doer in task['actioners']:
         try:
@@ -391,7 +378,6 @@ def get_projects_and_pms_for_user(user_oid: ObjectId, db: Database) -> str:
     ''' Function to get string of projects (and their PMs) where user participate as actioner '''
     
     projects_and_pms = ''
-    # DB = get_db()
     try:
         projects = list(db.projects.find({"tasks.actioners": {"$elemMatch":{"actioner_id": user_oid}}}, {"title":1, "pm_tg_id":1, "_id":0}))
     except Exception as e:
@@ -416,7 +402,6 @@ def get_project_team(project: dict, db: Database) -> list:
     Returns None if it is not possible to achieve or something went wrong.
     """
     team = []    
-    # DB = get_db()
   
     # Loop through project tasks and gather information about project team
     for task in project['tasks']:
@@ -445,7 +430,6 @@ def get_status_on_project(project: dict, user_oid: ObjectId, db: Database) -> st
     """
     Function compose message contains status update on given project for given ObjectId (actioner)
     """
-    # DB = get_db()
 
     bot_msg = f"Status of events for project '{project['title']}'"
 
@@ -505,7 +489,6 @@ def get_worker_oid_from_db_by_tg_username(tg_username: str, db: Database):
     '''
 
     worker_id = None
-    # DB = get_db()
   
     try:
         result = db.staff.find_one({'tg_username': tg_username})
