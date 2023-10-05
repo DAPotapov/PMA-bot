@@ -615,11 +615,14 @@ async def file_recieved(update: Update, context: ContextTypes.DEFAULT_TYPE) -> i
                                                           "title": {"$ne": context.user_data['project']['title']}}, 
                                                           {"$set": {"active": False}})
                         
-                        # If other project didn't switched to inactive state raise an error, 
-                        # because later bot couldn't comprehend which project to use
+                        # If other project didn't switched to inactive state end conversation and log error, 
+                        # because later bot wouldn't comprehend which project to use
                         if result.acknowledged and result.modified_count == 0:
-                            # TODO consider to create new type of error derived from some base class
-                            raise ValueError("Attempt to update database was unsuccessful. Records maybe corrupted. Contact developer.")
+                            logger.error(f"Error making project inactive when user '{update.effective_user.id}' project '{context.user_data['project']['title']}'")
+                            bot_msg = (bot_msg + f"Attempt to update database was unsuccessful. Records maybe corrupted. Contact developer or try later.")
+                            await update.message.reply_text(bot_msg)
+                            return ConversationHandler.END                                  
+                            
             else:
                 bot_msg = (bot_msg + f"There is a problem with database connection. Contact developer or try later.")
                 logger.error(f"Error occured while accessing database.")
@@ -627,6 +630,7 @@ async def file_recieved(update: Update, context: ContextTypes.DEFAULT_TYPE) -> i
                 return ConversationHandler.END        
   
         else:
+            logger.warning(f"User '{update.effective_user.id}' tried to upload unsupported file: '{update.message.document.file_name}'")
             bot_msg = (f"Couldn't process given file.\n"
                         f"Supported formats are: .gan (GanttProject), .json, .xml (MS Project)\n"
                         f"Make sure these files contain custom field named 'tg_username', which store usernames of project team members.\n"
