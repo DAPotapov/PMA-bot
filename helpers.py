@@ -14,9 +14,13 @@ from dotenv import load_dotenv
 from pprint import pprint
 from pymongo.errors import ConnectionFailure, ServerSelectionTimeoutError
 from pymongo.database import Database
-from telegram import User
+from telegram import User, InlineKeyboardButton
 from telegram.ext import ContextTypes
+from typing import Tuple
 from urllib.parse import quote_plus
+
+# Callback data for settings menu
+ONE, TWO, THREE, FOUR, FIVE, SIX = range(6)
 
 # Configure logging
 logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s', level=logging.INFO)
@@ -242,6 +246,145 @@ def get_job_preset_dict(job_id: str, context: ContextTypes.DEFAULT_TYPE) -> dict
         }
    
     return preset
+
+
+def get_keyboard_and_msg(db, level: int, user_id: str, project: dict, branch: str = None) -> Tuple[list, str]:
+    '''
+    Helper function to provide specific keyboard on different levels of settings menu
+    '''
+
+    keyboard = []
+    msg = ''
+
+    if ('title' in project.keys() and 'settings' in project.keys() and 
+        'reminders' in project.keys() and
+        project['title'] and project['settings']):
+        
+        # Configure keyboard and construct message depending of menu level
+        match level:
+
+            # First level of menu 
+            case 0:
+                msg = (f"Manage settings. Active project: '{project['title']}'")
+                keyboard = [        
+                    [InlineKeyboardButton(f"Change notifications settings", callback_data="notifications")],
+                    [InlineKeyboardButton(f"Manage projects", callback_data="projects")],
+                    [InlineKeyboardButton(f"Reminders settings", callback_data="reminders")],
+                    [InlineKeyboardButton(f"Transfer control over active project to other user", callback_data="control")],
+                    [InlineKeyboardButton(f"Finish settings", callback_data='finish')],        
+                ]
+
+            # Second level of menu
+            case 1:
+                match branch:
+                    case "notifications":
+                        if is_db(db):
+                            try: #TODO consider get this setting outside keyboard function
+                                pm_settings = db.staff.find_one({"tg_id": str(user_id)}, {"settings":1, "_id":0})
+                            except Exception as e:
+                                logger.error(f"There was error getting DB: {e}")
+                            else:
+                                if (pm_settings and 
+                                    type(pm_settings) == dict and
+                                    'settings' in pm_settings.keys() and
+                                    'INFORM_OF_ALL_PROJECTS' in pm_settings['settings'].keys()):
+
+                                    msg = f"Manage notification settings:"
+                                    keyboard = [        
+                                        [InlineKeyboardButton(f"Allow status update in group chat: {'On' if project['settings']['ALLOW_POST_STATUS_TO_GROUP'] == True else 'Off'}", callback_data=str(ONE))],
+                                        [InlineKeyboardButton(f"Users get anounces about milestones: {'On' if project['settings']['INFORM_ACTIONERS_OF_MILESTONES'] == True else 'Off'}", callback_data=str(TWO))],
+                                        [InlineKeyboardButton(f"/status command notify PM of all projects (not only active): {'On' if pm_settings['settings']['INFORM_OF_ALL_PROJECTS'] == True else 'Off'}", callback_data=str(THREE))],
+                                        [InlineKeyboardButton("Back", callback_data='back')], 
+                                        [InlineKeyboardButton("Finish settings", callback_data='finish')],        
+                                    ]
+
+                    case "projects":
+                        if is_db(db):
+                            msg = f"You can manage these projects (active project could only be renamed): "
+                            # Get list of projects for user
+                            projects = list(db.projects.find({"pm_tg_id": str(user_id)}))
+                            
+                            # For each project make buttons: active(if not active), rename, delete
+                            keyboard = []
+                            for project in projects:                                    
+                                keyboard.append([InlineKeyboardButton(f"Rename: '{project['title']}'", callback_data=f"rename_{project['title']}")])
+                                
+                                if project['active'] == False: 
+                                    row = [
+                                        InlineKeyboardButton(f"Activate '{project['title']}'", callback_data=f"activate_{project['title']}"),
+                                        InlineKeyboardButton(f"Delete '{project['title']}'", callback_data=f"delete_{project['title']}"),
+                                    ]   
+                                    keyboard.append(row)
+                            keyboard.extend([
+                                    [InlineKeyboardButton("Back", callback_data='back')],        
+                                    [InlineKeyboardButton("Finish settings", callback_data='finish')]
+                            ])                         
+
+                    case "reminders":
+                        # TODO: Here I could construct keyboard out of jobs registered for current user and active project,
+                        # similar to project list above.
+                        # but this will need of passing composite callback_data,
+                        # first part of which will be checked by pattern parameter of CallbackQueryHandler
+                        # and second used inside universal reminder function
+                        msg = (f"You can customize reminders here.")
+                        keyboard = [        
+                            [InlineKeyboardButton("Reminder on day before", callback_data='day_before_update')],
+                            [InlineKeyboardButton("Everyday morning reminder", callback_data='morning_update')],
+                            [InlineKeyboardButton("Friday reminder of project files update", callback_data='friday_update')],
+                            [InlineKeyboardButton("Back", callback_data='back')],        
+                            [InlineKeyboardButton("Finish settings", callback_data='finish')],        
+                        ]
+
+                    case "control":
+                        if is_db(db):
+                            msg = (f"Choose a project team member to transfer control to.")
+
+                            # Get team members names with telegram ids, except PM
+                            # Construct keyboard from that list
+                            # TODO TEST WHat if it's a sole project? Only PM is working?
+                            team = get_project_team(project, db)
+                            if team:
+                                keyboard = []
+                                for member in team:
+                                    if user_id != member['tg_id']:
+                                        keyboard.append([InlineKeyboardButton(f"{member['name']} (@{member['tg_username']})", callback_data=member['tg_id'])])       
+                                keyboard.extend([
+                                    [InlineKeyboardButton("Back", callback_data='back')],        
+                                    [InlineKeyboardButton("Finish settings", callback_data='finish')]
+                                ])                                
+
+            # Third menu level
+            case 2:
+                reminders_kbd = [        
+                    [InlineKeyboardButton("Turn on/off", callback_data=str(ONE))],
+                    [InlineKeyboardButton("Set time", callback_data=str(TWO))],
+                    [InlineKeyboardButton("Set days of week", callback_data=str(THREE))],
+                    [InlineKeyboardButton("Back", callback_data='back')],        
+                    [InlineKeyboardButton("Finish settings", callback_data='finish')],        
+                ]
+                project_delete_kbd = [
+                    [InlineKeyboardButton("Yes", callback_data='yes')],
+                    [InlineKeyboardButton("No", callback_data='back')],
+                ]
+                # Message contents depend on a branch of menu, return None if nonsense given
+                match branch:
+                    case 'morning_update':                    
+                        msg = (f"Daily morning reminder has to be set here.\n"
+                                )
+                        keyboard = reminders_kbd
+                    case 'day_before_update':
+                        msg = (f"The day before reminder has to be set here. \n"
+                                )
+                        keyboard = reminders_kbd
+                    case 'friday_update':
+                        msg = (f"Reminder for file updates on friday has to be set here. \n"
+                                )
+                        keyboard = reminders_kbd
+                    case 'delete':
+                        msg = f"Are you sure?"
+                        keyboard = project_delete_kbd
+
+    return keyboard, msg
 
 
 def get_projects_and_pms_for_user(user_oid: ObjectId, db: Database) -> str:
