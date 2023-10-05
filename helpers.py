@@ -168,6 +168,8 @@ def get_db():
     # DB_URI = f"mongodb://{BOT_NAME}:{BOT_PASS}@localhost:27017/admin?retryWrites=true&w=majority"
     DB_NAME = os.environ.get("DB_NAME", "database")
     host = '127.0.0.1:27017'
+    if not BOT_NAME or not BOT_PASS:
+        raise AttributeError("Can't get bot credentials from environment.")
     uri = "mongodb://%s:%s@%s" % (quote_plus(BOT_NAME), quote_plus(BOT_PASS), host)
     # DB = None
     try:
