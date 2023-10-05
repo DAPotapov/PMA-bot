@@ -2023,9 +2023,6 @@ def main() -> None:
         entry_points=[CommandHandler(settings_cmd.command, settings, ~filters.ChatType.GROUPS)],
         states={
             FIRST_LVL: [
-                # CallbackQueryHandler(notification_settings,pattern="^" + str(ONE) + "$"),
-                # CallbackQueryHandler(projects_management, pattern="^" + str(TWO) + "$"),
-                # CallbackQueryHandler(reminders_settings, pattern="^" + str(THREE) + "$"),
                 CallbackQueryHandler(second_lvl_menu, pattern="^notifications$|^reminders$|^projects$|^control$"),
                 CallbackQueryHandler(finish_settings, pattern="^finish$"),
             ],
@@ -2036,9 +2033,6 @@ def main() -> None:
                 # TODO: If there will be custom reminders how will be they handled? I can't predict their names to check in pattern
                 # But I can store it in list and use this list in pattern
                 CallbackQueryHandler(reminders_settings_item, pattern="^day_before_update$|^morning_update$|^friday_update$"),
-                # CallbackQueryHandler(day_before_update_item, pattern="^" + str(FOUR) + "$"),
-                # CallbackQueryHandler(morning_update_item, pattern="^" + str(FIVE) + "$"),
-                # CallbackQueryHandler(file_update_item, pattern="^" + str(SIX) + "$"),
                 # According to docs (https://core.telegram.org/bots/api#user) id should be less than 52 bits: 
                 CallbackQueryHandler(transfer_control, pattern="^\d{6,15}$"),
 
@@ -2056,10 +2050,10 @@ def main() -> None:
                 CallbackQueryHandler(settings_back, pattern="^back$"),
                 CallbackQueryHandler(finish_settings, pattern="^finish$"),
             ],
-            FOURTH_LVL:[ # TODO change this as below?
+            FOURTH_LVL:[ 
                 MessageHandler(filters.TEXT & ~filters.COMMAND, reminder_time_setter),
             ],
-            FIFTH_LVL:[ # TODO change this as below?
+            FIFTH_LVL:[ 
                 MessageHandler(filters.TEXT & ~filters.COMMAND, reminder_days_setter),
             ],
             SIXTH_LVL: [
@@ -2072,36 +2066,6 @@ def main() -> None:
         fallbacks=[CallbackQueryHandler(finish_settings)]
     )
     application.add_handler(settings_conv)
-# Old states:
-# states={
-#             FIRST_LVL: [
-#                 CallbackQueryHandler(allow_status_to_group, pattern="^" + str(ONE) + "$"),
-#                 CallbackQueryHandler(milestones_anounce, pattern="^" + str(TWO) + "$"),
-#                 CallbackQueryHandler(reminders, pattern="^" + str(THREE) + "$"),
-#                 CallbackQueryHandler(finish_settings, pattern="^" + str(FOUR) + "$"),
-#             ],
-#             SECOND_LVL: [
-#                 CallbackQueryHandler(day_before_update_item, pattern="^" + str(ONE) + "$"),
-#                 CallbackQueryHandler(morning_update_item, pattern="^" + str(TWO) + "$"),
-#                 CallbackQueryHandler(file_update_item, pattern="^" + str(THREE) + "$"),
-#                 CallbackQueryHandler(settings_back, pattern="^" + str(FOUR) + "$"),
-#                 CallbackQueryHandler(finish_settings, pattern="^" + str(FIVE) + "$"),
-#             ],
-#             THIRD_LVL: [
-#                 CallbackQueryHandler(reminder_switcher, pattern="^" + str(ONE) + "$"),
-#                 CallbackQueryHandler(reminder_time_pressed, pattern="^" + str(TWO) + "$"),
-#                 CallbackQueryHandler(reminder_days_pressed, pattern="^" + str(THREE) + "$"),
-#                 CallbackQueryHandler(settings_back, pattern="^" + str(FOUR) + "$"),
-#                 CallbackQueryHandler(finish_settings, pattern="^" + str(FIVE) + "$"),
-#             ],
-#             FOURTH_LVL:[
-#                 MessageHandler(filters.TEXT & ~filters.COMMAND, reminder_time_setter),
-#             ],
-#             FIFTH_LVL:[
-#                 MessageHandler(filters.TEXT & ~filters.COMMAND, reminder_days_setter),
-#             ]
-#         },
-
 
     # Configure /stop conversation and add a handler
     stop_conv = ConversationHandler(
