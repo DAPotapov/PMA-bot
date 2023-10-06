@@ -44,6 +44,7 @@ from telegram.ext import (
                             filters)
 from urllib.parse import quote_plus
 from uuid import uuid4
+from bson import ObjectId
 from ptbcontrib.ptb_jobstores import PTBMongoDBJobStore
 from helpers import (
     add_user_id_to_db,
@@ -339,7 +340,7 @@ async def start(update: Update, context: CallbackContext) -> int:
 
     bot_msg = (f"Hello, {update.effective_user.first_name}!\n"
                f"You are starting a new project.\n"
-               f"Provide a name for it.\n"
+               f"Provide a name for it (less than 128 characters).\n"
                f"(type 'cancel' if you changed you mind during this process)"
     )
     await update.message.reply_text(bot_msg)
@@ -384,14 +385,16 @@ async def naming_project(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
                 return ConversationHandler.END   
             else:
                 prj_id = DB.projects.find_one({"title": project['title'], "pm_tg_id": str(context.user_data['PM']['tg_id'])}, {"_id":1})
-                print(f"Search for project title returned this: {prj_id}")
+                # print(f"Search for project title returned this: {prj_id}")
                 if (prj_id and type(prj_id) == dict and 
                     '_id' in prj_id.keys() and prj_id['id']):
                     bot_msg = f"You've already started project with name {project['title']}. Try another one."
                     await update.message.reply_text(bot_msg)
                     return FIRST_LVL
                 else:
-                    bot_msg = f"Got it. Now you can upload your project file. Supported formats are: .gan (GanttProject), .json, .xml (MS Project)"
+                    bot_msg = (f"Title was refurbushed to: '{title}'.\nYou can change it later in /settings.\n"
+                        f"Now you can upload your project file. Supported formats are: .gan (GanttProject), .json, .xml (MS Project)"
+                    )
                     await update.message.reply_text(bot_msg)
                     return SECOND_LVL
         else:
@@ -412,7 +415,7 @@ async def file_recieved(update: Update, context: ContextTypes.DEFAULT_TYPE) -> i
         # Call function which converts given file to dictionary and add actioners to staff collection
         tasks = file_to_dict(fp)
         if tasks:
-            bot_msg = "File parsed successfully"
+            bot_msg = "File parsed successfully."
 
             # Add tasks to user data dictionary in context
             context.user_data['project']['tasks'] = tasks
@@ -1255,29 +1258,31 @@ async def project_activate(update: Update, context: ContextTypes.DEFAULT_TYPE) -
     await query.answer()
     msg = ''
     
-    # Таке name of the project from query
+    # Таке oid of the project from query
     if query.data:
         if is_db(DB):
-            new_active = query.data.split("_", 1)[1]
+            new_active_oid = ObjectId(query.data.split("_", 1)[1])
 
             # Make current project inactive
             make_inactive = DB.projects.update_one(
-                {"title": context.user_data['project']['title']}, 
+                {"title": context.user_data['project']['title'], 
+                 "pm_tg_id": str(update.effective_user.id)}, 
                 {"$set": {'active': False}}
                 )
             if make_inactive.modified_count > 0:
 
-                # Make project with remembered name active
-                make_active = DB.projects.update_one(
-                    {"title": new_active}, 
-                    {"$set": {"active": True}}
-                    )
-                if make_active.modified_count > 0:
-                    context.user_data['project']['title'] = new_active
-                    msg = f"Project '{new_active}' is active project now."
+                # Make project with received oid active
+                new_active = DB.projects.find_one_and_update(
+                    {"_id": new_active_oid}, 
+                    {"$set": {"active": True}}, # TODO do i need tasks?
+                    return_document=pymongo.ReturnDocument.AFTER
+                )
+                if new_active:
+                    context.user_data['project'] = new_active
+                    msg = f"Project '{new_active['title']}' is active project now."
                 else:
-                    msg = f"Couldn't set project '{new_active}' active"
-                    logger.error(msg)
+                    msg = f"Couldn't activate choosen project"
+                    logger.error(msg)                
             else:
                 msg = f"Couldn't set project '{context.user_data['project']['title']}' inactive"
                 logger.error(msg)
@@ -1316,10 +1321,19 @@ async def project_delete_start(update: Update, context: ContextTypes.DEFAULT_TYP
     await query.answer()
 
     if query.data:
-        context.user_data['title_to_delete'] = query.data.split("_", 1)[1]
+        context.user_data['oid_to_delete'] = ObjectId(query.data.split("_", 1)[1])
+        context.user_data['title_to_delete'] = ''
         context.user_data['level'] += 1
         context.user_data['branch'].append(query.data.split("_", 1)[0])
-        
+
+        if is_db(DB):
+            title = DB.projects.find_one(
+                {"_id": context.user_data['oid_to_delete']}, 
+                {"title": 1, "_id": 0}
+                )
+            if title and type(title) == dict and 'title' in title.keys() and title['title']:
+                context.user_data['title_to_delete'] = title['title']
+
         # Show confirmation keyboard 
         keyboard, bot_msg = get_keyboard_and_msg(
             DB,
@@ -1335,7 +1349,7 @@ async def project_delete_start(update: Update, context: ContextTypes.DEFAULT_TYP
             await query.edit_message_text(bot_msg)
             return ConversationHandler.END
         else:
-            reply_markup = InlineKeyboardMarkup(keyboard)
+            reply_markup = InlineKeyboardMarkup(keyboard) 
             bot_msg = f"You are going to delete project '{context.user_data['title_to_delete']}' with all reminders.\n" + bot_msg
             await query.edit_message_text(bot_msg, reply_markup=reply_markup)
             return THIRD_LVL 
@@ -1354,15 +1368,16 @@ async def project_delete_finish(update: Update, context: ContextTypes.DEFAULT_TY
 
     # Delete project and associated jobs from DB 
     if is_db(DB):
-        reminders = DB.projects.find_one_and_delete({
-            'title': context.user_data['title_to_delete'], 
-            'pm_tg_id': str(update.effective_user.id)}, 
+        reminders = DB.projects.find_one_and_delete(
+            {'_id': context.user_data['oid_to_delete']},
             {'reminders': 1, '_id':0}
             )
-        for id in reminders['reminders'].values():
-            context.job_queue.scheduler.get_job(id).remove()
-
-        msg = f"Project '{context.user_data['title_to_delete']}' successfully deleted"
+        if reminders and type(reminders) == dict and 'reminders' in reminders.keys() and reminders['reminders']:
+            for id in reminders['reminders'].values():
+                context.job_queue.scheduler.get_job(id).remove()
+            msg = f"Project '{context.user_data['title_to_delete']}' successfully deleted"
+        else:
+            msg = f"Error getting data from database."
     else:
         msg = f"Error occured while accessing database."
         logger.error(msg)
@@ -1396,10 +1411,17 @@ async def project_rename_start(update: Update, context: ContextTypes.DEFAULT_TYP
     query = update.callback_query
     await query.answer()
 
-    # Pass project title to rename
+    # Pass oid of project to rename
     if query.data:
-        context.user_data['title_to_rename'] = query.data.split("_", 1)[1]
-        bot_msg = f"Type a new title for the project '{context.user_data['title_to_rename']}': "
+        context.user_data['oid_to_rename'] = ObjectId(query.data.split("_", 1)[1])
+
+        #  Get title from DB by oid
+        if is_db(DB): #TODO can't find ObjectId by string
+            context.user_data['title_to_rename'] = DB.projects.find_one(
+                {"_id": context.user_data['oid_to_rename']},
+                {'title':1, "_id":0}
+                )
+        bot_msg = f"Type a new title for the project '{context.user_data['title_to_rename']['title']}': "
         await query.edit_message_text(bot_msg)
         return SIXTH_LVL
     else:
@@ -1424,7 +1446,11 @@ async def project_rename_finish(update: Update, context: ContextTypes.DEFAULT_TY
 
         if is_db(DB):
             # Check if not existing one then change project title in context and in DB
-            prj_id = DB.projects.find_one({"title": new_title, "pm_tg_id": str(update.effective_user.id)}, {"_id":1})
+            prj_id = DB.projects.find_one(
+                {"title": new_title, 
+                 "pm_tg_id": str(update.effective_user.id)}, 
+                 {"_id":1}
+                 )
             if (prj_id and type(prj_id) == dict and 
                 '_id' in prj_id.keys() and prj_id['_id']):
                 bot_msg = f"You already have project with name '{new_title}'. Try another one."
@@ -1434,21 +1460,19 @@ async def project_rename_finish(update: Update, context: ContextTypes.DEFAULT_TY
             else:
                 # Change title in DB
                 title_update = DB.projects.update_one(
-                    {'title': context.user_data['title_to_rename'], 
-                    "pm_tg_id": str(update.effective_user.id)}, 
+                    {'_id': context.user_data['oid_to_rename']}, 
                     {"$set": {'title': new_title}}
                     )
                 if title_update.modified_count > 0:
-                    bot_msg = f"Got it. '{context.user_data['title_to_rename']}' changed to '{new_title}'"
+                    bot_msg = f"Got it. '{context.user_data['title_to_rename']['title']}' changed to '{new_title}'"
                     
                     # Change title in context if needed
-                    if (context.user_data['project']['title'] == context.user_data['title_to_rename']):
+                    if (context.user_data['project']['title'] == context.user_data['title_to_rename']['title']):
                         context.user_data['project']['title'] = new_title
                     
                     # Get jobs id from reminders dict, get each job by id and change title in job_data in apscheduler DB
                     reminders = DB.projects.find_one(
-                        {'title':context.user_data['project']['title'], 
-                        "pm_tg_id": str(update.effective_user.id)}, 
+                        {'_id': context.user_data['oid_to_rename']}, 
                         {'reminders':1, '_id':0}
                         )
                     if (reminders and type(reminders) == dict and
@@ -1461,9 +1485,9 @@ async def project_rename_finish(update: Update, context: ContextTypes.DEFAULT_TY
                                 job = job.modify(args=args)
                     await update.message.reply_text(bot_msg)
                 else:
-                    bot_msg = (f"Something went wrong, couldn't change '{context.user_data['title_to_rename']}' to '{new_title}'.\n"
+                    bot_msg = (f"Something went wrong, couldn't change '{context.user_data['title_to_rename']['title']}' to '{new_title}'.\n"
                             "Maybe try again later")
-                    logger.error(f"Something went wrong, couldn't change '{context.user_data['title_to_rename']} to '{new_title}' for user: '{update.effective_user.id}'")
+                    logger.error(f"Something went wrong, couldn't change '{context.user_data['title_to_rename']['title']} to '{new_title}' for user: '{update.effective_user.id}'")
                     await update.message.reply_text(bot_msg)
 
                 # Return to level with projects

@@ -309,15 +309,15 @@ def get_keyboard_and_msg(db, level: int, user_id: str, project: dict, branch: st
                             # Get list of projects for user
                             projects = list(db.projects.find({"pm_tg_id": str(user_id)}))
                             
-                            # For each project make buttons: active(if not active), rename, delete
+                            # For each project make buttons: active(if not active), rename, delete with oid as a string
                             keyboard = []
                             for project in projects:                                    
-                                keyboard.append([InlineKeyboardButton(f"Rename: '{project['title']}'", callback_data=f"rename_{project['title']}")])
+                                keyboard.append([InlineKeyboardButton(f"Rename: '{project['title']}'", callback_data=f"rename_{project['_id']}")])
                                 
                                 if project['active'] == False: 
                                     row = [
-                                        InlineKeyboardButton(f"Activate '{project['title']}'", callback_data=f"activate_{project['title']}"),
-                                        InlineKeyboardButton(f"Delete '{project['title']}'", callback_data=f"delete_{project['title']}"),
+                                        InlineKeyboardButton(f"Activate '{project['title']}'", callback_data=f"activate_{project['_id']}"),
+                                        InlineKeyboardButton(f"Delete '{project['title']}'", callback_data=f"delete_{project['_id']}"),
                                     ]   
                                     keyboard.append(row)
                             keyboard.extend([
@@ -397,7 +397,12 @@ def get_projects_and_pms_for_user(user_oid: ObjectId, db: Database) -> str:
     
     projects_and_pms = ''
     try:
-        projects = list(db.projects.find({"tasks.actioners": {"$elemMatch":{"actioner_id": user_oid}}}, {"title":1, "pm_tg_id":1, "_id":0}))
+        projects = list(db.projects.find(
+            {"tasks.actioners": 
+                {"$elemMatch":
+                    {"actioner_id": user_oid}}}, 
+            {"title":1, "pm_tg_id":1, "_id":0})
+            )
     except Exception as e:
         logger.error(f"There was error getting DB: {e}")
     else:
@@ -527,7 +532,6 @@ def get_worker_oid_from_db_by_tg_id(tg_id, db: Database):
     '''
 
     worker_id = None
-    # DB = get_db()
   
     try:
         result = db.staff.find_one({'tg_id': str(tg_id)})
