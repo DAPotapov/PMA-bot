@@ -14,6 +14,7 @@ from dotenv import load_dotenv
 from pprint import pprint
 from pymongo.errors import ConnectionFailure, ServerSelectionTimeoutError
 from pymongo.database import Database
+from re import sub
 from telegram import User, InlineKeyboardButton
 from telegram.ext import ContextTypes
 from typing import Tuple
@@ -126,22 +127,14 @@ def clean_project_title(user_input: str) -> str:
     Should return string.
     If something went wrong raise value error to be managed on calling side.
     """
-    #TODO To implement
-    #TODO: Clean input and add check for malicous input    
-    # cases: 
-    # empty string - clean from whitespaces on start and end of string
-    # TODO Convert whitespaces to spaces
-    # TODO multiple spaces convert to single
-    # escape characters? try insert them first
-    # cursor control characters - try insert them first
-    # Maybe I should limit to Alphanumeric + spaces + punctuation ? 
-    # TODO look up restrictions: telegram.error.BadRequest: Button_data_invalid
-    # Length limit?
 
-    title = user_input.strip()
+    # Replace whitespaces and their doubles with spaces, cut leading and ending spaces
+    title = sub("\s+", " ", user_input).strip()
     if not title:
         raise ValueError("Text absent")
-    return title
+    
+    # For project title can be used in buttons it can't exceed 64 bytes (assume symbols for now)
+    return title[:63]
 
 
 def get_assignees(task: dict, db: Database):
