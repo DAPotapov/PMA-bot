@@ -137,8 +137,12 @@ async def day_before_update(context: ContextTypes.DEFAULT_TYPE) -> None:
     # because every reminder function load project from file and looks through it
 
     if DB != None and is_db(DB):
+        
         # Get project from DB
-        project = DB.projects.find_one({"pm_tg_id": str(context.job.data['pm_tg_id']), "title": context.job.data['project_title']})
+        project = DB.projects.find_one(
+            {"pm_tg_id": str(context.job.data['pm_tg_id']),
+             "title": context.job.data['project_title']}
+             )
 
         # Check type of return if it is dictionary, don't bother to check every expected field
         if project and type(project) == dict:            
@@ -235,7 +239,10 @@ async def file_update(context: ContextTypes.DEFAULT_TYPE) -> None:
 
     if DB != None and is_db(DB):
         # Get project from DB
-        project = DB.projects.find_one({"pm_tg_id": str(context.job.data['pm_tg_id']), "title": context.job.data['project_title']})
+        project = DB.projects.find_one(
+            {"pm_tg_id": str(context.job.data['pm_tg_id']), 
+             "title": context.job.data['project_title']}
+             )
         if project and type(project) == dict:                
 
             # Add PM username
@@ -290,7 +297,10 @@ async def morning_update(context: ContextTypes.DEFAULT_TYPE) -> None:
 
     if DB != None and is_db(DB):
         # Get project from DB
-        project = DB.projects.find_one({"pm_tg_id": str(context.job.data['pm_tg_id']), "title": context.job.data['project_title']})
+        project = DB.projects.find_one(
+            {"pm_tg_id": str(context.job.data['pm_tg_id']), 
+             "title": context.job.data['project_title']}
+             )
         if project and type(project) == dict:            
 
             # Get project team to inform
@@ -384,7 +394,11 @@ async def naming_project(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
                 await update.message.reply_text(bot_msg)
                 return ConversationHandler.END   
             else:
-                prj_id = DB.projects.find_one({"title": project['title'], "pm_tg_id": str(context.user_data['PM']['tg_id'])}, {"_id":1})
+                prj_id = DB.projects.find_one(
+                    {"title": project['title'], 
+                     "pm_tg_id": str(context.user_data['PM']['tg_id'])}, 
+                     {"_id":1}
+                     )
                 # print(f"Search for project title returned this: {prj_id}")
                 if (prj_id and type(prj_id) == dict and 
                     '_id' in prj_id.keys() and prj_id['id']):
@@ -705,7 +719,10 @@ async def status(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
                 else:
 
                     # Get all documents where user mentioned, cast cursor object to list to check if smth returned
-                    projects = list(DB.projects.find({"tasks.actioners": {"$elemMatch":{"actioner_id": user_oid}}}))
+                    projects = list(DB.projects.find(
+                        {"tasks.actioners": 
+                         {"$elemMatch":{"actioner_id": user_oid}}}
+                         ))
             
                     # If documents was found where user mentioned then loop them and collect status update for user
                     if projects:
@@ -829,7 +846,11 @@ async def upload(update: Update, context: CallbackContext) -> int:
         if docs_count > 0:
 
             # Get active project title and store in user_data (because now PROJECTTITLE contain default value not associated with project)
-            result = DB.projects.find_one({"pm_tg_id": str(update.effective_user.id), "active": True}, {"title": 1, "_id": 0})
+            result = DB.projects.find_one(
+                {"pm_tg_id": str(update.effective_user.id), 
+                 "active": True}, 
+                 {"title": 1, "_id": 0}
+                 )
             if (result and type(result) == dict and 
                 'title' in result.keys() and result['title']):
                 project = {
@@ -877,8 +898,11 @@ async def upload_file_recieved(update: Update, context: CallbackContext) -> int:
     
             # Update tasks in active project
             if is_db(DB):
-                result = DB.projects.update_one({"pm_tg_id": str(update.effective_user.id), "title": context.user_data['project']['title']},
-                                                {"$set": {"tasks": tasks}})
+                result = DB.projects.update_one(
+                    {"pm_tg_id": str(update.effective_user.id), 
+                     "title": context.user_data['project']['title']},
+                    {"$set": {"tasks": tasks}}
+                    )
                 if result.matched_count > 0:
                     if result.modified_count > 0:
                         bot_msg = bot_msg + f"\nProject schedule updated successfully."
@@ -1206,7 +1230,11 @@ async def transfer_control(update: Update, context: ContextTypes.DEFAULT_TYPE) -
             if result.matched_count > 0 and result.modified_count > 0:
 
                 # On success update corresponding jobs
-                reminders = DB.projects.find_one({'title':context.user_data['project']['title'], "pm_tg_id": query.data}, {'reminders':1, '_id':0})
+                reminders = DB.projects.find_one(
+                    {'title':context.user_data['project']['title'], 
+                     "pm_tg_id": query.data}, 
+                     {'reminders':1, '_id':0}
+                     )
                 if (reminders and type(reminders) == dict and
                     'reminders' in reminders.keys() and reminders['reminders']):
                     for id in reminders['reminders'].values():
