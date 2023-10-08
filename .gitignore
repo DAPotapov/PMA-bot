@@ -161,6 +161,7 @@ cython_debug/
 #.idea/
 
 # Project specific folders
+.data
 data/
 
 # Project specific files

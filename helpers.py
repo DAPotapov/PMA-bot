@@ -24,7 +24,11 @@ from urllib.parse import quote_plus
 ONE, TWO, THREE, FOUR, FIVE, SIX = range(6)
 
 # Configure logging
-logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s', level=logging.INFO)
+# logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s', level=logging.INFO)
+logging.basicConfig(filename=".data/log.log", 
+                    filemode='a', 
+                    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s', 
+                    level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 
