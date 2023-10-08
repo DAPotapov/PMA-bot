@@ -137,7 +137,7 @@ async def day_before_update(context: ContextTypes.DEFAULT_TYPE) -> None:
     # because every reminder function load project from file and looks through it
 
     if DB != None and is_db(DB):
-        
+
         # Get project from DB
         project = DB.projects.find_one(
             {"pm_tg_id": str(context.job.data['pm_tg_id']),
@@ -1919,8 +1919,8 @@ def main() -> None:
     start_conv = ConversationHandler(
         entry_points=[CommandHandler(start_cmd.command, start)],
         states={
-            FIRST_LVL: [MessageHandler(filters.TEXT & ~(filters.COMMAND | filters.Regex(re.compile(r'cancel', re.IGNORECASE))), naming_project),
-                        MessageHandler(filters.Regex(re.compile(r'cancel', re.IGNORECASE)), start_ended)
+            FIRST_LVL: [MessageHandler(filters.TEXT & ~(filters.COMMAND | filters.Regex(re.compile('^cancel$', re.IGNORECASE))), naming_project),
+                        MessageHandler(filters.Regex(re.compile('^cancel$', re.IGNORECASE)), start_ended)
                         ],
             SECOND_LVL: [MessageHandler(filters.Document.ALL, file_recieved)]
         },
