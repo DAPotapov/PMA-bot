@@ -128,13 +128,15 @@ def clean_project_title(user_input: str) -> str:
     If something went wrong raise value error to be managed on calling side.
     """
 
+    # To prevent user from using War and Peace as a title let's limit its length to this number of symbols
+    max_title_len = 128
+
     # Replace whitespaces and their doubles with spaces, cut leading and ending spaces
     title = sub("\s+", " ", user_input).strip()
     if not title:
         raise ValueError("Text absent")
     
-    # For project title can be used in buttons it can't exceed 64 bytes (assume symbols for now)
-    return title[:63]
+    return title[:max_title_len]
 
 
 def get_assignees(task: dict, db: Database):
