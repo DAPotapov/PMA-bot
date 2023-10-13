@@ -101,7 +101,7 @@ BOT_NAME = os.environ.get('BOT_NAME')
 BOT_PASS = os.environ.get('BOT_PASS')
 DB_URI = f"mongodb://{BOT_NAME}:{BOT_PASS}@localhost:27017/admin?retryWrites=true&w=majority"
 
-# Make connection to database # TODO use similar check in other places
+# Make connection to database # 
 try:
     DB = get_db()
 except ConnectionError as e:
@@ -109,16 +109,10 @@ except ConnectionError as e:
 except AttributeError as e:
     sys.exit(f"{e}")
 
-# else:
-#     if DB == None or not is_db(DB):
-#         sys.exit(f"Couldn't connect to DB.\n Can't work without it.")
-
-
 # Set list of commands
 help_cmd = BotCommand("help","выводит данное описание")
 status_cmd = BotCommand("status", "информация о текущем состоянии проекта")
 settings_cmd = BotCommand("settings", "настройка параметров бота (работает только в личных сообщениях)")
-# freshstart_cmd = BotCommand("freshstart", "начало нового проекта")
 feedback_cmd = BotCommand("feedback", "отправка сообщения разработчику")
 start_cmd = BotCommand("start", "запуск бота")
 stop_cmd = BotCommand("stop", "прекращение работы бота")
@@ -228,7 +222,6 @@ async def feedback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
 
 async def feedback_answer(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     """ Gather information user provided and answer user"""
-    # TODO Maybe add handling of file or screenshot (PHOTO) recieving from user? - in next version
     logger.warning(f'FEEDBACK from {update.message.from_user.username} ({update.message.from_user.id}): {update.message.text}')
     bot_msg = "Feedback sent to developer."
     await update.message.reply_text(bot_msg)
@@ -297,7 +290,6 @@ async def morning_update(context: ContextTypes.DEFAULT_TYPE) -> None:
 
     # TODO how to make observation of project a standalone function to be called elsewhere?
     # because status function load project from file and looks through it
-    # Use gen_team
 
     if DB != None and is_db(DB):
         # Get project from DB
@@ -1448,7 +1440,7 @@ async def project_rename_start(update: Update, context: ContextTypes.DEFAULT_TYP
         context.user_data['oid_to_rename'] = ObjectId(query.data.split("_", 1)[1])
 
         #  Get title from DB by oid
-        if is_db(DB): #TODO can't find ObjectId by string
+        if is_db(DB): 
             context.user_data['title_to_rename'] = DB.projects.find_one(
                 {"_id": context.user_data['oid_to_rename']},
                 {'title':1, "_id":0}
@@ -1911,10 +1903,6 @@ def main() -> None:
 
     # And if changes were made inside the bot, PM could download updated schedule (original format?)
     # dispatcher.add_handler(CommandHandler("download", download))
-
-    # TODO: version 2 - ability to add custom user reminders (jobs)
-    # in this case reminders edit ability should be separated from settings
-    # application.add_handler(CommandHandler("remind", add_reminder))
     
     # Echo any message that is text and not a command
     # application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, echo))
@@ -1955,8 +1943,6 @@ def main() -> None:
                 CallbackQueryHandler(allow_status_to_group, pattern="^" + str(ONE) + "$"),
                 CallbackQueryHandler(milestones_anounce, pattern="^" + str(TWO) + "$"),
                 CallbackQueryHandler(notify_of_all_projects, pattern="^" + str(THREE) + "$"),
-                # TODO: If there will be custom reminders how will be they handled? I can't predict their names to check in pattern
-                # But I can store it in list and use this list in pattern
                 CallbackQueryHandler(reminders_settings_item, pattern="^day_before_update$|^morning_update$|^friday_update$"),
                 # According to docs (https://core.telegram.org/bots/api#user) id should be less than 52 bits: 
                 CallbackQueryHandler(transfer_control, pattern="^\d{6,15}$"),
@@ -2011,7 +1997,6 @@ def main() -> None:
             FIRST_LVL: [
                 MessageHandler(filters.Document.ALL, upload_file_recieved),
                 CallbackQueryHandler(upload_ended, pattern="^" + str(ONE) + "$")],
-            # TODO v.2: add ability (and dialog to choose file format) for user to download his data (projects as separate files)
         },
         fallbacks=[MessageHandler(filters.TEXT & ~filters.COMMAND, upload_ended)]
     )

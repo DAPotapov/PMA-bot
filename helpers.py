@@ -208,7 +208,6 @@ def get_db():
 
 def get_job_preset(job_id: str, context: ContextTypes.DEFAULT_TYPE) -> str:
     """ Returns current preset of job in text format to add to messages """
-    #TODO Better make this a method of a job-class (maybe reminder class) evolved from base job-class
 
     presets_dict = get_job_preset_dict(job_id, context)
     if presets_dict:
@@ -228,14 +227,12 @@ def get_job_preset_dict(job_id: str, context: ContextTypes.DEFAULT_TYPE) -> dict
     Helper function that returns current reminder preset for given job id
     Returns empty dict if nothing is found or error occured
     '''  
-    #TODO Better make this a method of a job-class (maybe reminder class) evolved from base job-class
     
     preset = {}
 
     job = context.job_queue.scheduler.get_job(job_id)
     try:
         hour = job.trigger.fields[job.trigger.FIELD_NAMES.index('hour')]
-        # TODO WHY string?
         minute = job.trigger.fields[job.trigger.FIELD_NAMES.index('minute')]
         days_preset = str(job.trigger.fields[job.trigger.FIELD_NAMES.index('day_of_week')])
         # days_list = list(job.trigger.fields[job.trigger.FIELD_NAMES.index('day_of_week')])
@@ -290,7 +287,7 @@ def get_keyboard_and_msg(db, level: int, user_id: str, project: dict, branch: st
                 match branch:
                     case "notifications":
                         if is_db(db):
-                            try: #TODO consider get this setting outside keyboard function
+                            try: 
                                 pm_settings = db.staff.find_one({"tg_id": str(user_id)}, {"settings":1, "_id":0})
                             except Exception as e:
                                 logger.error(f"There was error getting DB: {e}")
@@ -332,11 +329,6 @@ def get_keyboard_and_msg(db, level: int, user_id: str, project: dict, branch: st
                             ])                         
 
                     case "reminders":
-                        # TODO: Here I could construct keyboard out of jobs registered for current user and active project,
-                        # similar to project list above.
-                        # but this will need of passing composite callback_data,
-                        # first part of which will be checked by pattern parameter of CallbackQueryHandler
-                        # and second used inside universal reminder function
                         msg = (f"You can customize reminders here.")
                         keyboard = [        
                             [InlineKeyboardButton("Reminder on day before", callback_data='day_before_update')],

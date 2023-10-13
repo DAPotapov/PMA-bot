@@ -281,7 +281,6 @@ def compose_tasks_list(tasks, task, allocations, resources, property_id, db: Dat
     else:
         raise ValueError('File may be damaged: milestone field contains invalid value ' + str(task['meeting']))
     
-    # TODO in v.2: project apps supports alternative calendars, bot should support them as well.
     # Construct end date from start date, duration and numpy function.
     # Numpy function returns sees duration as days _between_ dates, 
     # but in project management enddate must be a date of deadline, 
@@ -340,8 +339,6 @@ def load_xml(fp, db: Database):
 
     tasks = []
     obj = untangle.parse(str(fp))
-
-    #TODO consider adding version check if difficulties ocurr
 
     # Store resources
     if 'Resource' in obj.Project.Resources:
