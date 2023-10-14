@@ -384,7 +384,13 @@ async def naming_project(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
 
         # Check and add PM to staff
         if DB != None and is_db(DB):
-            pm_oid = add_worker_info_to_staff(context.user_data['PM'], DB)
+            pm_oid = ''
+            try:
+                pm_oid = add_worker_info_to_staff(context.user_data['PM'], DB)
+            except ValueError as e:
+                bot_msg = f"{e}"
+                await update.message.reply_text(bot_msg)
+                return ConversationHandler.END 
             if not pm_oid:
                 bot_msg = "There is a problem with database connection. Contact developer or try later."
                 await update.message.reply_text(bot_msg)
@@ -500,7 +506,7 @@ def file_to_dict(fp):
     Get file with project, determine supported type, call dedicated function to convert to dictionary, return it to caller
     '''
 
-    tasks = None
+    tasks = []
 
     # If file is known format: call appropriate function with this file as argument and expect project dictionary on return
     try:
@@ -516,8 +522,10 @@ def file_to_dict(fp):
 
         # else log what was tried to be loaded
             case _:
-                logger.warning(f"Someone tried to load '{fp.suffix}' file.")                
-    except Exception as e:
+                logger.warning(f"Someone tried to load '{fp.suffix}' file.")      
+    except (AttributeError, IndexError, ValueError) as e:
+        logger.error(f'{e}')
+    except Exception as e: # TODO delete
         logger.error(f'{e}')
     finally:
         return tasks

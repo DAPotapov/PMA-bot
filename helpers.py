@@ -187,23 +187,24 @@ def get_db():
         raise AttributeError("Can't get bot credentials from environment.")
     uri = "mongodb://%s:%s@%s" % (quote_plus(BOT_NAME), quote_plus(BOT_PASS), host)
     # DB = None
-    try:
+    # try:
         # client = pymongo.MongoClient(f"mongodb://{BOT_NAME}:{BOT_PASS}@localhost:27017/admin?retryWrites=true&w=majority")
-        client = pymongo.MongoClient(uri, serverSelectionTimeoutMS=1000) 
-    except ConnectionError as e:
-        logger.error(f"There is problem with connecting to db '{DB_NAME}': {e}")   
-    else:
+    client = pymongo.MongoClient(uri, serverSelectionTimeoutMS=1000) 
+    # except ConnectionError as e: # Нужно ли? или на той стороне только 
+    #     logger.error(f"There is problem with connecting to db '{DB_NAME}': {e}")
+    #     raise ConnectionError(e)
+    # else:
 
-        # Check for connection
-        try:
-            # client.admin.command('ping')
-            # client.admin.command('ismaster')
-            client.server_info()
-        except (ServerSelectionTimeoutError, ConnectionFailure) as e:
-            raise ConnectionError(e)
-        else:
-            DB = client[DB_NAME]
-            return DB        
+    # Check for connection
+    try:
+        # client.admin.command('ping')
+        # client.admin.command('ismaster')
+        client.server_info()
+    except (ServerSelectionTimeoutError, ConnectionFailure) as e:
+        raise ConnectionError(e)
+    else:
+        DB = client[DB_NAME]
+        return DB        
 
 
 def get_job_preset(job_id: str, context: ContextTypes.DEFAULT_TYPE) -> str:

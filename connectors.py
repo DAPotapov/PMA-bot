@@ -150,18 +150,11 @@ def load_gan(fp, db: Database):
     if 'task' in obj.project.tasks:
         # Loop through tasks
         for task in obj.project.tasks.task:
-            # Add relevant data to list containing task information
-            
-                # pprint(f' Tasks list before function call: {tasks}')
-                # pprint(f"This task will be send to function: {task['name']}")
+            # Add relevant data to list containing task information            
                 tasks = compose_tasks_list(tasks, task, allocations, resources, property_id, db)
-                # pprint(f" .. and after function: {tasks}")
-                # if task has subtask retreive data from it too
                 if 'task' in task:
                     for subtask in task.task:
-                        # pprint(f' Tasks list before function call: {tasks}')
                         tasks = compose_tasks_list(tasks, subtask, allocations, resources, property_id, db)
-                        # pprint(f' .. and after: {tasks}')
 
     else:
         raise AttributeError('There are no tasks in provided file. Nothing to do.')
@@ -178,15 +171,14 @@ def get_tg_un_from_gan_resources(resource_id, resources, property_id):
     Return None if nothing found. Should be controlled on calling side.
     '''
 
-    tg_username = None
-    # print(f"Func called with id: {resource_id}")
+    tg_username = ''
 
     for actioner in resources.resource:
-        # pprint(f"Actioner: {actioner}")
         if resource_id == actioner['id']:
 
             for property in actioner.custom_property:
                 if property['definition-id'] == property_id:
+
                     # If such property not filled then abort and tell user to do his job and make a proper file
                     if not property['value']:
                         raise ValueError(f"'{actioner['name']}' have no tg_username value")
@@ -202,8 +194,6 @@ def get_tg_un_from_xml_resources(resource_id, resources, property_id):
     '''
 
     tg_username = None
-    # print(f"Func called with id: {resource_id}")
-
     for actioner in resources.Resource:
         if resource_id == actioner.UID.cdata:
 
@@ -430,8 +420,6 @@ def load_xml(fp, db: Database):
                 duration = 0
             else:
                 duration = int(busday_count(xml_date_conversion(task.Start.cdata), xml_date_conversion(task.Finish.cdata)) + 1)
-                # print(f"Duration type is: {type(duration)}")
-            # print(f"Start: {task.Start.cdata}, End: {task.Finish.cdata}, duration: {duration}")
 
             # make actioners list for this task, skipping milestones
             # Completeness of task assignments will be controlled in /status function
