@@ -10,6 +10,13 @@ from numpy import busday_offset, busday_count, floor, datetime64
 from pprint import pprint
 from pymongo.database import Database
 
+# Because GanttProject and MS Project have different values for dependency type here is the adaptor
+# Will use MS Project values, because it's more popular program
+# MS Project type of link (depend_type): Values are 0=FF, 1=FS, 2=SF and 3=SS 
+# (docs at https://learn.microsoft.com/en-us/office-project/xml-data-interchange/xml-schema-for-the-tasks-element?view=project-client-2016)
+# GanttProject type values: 0 = none, 1 = start-start SS, 2 = finish-start FS, 3 - finish-finish FF, 4 - start-finish SF (usually not used)
+# Map GanttProject dependency types to MS Project
+GAN_DEPEND_TYPES = [3, 1, 0, 2]
 
 # Configure logging
 # logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s', level=logging.INFO)
@@ -242,30 +249,32 @@ def compose_tasks_list(tasks, task, allocations, resources, property_id, db: Dat
     successors = []
     if 'depend' in dir(task):
         for follower in task.depend:
-            # Because GanttProject and MS Project have different values for dependency type here is the adaptor
-            # Will use MS Project values, because it's more popular program
-            # Type of link (depend_type): Values are 0=FF, 1=FS, 2=SF and 3=SS (docs at https://learn.microsoft.com/en-us/office-project/xml-data-interchange/xml-schema-for-the-tasks-element?view=project-client-2016)
-            # GanttProject type values: 0 = none, 1 = start-start SS, 2 = finish-start FS, 3 - finish-finish FF, 4 - start-finish SF (usually not used)
-            depend_type = 1 # FS - most common
-            # TODO refactor to use list:
-            # types = [3, 1, 0, 2]
-            # depend_type = types[int(follower['type'])-1] 
-            match follower['type']:
-                case '1':
-                    depend_type = 3
-                case '2':
-                    depend_type = 1
-                case '3':
-                    depend_type = 0
-                case '4':
-                    depend_type = 2
-                case _:
-                    raise ValueError(f"Unknown dependency type ('{follower['type']}')of successor task: {int(follower['id'])}")
-            successors.append({
-                'id': int(follower['id']),
-                'depend_type': depend_type,
-                'depend_offset': int(follower['difference'])
-                })
+
+            # If dependency translation not possible better aware user than import with somehow
+            if int(follower['type']) == 0:
+                raise ValueError(f"Unknown dependency type ('{follower['type']}')of successor task: {int(follower['id'])}")
+            try:
+                depend_type = GAN_DEPEND_TYPES[int(follower['type'])-1] 
+            except IndexError as e:
+                raise ValueError(f"Unknown dependency type ('{follower['type']}')of successor task: {int(follower['id'])}")
+            else:
+
+            # match follower['type']:
+            #     case '1':
+            #         depend_type = 3
+            #     case '2':
+            #         depend_type = 1
+            #     case '3':
+            #         depend_type = 0
+            #     case '4':
+            #         depend_type = 2
+            #     case _:
+            #         raise ValueError(f"Unknown dependency type ('{follower['type']}')of successor task: {int(follower['id'])}")
+                successors.append({
+                    'id': int(follower['id']),
+                    'depend_type': depend_type,
+                    'depend_offset': int(follower['difference'])
+                    })
 
     # Dictionary of subtasks' id of this one. This way helpful to almost infinitely decompose tasks. 
     include = []
