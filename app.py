@@ -1213,11 +1213,11 @@ async def transfer_control(update: Update, context: ContextTypes.DEFAULT_TYPE) -
     
     query = update.callback_query
     await query.answer()
-
+    
     # Write to DB new owner of project and update corresponding jobs
     # Send message to user and
     # End conversation because only PM should change settings but current user isn't a PM already 
-    if query.data:
+    if query and 'data' in dir(query) and query.data: # TODO test and on success use in other places
         if DB != None and is_db(DB):
             result = DB.projects.update_one({
                 "pm_tg_id": str(update.effective_user.id), 
@@ -1240,7 +1240,13 @@ async def transfer_control(update: Update, context: ContextTypes.DEFAULT_TYPE) -
                             args[0].data['pm_tg_id'] = query.data
                             job = job.modify(args=args)
                 bot_msg = f"You successfuly transfered control over project to other"
-                # TODO inform reciever that he is in control now
+                # Inform reciever that he is in control now
+                msg = (f"@{update.effective_user.username} delegated to you management" 
+                       f"of the project '{context.user_data['project']['title']}'.\n"
+                       f"You can use /status command to see current state of the project."
+                       f"To know other functions use /help."
+                )
+                await context.bot.send_message(query.data, msg)
             
             else:
                 bot_msg = f"Something went wrong while transfering control to choosen project team member. Contact developer to check the logs."
