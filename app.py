@@ -1782,37 +1782,37 @@ async def reminder_days_setter(update: Update, context: ContextTypes.DEFAULT_TYP
     bot_msg = (f"Unable to reschedule the reminder")
     new_days = []
 
-    # TODO: better use variables for names of days for later translation
-    # days_of_week = ['mon','tue','wed','thu','fri','sat','sun']
+    # Better use variables for names of days for later translation
+    days_of_week = ['sun', 'mon','tue','wed','thu','fri','sat']
 
     # Store user input to list, clean from whitespaces, convert to lower case
     if update.message.text:
         user_input = update.message.text.split(',')
         for day in user_input:
             day = day.strip().lower()
-            if day == 'monday' or day == 'mon' or day == 'понедельник' or day == 'пн':
+            if day == 'monday' or day == 'mon' or day == 'понедельник' or day == 'пн' or day == 'пон':
 
                 # Do not add doubles
-                if not 'mon' in new_days:
-                    new_days.append('mon')
-            if day == 'tuesday' or day == 'tue' or day == 'вторник' or day == 'вт':
-                if not 'tue' in new_days:               
-                    new_days.append('tue')
-            if day == 'wednesday' or day == 'wed' or day == 'среда' or day == 'ср':
-                if not 'wed' in new_days:
-                    new_days.append('wed')  
-            if day == 'thursday' or day == 'thu' or day == 'четверг' or day == 'чт':
-                if not 'thu' in new_days:
-                    new_days.append('thu')
-            if day == 'friday' or day == 'fri' or day == 'пятница' or day == 'пт':
-                if not 'fri' in new_days:
-                    new_days.append('fri')
-            if day == 'saturday' or day == 'sat' or day == 'суббота' or day == 'сб':
-                if not 'sat' in new_days:
-                    new_days.append('sat')
-            if day == 'sunday' or day == 'sun' or day == 'воскресенье' or day == 'вс':
-                if not 'sun' in new_days:
-                    new_days.append('sun') 
+                if not days_of_week[1] in new_days:
+                    new_days.append(days_of_week[1])
+            if day == 'tuesday' or day == 'tue' or day == 'вторник' or day == 'вт' or day == 'вто':
+                if not days_of_week[2] in new_days:               
+                    new_days.append(days_of_week[2])
+            if day == 'wednesday' or day == 'wed' or day == 'среда' or day == 'ср' or day == 'сре':
+                if not days_of_week[3] in new_days:
+                    new_days.append(days_of_week[3])  
+            if day == 'thursday' or day == 'thu' or day == 'четверг' or day == 'чт' or day == 'чет':
+                if not days_of_week[4] in new_days:
+                    new_days.append(days_of_week[4])
+            if day == 'friday' or day == 'fri' or day == 'пятница' or day == 'пт' or day == 'пят':
+                if not days_of_week[5] in new_days:
+                    new_days.append(days_of_week[5])
+            if day == 'saturday' or day == 'sat' or day == 'суббота' or day == 'сб' or day == 'суб':
+                if not days_of_week[6] in new_days:
+                    new_days.append(days_of_week[6])
+            if day == 'sunday' or day == 'sun' or day == 'воскресенье' or day == 'вс' or day == 'вос':
+                if not days_of_week[0] in new_days:
+                    new_days.append(days_of_week[0]) 
         if new_days:
 
             # Find job by id to reschedule
