@@ -56,6 +56,7 @@ from helpers import (
     get_job_preset,
     get_job_preset_dict,
     get_keyboard_and_msg,
+    get_project,
     get_project_team,
     get_projects_and_pms_for_user,
     get_status_on_project,
@@ -126,6 +127,7 @@ FIRST_LVL, SECOND_LVL, THIRD_LVL, FOURTH_LVL, FIFTH_LVL, SIXTH_LVL, SEVENTH_LVL 
 ONE, TWO, THREE, FOUR, FIVE, SIX = range(6)
 
 
+
 async def day_before_update(context: ContextTypes.DEFAULT_TYPE) -> None:
     '''
     This reminder must be send to all team members on the day before of the important dates:
@@ -134,24 +136,11 @@ async def day_before_update(context: ContextTypes.DEFAULT_TYPE) -> None:
     # TODO how to make observation of project a standalone function to be called elsewhere?
     # because every reminder function load project from file and looks through it
 
+
     if DB != None and is_db(DB):
-
-        # Get project from DB
-        project = DB.projects.find_one(
-            {"pm_tg_id": str(context.job.data['pm_tg_id']),
-             "title": context.job.data['project_title']}
-             )
-
-        # Check type of return if it is dictionary, don't bother to check every expected field
-        if project and type(project) == dict:            
-
-            # Add PM username
-            pm_username = get_worker_tg_username_by_tg_id(str(context.job.data['pm_tg_id']), DB)
-            if pm_username:
-                project['tg_username'] = pm_username
-            else:
-                logger.error(f"PM (with tg_id: {str(context.job.data['pm_tg_id'])}) was not found in db.staff!")
-            
+        project = get_project(DB, str(context.job.data['pm_tg_id']), context.job.data['project_title'])
+        if project:
+           
             # Find task to inform about and send message to users
             for task in project['tasks']:
                 bot_msg = '' # Also acts as flag that there is something to inform user of
@@ -239,20 +228,8 @@ async def file_update(context: ContextTypes.DEFAULT_TYPE) -> None:
     '''
 
     if DB != None and is_db(DB):
-        # Get project from DB
-        project = DB.projects.find_one(
-            {"pm_tg_id": str(context.job.data['pm_tg_id']), 
-             "title": context.job.data['project_title']}
-             )
-        if project and type(project) == dict:                
-
-            # Add PM username
-            pm_username = get_worker_tg_username_by_tg_id(str(context.job.data['pm_tg_id']), DB)
-            if pm_username:
-                project['tg_username'] = pm_username
-            else:
-                logger.error(f"PM (with tg_id: {str(context.job.data['pm_tg_id'])}) was not found in db.staff!")
-            
+        project = get_project(DB, str(context.job.data['pm_tg_id']), context.job.data['project_title'])
+        if project:                    
             team = get_project_team(project, DB)
             if team:
                 for member in team:
@@ -292,16 +269,9 @@ async def morning_update(context: ContextTypes.DEFAULT_TYPE) -> None:
     This routine will be executed on daily basis to control project(s) schedule
     '''
 
-    # TODO how to make observation of project a standalone function to be called elsewhere?
-    # because status function load project from file and looks through it
-
     if DB != None and is_db(DB):
-        # Get project from DB
-        project = DB.projects.find_one(
-            {"pm_tg_id": str(context.job.data['pm_tg_id']), 
-             "title": context.job.data['project_title']}
-             )
-        if project and type(project) == dict:            
+        project = get_project(DB, str(context.job.data['pm_tg_id']), context.job.data['project_title'])
+        if project: 
 
             # Get project team to inform
             team = get_project_team(project, DB)
@@ -331,6 +301,7 @@ async def start(update: Update, context: CallbackContext) -> int:
     '''
     Function to handle start of the bot
     '''
+    
     # Collect information about PM
     pm = {
         'name': update.effective_user.first_name,

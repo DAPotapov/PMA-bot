@@ -391,6 +391,34 @@ def get_keyboard_and_msg(db, level: int, user_id: str, project: dict, branch: st
     return keyboard, msg
 
 
+def get_project(db: Database, pm_tg_id: str, title: str) -> dict[str, str]:
+    """
+    Get project from database by name for given telegram id of PM
+    """
+
+    # Get project from DB
+    project = db.projects.find_one(
+        {"pm_tg_id": pm_tg_id,
+            "title": title}
+            )
+
+    # Check that returned all data needed
+    if (project and type(project) == dict and 
+        'tasks' in project.keys() and 
+        'pm_tg_id' in project.keys() and 
+        project['tasks'] and project['pm_tg_id']):            
+
+        # Add PM username
+        pm_username = get_worker_tg_username_by_tg_id(pm_tg_id, db)
+        if pm_username:
+            project['tg_username'] = pm_username
+        else:
+            logger.error(f"PM (with tg_id: {pm_tg_id}) was not found in db.staff!") 
+        return project
+    else:
+        return {}
+
+
 def get_projects_and_pms_for_user(user_oid: ObjectId, db: Database) -> str:
     ''' Function to get string of projects (and their PMs) where user participate as actioner '''
     
@@ -418,7 +446,7 @@ def get_projects_and_pms_for_user(user_oid: ObjectId, db: Database) -> str:
     return projects_and_pms
 
 
-def get_project_team(project: dict, db: Database) -> list:
+def get_project_team(project: dict, db: Database) -> list[dict]:
     """
     Construct list of project team members.
     Returns None if it is not possible to achieve or something went wrong.
