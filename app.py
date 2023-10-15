@@ -329,7 +329,6 @@ async def start(update: Update, context: CallbackContext) -> int:
     '''
     # Collect information about PM
     pm = {
-        'program_id': '',
         'name': update.effective_user.first_name,
         'email' : '',
         'phone' : '',

@@ -124,7 +124,6 @@ def load_gan(fp, db: Database):
             
             # Make dict of actioner
             worker = {
-                "program_id" : int(actioner['id']), 
                 "name" : actioner['name'],
                 "email" : actioner['contacts'],
                 "phone" : actioner['phone'],
@@ -382,7 +381,6 @@ def load_xml(fp, db: Database):
 
             # Make dict of actioner
             worker = {
-                'program_id' : int(actioner.UID.cdata),
                 'name' : actioner.Name.cdata,
                 # Seems like XML not necessary contain email address field for resource
                 'email' : actioner.EmailAddress.cdata if 'EmailAddress' in actioner else '',

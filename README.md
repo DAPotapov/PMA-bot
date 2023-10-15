@@ -175,10 +175,9 @@ First of all: the project file sent to bot should contain field 'tg_username' co
                 ]
             },        
         ],
-    "staff": [                                      # Actioners are stored separately because it is more convinient to write tg_id
+    "staff": [                                      # Actioners are stored separately 
         {                                           # If they were stored in tasks, then it will be a problem to write tg_id in each task
             "_id": ObjectId(),
-            "program_id": '',                       # id of this resource from original project file
             "name": "John",
             "email": "",
             "phone": "",
