@@ -90,12 +90,12 @@ ONTHEEVE = "16:00"
 FRIDAY = "15:00"
 
 # TODO: change according to starter of the bot
-PROJECTTITLE = 'TESTING PROJECT'
+# PROJECTTITLE = 'TESTING PROJECT'
 # KNOWN_USERS = {}
 load_dotenv()
-PM = os.environ.get("PM")
-PROJECTJSON = os.environ.get("PROJECTJSON")
-
+# PM = os.environ.get("PM")
+# PROJECTJSON = os.environ.get("PROJECTJSON")
+DEV_TG_ID = os.environ.get('DEV_TG_ID')
 # Link to DB for storing jobs
 BOT_NAME = os.environ.get('BOT_NAME')
 BOT_PASS = os.environ.get('BOT_PASS')
@@ -222,10 +222,14 @@ async def feedback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
 
 async def feedback_answer(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     """ Gather information user provided and answer user"""
-    logger.warning(f'FEEDBACK from {update.message.from_user.username} ({update.message.from_user.id}): {update.message.text}')
+
+    msg = f'FEEDBACK from {update.message.from_user.username} ({update.message.from_user.id}): {update.message.text}'
+    logger.warning(msg)
     bot_msg = "Feedback sent to developer."
     await update.message.reply_text(bot_msg)
-    # TODO definitely should send message to me (hide tg_id in .env)
+    # Send message to developer
+    if DEV_TG_ID:
+        await context.bot.send_message(DEV_TG_ID, msg)
     return ConversationHandler.END
 
 
