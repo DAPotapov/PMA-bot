@@ -401,7 +401,6 @@ async def naming_project(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
                      "pm_tg_id": str(context.user_data['PM']['tg_id'])}, 
                      {"_id":1}
                      )
-                # print(f"Search for project title returned this: {prj_id}")
                 if (prj_id and type(prj_id) == dict and 
                     '_id' in prj_id.keys() and prj_id['id']):
                     bot_msg = f"You've already started project with name {project['title']}. Try another one."
@@ -662,28 +661,29 @@ async def status(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
                                     msg = msg + f"\nMilestone '{task['name']}' is near ({task['enddate']})!"
                             else:
 
+                                #TODO these lines repeating
+                                people, user_ids = get_assignees(task, DB)
+                                if not people:
+                                    people = "can't say, better check assignments in project file."
+                                # to here
                                 # Check dates and compose message including information about human resurces
                                 if delta_start.days == 0:
-                                    people, user_ids = get_assignees(task, DB)
-                                    if not people:
-                                        people = "can't say, better check assignments in project file."
-
                                     # TODO: I can compose not only message here but also a keyboard to send to user to interact with
                                     msg = msg + f"\nTask {task['id']} '{task['name']}' started today. Assigned to: {people}"
                                 elif delta_start.days > 0  and delta_end.days < 0:
-                                    people, user_ids = get_assignees(task, DB)
-                                    if not people:
-                                        people = "can't say, better check assignments in project file."
+                                    # people, user_ids = get_assignees(task, DB)
+                                    # if not people:
+                                    #     people = "can't say, better check assignments in project file."
                                     msg = msg + f"\nTask {task['id']} '{task['name']}' is intermidiate. Due date is {task['enddate']}. Assigned to: {people}"
                                 elif delta_end.days == 0:
-                                    people, user_ids = get_assignees(task, DB)
-                                    if not people:
-                                        people = "can't say, better check assignments in project file."
+                                    # people, user_ids = get_assignees(task, DB)
+                                    # if not people:
+                                    #     people = "can't say, better check assignments in project file."
                                     msg = msg + f"\nTask {task['id']}  '{task['name']}' must be completed today! Assigned to: {people}"
                                 elif delta_start.days > 0 and delta_end.days > 0:         
-                                    people, user_ids = get_assignees(task, DB)
-                                    if not people:
-                                        people = "can't say, better check assignments in project file."                              
+                                    # people, user_ids = get_assignees(task, DB)
+                                    # if not people:
+                                    #     people = "can't say, better check assignments in project file."                              
                                     msg = msg + f"\nTask {task['id']} '{task['name']}' is overdue! (had to be completed on {task['enddate']}). Assigned to: {people}"
                                 else:
                                     logger.info(f"Loop through future task '{task['id']}' '{task['name']}'")
@@ -1248,6 +1248,7 @@ async def transfer_control(update: Update, context: ContextTypes.DEFAULT_TYPE) -
                             args[0].data['pm_tg_id'] = query.data
                             job = job.modify(args=args)
                 bot_msg = f"You successfuly transfered control over project to other"
+                
                 # Inform reciever that he is in control now
                 msg = (f"@{update.effective_user.username} delegated to you management" 
                        f"of the project '{context.user_data['project']['title']}'.\n"
