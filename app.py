@@ -230,7 +230,7 @@ async def file_update(context: ContextTypes.DEFAULT_TYPE) -> None:
     if DB != None and is_db(DB):
         project = get_project(DB, str(context.job.data['pm_tg_id']), context.job.data['project_title'])
         if project:                    
-            team = get_project_team(project, DB)
+            team = get_project_team(project['_id'], DB)
             if team:
                 for member in team:
                     if member['tg_id']:
@@ -274,7 +274,7 @@ async def morning_update(context: ContextTypes.DEFAULT_TYPE) -> None:
         if project: 
 
             # Get project team to inform
-            team = get_project_team(project, DB)
+            team = get_project_team(project['_id'], DB)
             if team:
 
                 # For each member compose status update on project and send
@@ -935,7 +935,7 @@ async def settings(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
             context.user_data['level'] = FIRST_LVL
             # TODO Check if command called in chat
             # Get active project WITH TASKS and store in user_data to further use
-            project = DB.projects.find_one({"pm_tg_id": str(update.effective_user.id), "active": True}) 
+            project = DB.projects.find_one({"pm_tg_id": str(update.effective_user.id), "active": True}, {"tasks":0}) 
             if (project and type(project) == dict and 
                 'title' in project.keys() and project['title']):
                 context.user_data['project'] = project

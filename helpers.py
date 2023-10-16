@@ -346,16 +346,16 @@ def get_keyboard_and_msg(db, level: int, user_id: str, project: dict, branch: st
                             # Get team members names with telegram ids, except PM
                             # Construct keyboard from that list
                             # TODO TEST WHat if it's a sole project? Only PM is working?
-                            team = get_project_team(project, db)
+                            team = get_project_team(project['_id'], db)
+                            keyboard = []
                             if team:
-                                keyboard = []
                                 for member in team:
                                     if user_id != member['tg_id']:
                                         keyboard.append([InlineKeyboardButton(f"{member['name']} (@{member['tg_username']})", callback_data=member['tg_id'])])       
-                                keyboard.extend([
-                                    [InlineKeyboardButton("Back", callback_data='back')],        
-                                    [InlineKeyboardButton("Finish settings", callback_data='finish')]
-                                ])                                
+                            keyboard.extend([
+                                [InlineKeyboardButton("Back", callback_data='back')],        
+                                [InlineKeyboardButton("Finish settings", callback_data='finish')]
+                            ])                                
 
             # Third menu level
             case 2:
@@ -391,7 +391,7 @@ def get_keyboard_and_msg(db, level: int, user_id: str, project: dict, branch: st
     return keyboard, msg
 
 
-def get_project(db: Database, pm_tg_id: str, title: str) -> dict[str, str]:
+def get_project(db: Database, pm_tg_id: str, title: str) -> dict:
     """
     Get project from database by name for given telegram id of PM
     """
@@ -446,32 +446,38 @@ def get_projects_and_pms_for_user(user_oid: ObjectId, db: Database) -> str:
     return projects_and_pms
 
 
-def get_project_team(project: dict, db: Database) -> list[dict]:
+def get_project_team(prj_oid: ObjectId, db: Database) -> list[dict]:
     """
     Construct list of project team members.
     Returns None if it is not possible to achieve or something went wrong.
     """
     team = []    
-  
-    # Loop through project tasks and gather information about project team
-    for task in project['tasks']:
-
-        # Process only tasks with actioners
-        if task['actioners']:
-            for actioner in task['actioners']:
-
-                # Proceed if such actioner not in team already
-                if not any(str(actioner['actioner_id']) in str(member['_id']) for member in team):
-                    try:
-                        result = db.staff.find_one({'_id': actioner['actioner_id']})
-                    except Exception as e:
-                        logger.error(f"There was error getting DB: {e}")
-                    else:
-                        if result and type(result) == dict:
-                            team.append(result)
     
-    if not team:
-        logger.error(f"Maybe DB is corrupted: project '{project['title']}' (id: {project['_id']}) has no project team!")
+    project = db.projects.find_one({'_id': prj_oid})
+
+    if (project and 
+        type(project) == dict and 
+        'tasks' in project.keys() and 
+        project['tasks']):
+        # Loop through project tasks and gather information about project team
+        for task in project['tasks']:
+
+            # Process only tasks with actioners
+            if task['actioners']:
+                for actioner in task['actioners']:
+
+                    # Proceed if such actioner not in team already
+                    if not any(str(actioner['actioner_id']) in str(member['_id']) for member in team):
+                        try:
+                            result = db.staff.find_one({'_id': actioner['actioner_id']}) # TODO what if no such record
+                        except Exception as e:
+                            logger.error(f"There was error getting DB: {e}")
+                        else:
+                            if result and type(result) == dict:
+                                team.append(result)
+    
+        if not team:
+            logger.error(f"Maybe DB is corrupted: project '{project['title']}' (id: {project['_id']}) has no project team!")
 
     return team
 
@@ -567,7 +573,8 @@ def get_worker_oid_from_db_by_tg_id(tg_id, db: Database):
     else:
         if (result and type(result) == dict and 
             '_id' in result.keys() and result['_id']):
-            worker_id = result['_id']
+            worker_id = result['_id'] # ObjectID
+            # print(type(worker_id))
 
     return worker_id
 
