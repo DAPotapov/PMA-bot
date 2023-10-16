@@ -1025,7 +1025,7 @@ async def second_lvl_menu(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
     # Call function which create keyboard and generate message to send to user. 
     # End conversation if that was unsuccessful.
     if query.data:
-        context.user_data['level'] = SECOND_LVL
+        context.user_data['level'] += 1
         if not 'branch' in context.user_data:
             context.user_data['branch'] = []
         context.user_data['branch'].append(query.data)
