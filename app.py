@@ -930,15 +930,18 @@ async def settings(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
         if docs_count > 0:
             keyboard = []
             bot_msg = ''
+
+            # Let's control which level of settings we are at any given moment
+            context.user_data['level'] = FIRST_LVL
             # TODO Check if command called in chat
-            # Get active project and store in user_data to further use
+            # Get active project WITH TASKS and store in user_data to further use
             project = DB.projects.find_one({"pm_tg_id": str(update.effective_user.id), "active": True}) 
             if (project and type(project) == dict and 
                 'title' in project.keys() and project['title']):
                 context.user_data['project'] = project
                 keyboard, bot_msg = get_keyboard_and_msg(
                     DB, 
-                    FIRST_LVL, 
+                    context.user_data['level'], 
                     str(update.message.from_user.id), 
                     context.user_data['project']
                     )
@@ -946,12 +949,9 @@ async def settings(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
                 bot_msg = "Some error happened. Unable to show a menu."
                 await update.message.reply_text(bot_msg)
             else:
-
-                # Let's control which level of settings we are at any given moment
-                context.user_data['level'] = FIRST_LVL
                 reply_markup = InlineKeyboardMarkup(keyboard)
                 await update.message.reply_text(bot_msg, reply_markup=reply_markup)
-            return FIRST_LVL
+            return context.user_data['level']
         else:
 
             # If user is not PM at least add his id in DB (if his telegram username is there)
@@ -1022,7 +1022,8 @@ async def second_lvl_menu(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
     query = update.callback_query
     await query.answer()
 
-    # Call function which create keyboard and generate message to send to user. End conversation if that was unsuccessful.
+    # Call function which create keyboard and generate message to send to user. 
+    # End conversation if that was unsuccessful.
     if query.data:
         context.user_data['level'] = SECOND_LVL
         if not 'branch' in context.user_data:
@@ -1052,10 +1053,10 @@ async def second_lvl_menu(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
     else:
         reply_markup = InlineKeyboardMarkup(keyboard)
         await query.edit_message_text(bot_msg, reply_markup=reply_markup)
-        return SECOND_LVL    
+        return context.user_data['level']
 
 
-### SECOND LEVEL
+### REMINDERS BRANCH
 
 async def allow_status_to_group(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     """Switch for menu option 'Allow status update in group chat'"""
@@ -1075,7 +1076,6 @@ async def allow_status_to_group(update: Update, context: ContextTypes.DEFAULT_TY
                 "settings.ALLOW_POST_STATUS_TO_GROUP": context.user_data['project']['settings']['ALLOW_POST_STATUS_TO_GROUP']
                 }})
     else:
-        logger.error(f"Error occured while accessing database.")
         bot_msg = f"Error occured while accessing database. Try again later or contact developer."
         await context.bot.send_message(update.effective_user.id, bot_msg)
         return ConversationHandler.END
@@ -1083,7 +1083,7 @@ async def allow_status_to_group(update: Update, context: ContextTypes.DEFAULT_TY
     # Call function which create keyboard and generate message to send to user. End conversation if that was unsuccessful.
     keyboard, bot_msg = get_keyboard_and_msg(
         DB,
-        SECOND_LVL, 
+        context.user_data['level'], 
         str(update.effective_user.id), 
         context.user_data['project'], 
         context.user_data['branch'][-1]
@@ -1095,7 +1095,7 @@ async def allow_status_to_group(update: Update, context: ContextTypes.DEFAULT_TY
     else:
         reply_markup = InlineKeyboardMarkup(keyboard)
         await query.edit_message_text(bot_msg, reply_markup=reply_markup)
-    return SECOND_LVL
+    return context.user_data['level']
 
 
 async def milestones_anounce(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
@@ -1115,7 +1115,6 @@ async def milestones_anounce(update: Update, context: ContextTypes.DEFAULT_TYPE)
                 "settings.INFORM_ACTIONERS_OF_MILESTONES": context.user_data['project']['settings']['INFORM_ACTIONERS_OF_MILESTONES']
                 }})
     else:
-        logger.error(f"Error occured while accessing database.")
         bot_msg = f"Error occured while accessing database. Try again later or contact developer."
         await context.bot.send_message(update.effective_user.id, bot_msg)
         return ConversationHandler.END    
@@ -1123,7 +1122,7 @@ async def milestones_anounce(update: Update, context: ContextTypes.DEFAULT_TYPE)
     # Call function which create keyboard and generate message to send to user. End conversation if that was unsuccessful.
     keyboard, bot_msg = get_keyboard_and_msg(
         DB,
-        SECOND_LVL, 
+        context.user_data['level'], 
         str(update.effective_user.id), 
         context.user_data['project'], 
         context.user_data['branch'][-1]
@@ -1135,7 +1134,7 @@ async def milestones_anounce(update: Update, context: ContextTypes.DEFAULT_TYPE)
     else:
         reply_markup = InlineKeyboardMarkup(keyboard)
         await query.edit_message_text(bot_msg, reply_markup=reply_markup)
-    return SECOND_LVL
+    return context.user_data['level']
 
 
 async def notify_of_all_projects(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
@@ -1157,14 +1156,13 @@ async def notify_of_all_projects(update: Update, context: ContextTypes.DEFAULT_T
                                 {"$set": {"settings.INFORM_OF_ALL_PROJECTS": INFORM_OF_ALL_PROJECTS}})
     else:
         bot_msg = f"Error occured while accessing database. Try again later or contact developer."
-        logger.error(f"Error occured while accessing database.")
         await context.bot.send_message(update.effective_user.id, bot_msg)
         return ConversationHandler.END
 
     # Call function which create keyboard and generate message to send to user. End conversation if that was unsuccessful.
     keyboard, bot_msg = get_keyboard_and_msg(
         DB,
-        SECOND_LVL, 
+        context.user_data['level'], 
         str(update.effective_user.id), 
         context.user_data['project'], 
         context.user_data['branch'][-1]
@@ -1176,8 +1174,10 @@ async def notify_of_all_projects(update: Update, context: ContextTypes.DEFAULT_T
     else:
         reply_markup = InlineKeyboardMarkup(keyboard)
         await query.edit_message_text(bot_msg, reply_markup=reply_markup)
-        return SECOND_LVL
+        return context.user_data['level']
     
+
+### TRANSFER CONTROL BRANCH
 
 async def transfer_control(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     """ Change ownership of current project to given telegram user (id)"""
@@ -1213,7 +1213,7 @@ async def transfer_control(update: Update, context: ContextTypes.DEFAULT_TYPE) -
                 bot_msg = f"You successfuly transfered control over project to other"
 
                 # Inform reciever that he is in control now
-                msg = (f"@{update.effective_user.username} delegated to you management" 
+                msg = (f"@{update.effective_user.username} delegated to you management " 
                        f"of the project '{context.user_data['project']['title']}'.\n"
                        f"You can use /status command to see current state of the project."
                        f"To know other functions use /help."
@@ -1250,10 +1250,11 @@ async def transfer_control(update: Update, context: ContextTypes.DEFAULT_TYPE) -
         else:
             reply_markup = InlineKeyboardMarkup(keyboard)
             await query.edit_message_text(bot_msg, reply_markup=reply_markup)
-            return SECOND_LVL      
+            return context.user_data['level']      
     
     
-# THIRD LEVEL
+### PROJECTS CONTROL BRANCH
+
 async def project_activate(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     """  Menu option to activate choosen project. Work as switch and return keyboard with projects """
     query = update.callback_query
@@ -1315,7 +1316,7 @@ async def project_activate(update: Update, context: ContextTypes.DEFAULT_TYPE) -
         if msg:
             bot_msg = msg + '\n' + bot_msg
         await query.edit_message_text(bot_msg, reply_markup=reply_markup)
-        return SECOND_LVL      
+        return context.user_data['level']      
 
 
 async def project_delete_start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
@@ -1355,10 +1356,10 @@ async def project_delete_start(update: Update, context: ContextTypes.DEFAULT_TYP
             reply_markup = InlineKeyboardMarkup(keyboard) 
             bot_msg = f"You are going to delete project '{context.user_data['title_to_delete']}' with all reminders.\n" + bot_msg
             await query.edit_message_text(bot_msg, reply_markup=reply_markup)
-            return THIRD_LVL 
+            return context.user_data['level'] 
 
     else:
-        logger.error(f"Something strange happened while trying to rename chosen project. Context: {context.user_data}")
+        logger.error(f"Something strange happened while trying to rename delete project. Context: {context.user_data}")
         bot_msg = f"Error occured. Contact developer."
         await query.edit_message_text(bot_msg)
         return ConversationHandler.END
@@ -1381,9 +1382,6 @@ async def project_delete_finish(update: Update, context: ContextTypes.DEFAULT_TY
             msg = f"Project '{context.user_data['title_to_delete']}' successfully deleted"
         else:
             msg = f"Error getting data from database."
-    else:
-        msg = f"Error occured while accessing database."
-        logger.error(msg)
 
     # Return to projects menu level
     context.user_data['level'] -= 1
@@ -1405,7 +1403,7 @@ async def project_delete_finish(update: Update, context: ContextTypes.DEFAULT_TY
         reply_markup = InlineKeyboardMarkup(keyboard)
         bot_msg = msg + '\n' + bot_msg
         await query.edit_message_text(bot_msg, reply_markup=reply_markup)
-        return SECOND_LVL 
+        return context.user_data['level'] 
 
 
 async def project_rename_start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
@@ -1435,7 +1433,11 @@ async def project_rename_start(update: Update, context: ContextTypes.DEFAULT_TYP
 
 
 async def project_rename_finish(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
-    """ End point of conversation of project rename. Receive and check new project title"""
+    """ 
+    End point of conversation of project rename. 
+    Receive and check new project title.
+    Return user to project control menu at the end.
+    """
 
     try:
         new_title = clean_project_title(update.message.text) 
@@ -1446,8 +1448,8 @@ async def project_rename_finish(update: Update, context: ContextTypes.DEFAULT_TY
         await update.message.reply_text(bot_msg)
         return SIXTH_LVL
     else:
-
         if is_db(DB):
+
             # Check if not existing one then change project title in context and in DB
             prj_id = DB.projects.find_one(
                 {"title": new_title, 
@@ -1493,35 +1495,38 @@ async def project_rename_finish(update: Update, context: ContextTypes.DEFAULT_TY
                     logger.error(f"Something went wrong, couldn't change '{context.user_data['title_to_rename']['title']} to '{new_title}' for user: '{update.effective_user.id}'")
                     await update.message.reply_text(bot_msg)
 
-                # Return to level with projects
-                keyboard, bot_msg = get_keyboard_and_msg(
-                    DB,
-                    context.user_data['level'], 
-                    str(update.effective_user.id), 
-                    context.user_data['project'], 
-                    context.user_data['branch'][-1]
-                    )
-            
-                # Check if we have message and keyboard and show them to user
-                if keyboard == None or bot_msg == None:
-                    bot_msg = "Some error happened. Unable to show a menu."
-                    await update.message.reply_text(bot_msg)
-                    return ConversationHandler.END
-                else:
-                    reply_markup = InlineKeyboardMarkup(keyboard)
-                    await update.message.reply_text(bot_msg, reply_markup=reply_markup)
-                    return SECOND_LVL 
+        # Return to level with projects
+        keyboard, bot_msg = get_keyboard_and_msg(
+            DB,
+            context.user_data['level'], 
+            str(update.effective_user.id), 
+            context.user_data['project'], 
+            context.user_data['branch'][-1]
+            )
     
+        # Check if we have message and keyboard and show them to user
+        if keyboard == None or bot_msg == None:
+            bot_msg = "Some error happened. Unable to show a menu."
+            await update.message.reply_text(bot_msg)
+            return ConversationHandler.END
+        else:
+            reply_markup = InlineKeyboardMarkup(keyboard)
+            await update.message.reply_text(bot_msg, reply_markup=reply_markup)
+            return context.user_data['level']
+    
+
+### REMINDERS SETTINGS BRANCH
 
 async def reminders_settings_item(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     """ Controls settings menu branch with reminders """
     query = update.callback_query
     await query.answer()
 
-    # Check if data contains reminder name and make a keyboard for it, get it's preset to show to user
+    # Check if data contains reminder name then prepare going to next level
+    # make a keyboard for it, get reminder's preset to show to user
     preset = ''
     if query.data:
-        context.user_data['level'] = THIRD_LVL
+        context.user_data['level'] += 1
         context.user_data['branch'].append(query.data)
         keyboard, bot_msg = get_keyboard_and_msg(
             DB,
@@ -1550,7 +1555,7 @@ async def reminders_settings_item(update: Update, context: ContextTypes.DEFAULT_
         reply_markup = InlineKeyboardMarkup(keyboard)
         bot_msg = f"{bot_msg}Current preset: {preset}"
         await query.edit_message_text(bot_msg, reply_markup=reply_markup)
-        return THIRD_LVL
+        return context.user_data['level']
 
 
 async def reminder_switcher(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
@@ -1576,7 +1581,7 @@ async def reminder_switcher(update: Update, context: ContextTypes.DEFAULT_TYPE) 
     # End conversation if that was unsuccessful. 
     keyboard, bot_msg = get_keyboard_and_msg(
         DB,
-        THIRD_LVL, 
+        context.user_data['level'], 
         str(update.effective_user.id),        
         context.user_data['project'], 
         context.user_data['branch'][-1]
@@ -1590,7 +1595,7 @@ async def reminder_switcher(update: Update, context: ContextTypes.DEFAULT_TYPE) 
         reply_markup = InlineKeyboardMarkup(keyboard)
         bot_msg = f"{bot_msg}Current preset: {preset}"
         await query.edit_message_text(bot_msg, reply_markup=reply_markup)
-    return THIRD_LVL
+    return context.user_data['level']
 
 
 async def reminder_time_pressed(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
@@ -1610,7 +1615,7 @@ async def reminder_time_pressed(update: Update, context: ContextTypes.DEFAULT_TY
         # Call function which create keyboard and generate message to send to user. End conversation if that was unsuccessful.
         keyboard, bot_msg = get_keyboard_and_msg(
             DB,
-            THIRD_LVL, 
+            context.user_data['level'], 
             str(update.effective_user.id), 
             context.user_data['project'], 
             context.user_data['branch'][-1]
@@ -1623,7 +1628,7 @@ async def reminder_time_pressed(update: Update, context: ContextTypes.DEFAULT_TY
             reply_markup = InlineKeyboardMarkup(keyboard)  
             bot_msg = f"{text}\n{bot_msg}"  
             await query.edit_message_text(bot_msg, reply_markup=reply_markup)
-        return THIRD_LVL
+        return context.user_data['level']
     
     # If reminder set send message to user with current preset and example of input expected from him
     else:
@@ -1654,7 +1659,7 @@ async def reminder_days_pressed(update: Update, context: ContextTypes.DEFAULT_TY
         # Call function which create keyboard and generate message to send to user. End conversation if that was unsuccessful.
         keyboard, bot_msg = get_keyboard_and_msg(
             DB,
-            THIRD_LVL, 
+            context.user_data['level'], 
             str(update.effective_user.id), 
             context.user_data['project'], 
             context.user_data['branch'][-1]
@@ -1667,16 +1672,16 @@ async def reminder_days_pressed(update: Update, context: ContextTypes.DEFAULT_TY
             reply_markup = InlineKeyboardMarkup(keyboard)  
             bot_msg = f"{text}\n{bot_msg}"  
             await query.edit_message_text(bot_msg, reply_markup=reply_markup)
-        return THIRD_LVL
+        return context.user_data['level']
     
     # If reminder set send message to user with current preset and example of input expected from him
     else:
         bot_msg = (f"Current preset for reminder:\n"
                     f"{preset} \n"
-                    f"Write days of week when reminder should work in this format: \n"
+                    f"Type days of week when reminder should work in this format: \n"
                     f"monday, wednesday, friday \n"
                     f"or\n"
-                    f"mon,wed,fri"
+                    f"mon, wed, fri"
                     )
         await query.edit_message_text(bot_msg)
 
@@ -1728,7 +1733,7 @@ async def reminder_time_setter(update: Update, context: ContextTypes.DEFAULT_TYP
     # Provide keyboard of level 3 menu 
     keyboard, bot_msg = get_keyboard_and_msg(
         DB,
-        THIRD_LVL, 
+        context.user_data['level'], 
         str(update.effective_user.id), 
         context.user_data['project'], 
         context.user_data['branch'][-1]
@@ -1747,7 +1752,7 @@ async def reminder_time_setter(update: Update, context: ContextTypes.DEFAULT_TYP
         await update.message.reply_text(bot_msg, reply_markup=reply_markup)
 
     # Tell conversation handler to process query from this keyboard as STATE3
-    return THIRD_LVL    
+    return context.user_data['level']    
 
 
 async def reminder_days_setter(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
@@ -1818,7 +1823,7 @@ async def reminder_days_setter(update: Update, context: ContextTypes.DEFAULT_TYP
     # Provide keyboard of level 3 menu 
     keyboard, bot_msg = get_keyboard_and_msg(
         DB,
-        THIRD_LVL, 
+        context.user_data['level'], 
         str(update.effective_user.id), 
         context.user_data['project'], 
         context.user_data['branch'][-1]
@@ -1836,7 +1841,7 @@ async def reminder_days_setter(update: Update, context: ContextTypes.DEFAULT_TYP
         await update.message.reply_text(bot_msg, reply_markup=reply_markup)
 
     # Tell conversation handler to process query from this keyboard as STATE3
-    return THIRD_LVL  
+    return context.user_data['level']  
 
 ### END OF SETTINGS PART #################################
                   

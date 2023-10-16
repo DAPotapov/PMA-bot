@@ -631,6 +631,11 @@ def get_worker_tg_username_by_tg_id(tg_id: str, db: Database) -> str:
 
 
 def is_db(db):
+    """ 
+    Function to check there is connection to DB. 
+    Return True if database reached, and False otherwise. 
+    """
+    
     try:
         db.command('ping')
     except (AttributeError, ServerSelectionTimeoutError) as e:
