@@ -70,11 +70,12 @@ from helpers import (
 from pprint import pprint
 
 # Configure logging
-# logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s', level=logging.INFO)
-logging.basicConfig(filename=".data/log.log", 
-                    filemode='a', 
-                    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s', 
-                    level=logging.INFO)
+logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s', level=logging.INFO)
+# TODO log to file in production stage
+# logging.basicConfig(filename=".data/log.log", 
+#                     filemode='a', 
+#                     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s', 
+#                     level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 # Project constants, should be stored in DB tied to project and PM TODO
@@ -935,6 +936,7 @@ async def settings(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
             context.user_data['level'] = FIRST_LVL
             # TODO Check if command called in chat
             # Get active project WITH TASKS and store in user_data to further use
+            # TODO add check for consistency here: if docs>0 but active==0 - that's wrong and should be corrected
             project = DB.projects.find_one({"pm_tg_id": str(update.effective_user.id), "active": True}, {"tasks":0}) 
             if (project and type(project) == dict and 
                 'title' in project.keys() and project['title']):
@@ -1190,10 +1192,20 @@ async def transfer_control(update: Update, context: ContextTypes.DEFAULT_TYPE) -
     # End conversation because only PM should change settings but current user isn't a PM already 
     if query and 'data' in dir(query) and query.data: # TODO test and on success use in other places
         if DB != None and is_db(DB):
-            result = DB.projects.update_one({
-                "pm_tg_id": str(update.effective_user.id), 
-                "title": context.user_data['project']['title']},
-                {"$set":{"pm_tg_id": query.data}})
+            
+            # Check if reciever has other projects, and deactivate given project if so
+            new_pm_projects_count = DB.projects.count_documents({"pm_tg_id": query.data})
+            if new_pm_projects_count == 0:
+                result = DB.projects.update_one({
+                    "pm_tg_id": str(update.effective_user.id), 
+                    "title": context.user_data['project']['title']},
+                    {"$set":{"pm_tg_id": query.data}})
+            else:
+                result = DB.projects.update_one({
+                    "pm_tg_id": str(update.effective_user.id), 
+                    "title": context.user_data['project']['title']},
+                    {"$set":{"pm_tg_id": query.data, "active": False}})
+                
             if result.matched_count > 0 and result.modified_count > 0:
 
                 # On success update corresponding jobs
@@ -1215,31 +1227,32 @@ async def transfer_control(update: Update, context: ContextTypes.DEFAULT_TYPE) -
                 # First check if he has other projects
                 # Then make sure he has no other active projects (just in case)
                 # Replace project stored in context with one from database
-                count_projects = DB.projects.count_documents({'pm_tg_id':context.user_data['project']['pm_tg_id']})
+                former_pm_projects_count = DB.projects.count_documents({'pm_tg_id':context.user_data['project']['pm_tg_id']})
                 activated = {}
-                if count_projects > 0:
+                if former_pm_projects_count > 0:
                     count_active = DB.projects.count_documents(
                         {'pm_tg_id':context.user_data['project']['pm_tg_id'], 'active': True})
                     if count_active == 0:
                         activated = DB.projects.find_one_and_update(
                             {'pm_tg_id':context.user_data['project']['pm_tg_id']}, 
-                            {'$set': {'active': True}})
+                            {'$set': {'active': True}}, {"tasks": 0})
                     else:
                         activated = DB.projects.find_one({'pm_tg_id':context.user_data['project']['pm_tg_id'], 
-                                                          'active': True})
+                                                          'active': True}, {"tasks": 0})
+                context.user_data['old_title'] = context.user_data['project']['title']
                 context.user_data['project'] = activated 
-                bot_msg = f"You successfuly transfered control over project to other."
+                bot_msg = f"You successfuly transfered control over project '{context.user_data['old_title']}'."
                 if activated and 'title' in activated.keys() and activated['title']:
                     bot_msg = bot_msg + f"\nProject '{activated['title']}' activated. You can change it in /settings."
                 else:
                     bot_msg = bot_msg + f"\nYou can /start a new project now."
-                    
+
                 # Inform reciever that he is in control now
-                msg = (f"@{update.effective_user.username} delegated to you management " 
-                       f"of the project '{context.user_data['project']['title']}'.\n"
-                       f"You can use /status command to see current state of the project."
-                       f"To know other functions use /help."
-                )
+                msg = (f"@{update.effective_user.username} delegated management " 
+                       f"of the project '{context.user_data['old_title']}' to you.\n")
+                msg = msg + f"You can activate it in /settings." if new_pm_projects_count > 0 else msg + f"You can check its /status."
+                msg = msg + f"\nTo learn other functions use /help."
+                
                 await context.bot.send_message(query.data, msg)
             
             else:
