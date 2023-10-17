@@ -1210,8 +1210,30 @@ async def transfer_control(update: Update, context: ContextTypes.DEFAULT_TYPE) -
                             args = job.args
                             args[0].data['pm_tg_id'] = query.data
                             job = job.modify(args=args)
-                bot_msg = f"You successfuly transfered control over project to other"
-
+                
+                # Make other project active for former PM,
+                # First check if he has other projects
+                # Then make sure he has no other active projects (just in case)
+                # Replace project stored in context with one from database
+                count_projects = DB.projects.count_documents({'pm_tg_id':context.user_data['project']['pm_tg_id']})
+                activated = {}
+                if count_projects > 0:
+                    count_active = DB.projects.count_documents(
+                        {'pm_tg_id':context.user_data['project']['pm_tg_id'], 'active': True})
+                    if count_active == 0:
+                        activated = DB.projects.find_one_and_update(
+                            {'pm_tg_id':context.user_data['project']['pm_tg_id']}, 
+                            {'$set': {'active': True}})
+                    else:
+                        activated = DB.projects.find_one({'pm_tg_id':context.user_data['project']['pm_tg_id'], 
+                                                          'active': True})
+                context.user_data['project'] = activated 
+                bot_msg = f"You successfuly transfered control over project to other."
+                if activated and 'title' in activated.keys() and activated['title']:
+                    bot_msg = bot_msg + f"\nProject '{activated['title']}' activated. You can change it in /settings."
+                else:
+                    bot_msg = bot_msg + f"\nYou can /start a new project now."
+                    
                 # Inform reciever that he is in control now
                 msg = (f"@{update.effective_user.username} delegated to you management " 
                        f"of the project '{context.user_data['project']['title']}'.\n"
