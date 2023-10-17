@@ -51,12 +51,13 @@ from helpers import (
     add_user_info_to_db,
     add_worker_info_to_staff, 
     clean_project_title,
+    get_active_project,
     get_assignees,
     get_db, 
     get_job_preset,
     get_job_preset_dict,
     get_keyboard_and_msg,
-    get_project,
+    get_project_by_title,
     get_project_team,
     get_projects_and_pms_for_user,
     get_status_on_project,
@@ -139,7 +140,7 @@ async def day_before_update(context: ContextTypes.DEFAULT_TYPE) -> None:
 
 
     if DB != None and is_db(DB):
-        project = get_project(DB, str(context.job.data['pm_tg_id']), context.job.data['project_title'])
+        project = get_project_by_title(DB, str(context.job.data['pm_tg_id']), context.job.data['project_title'])
         if project:
            
             # Find task to inform about and send message to users
@@ -229,7 +230,7 @@ async def file_update(context: ContextTypes.DEFAULT_TYPE) -> None:
     '''
 
     if DB != None and is_db(DB):
-        project = get_project(DB, str(context.job.data['pm_tg_id']), context.job.data['project_title'])
+        project = get_project_by_title(DB, str(context.job.data['pm_tg_id']), context.job.data['project_title'])
         if project:                    
             team = get_project_team(project['_id'], DB)
             if team:
@@ -271,7 +272,7 @@ async def morning_update(context: ContextTypes.DEFAULT_TYPE) -> None:
     '''
 
     if DB != None and is_db(DB):
-        project = get_project(DB, str(context.job.data['pm_tg_id']), context.job.data['project_title'])
+        project = get_project_by_title(DB, str(context.job.data['pm_tg_id']), context.job.data['project_title'])
         if project: 
 
             # Get project team to inform
@@ -927,26 +928,26 @@ async def settings(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
 
     # Check if current user is acknowledged PM then proceed otherwise suggest to start a new project
     if DB != None and is_db(DB): #  and DB != None: could be added to silence pylance (see below)
-        docs_count = DB.projects.count_documents({"pm_tg_id": str(update.effective_user.id)})
-        if docs_count > 0:
-            keyboard = []
-            bot_msg = ''
 
-            # Let's control which level of settings we are at any given moment
-            context.user_data['level'] = FIRST_LVL
-            # TODO Check if command called in chat
-            # Get active project WITH TASKS and store in user_data to further use
-            # TODO add check for consistency here: if docs>0 but active==0 - that's wrong and should be corrected
-            project = DB.projects.find_one({"pm_tg_id": str(update.effective_user.id), "active": True}, {"tasks":0}) 
-            if (project and type(project) == dict and 
-                'title' in project.keys() and project['title']):
-                context.user_data['project'] = project
-                keyboard, bot_msg = get_keyboard_and_msg(
-                    DB, 
-                    context.user_data['level'], 
-                    str(update.message.from_user.id), 
-                    context.user_data['project']
-                    )
+        # Let's control which level of settings we are at any given moment
+        context.user_data['level'] = FIRST_LVL
+        try:
+            project = get_active_project(str(update.message.from_user.id), DB)
+        except ValueError:
+
+            # If user is not PM at least add his id in DB (if his telegram username is there)
+            add_user_info_to_db(update.effective_user, DB)
+            bot_msg = f"Settings available after starting a project: use /start command for a new one."
+            await update.message.reply_text(bot_msg)
+            return ConversationHandler.END
+        else:
+            context.user_data['project'] = project
+            keyboard, bot_msg = get_keyboard_and_msg(
+                DB, 
+                context.user_data['level'], 
+                str(update.message.from_user.id), 
+                context.user_data['project']
+                )
             if keyboard == None or bot_msg == None:
                 bot_msg = "Some error happened. Unable to show a menu."
                 await update.message.reply_text(bot_msg)
@@ -954,13 +955,6 @@ async def settings(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
                 reply_markup = InlineKeyboardMarkup(keyboard)
                 await update.message.reply_text(bot_msg, reply_markup=reply_markup)
             return context.user_data['level']
-        else:
-
-            # If user is not PM at least add his id in DB (if his telegram username is there)
-            add_user_info_to_db(update.effective_user, DB)
-            bot_msg = f"Settings available after starting a project: use /start command for a new one."
-            await update.message.reply_text(bot_msg)
-            return ConversationHandler.END
     else:
         bot_msg = f"Error occured while accessing database. Try again later or contact developer."
         logger.error(f"Error occured while accessing database.")

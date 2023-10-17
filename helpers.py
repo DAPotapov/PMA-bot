@@ -24,11 +24,11 @@ from urllib.parse import quote_plus
 ONE, TWO, THREE, FOUR, FIVE, SIX = range(6)
 
 # Configure logging
-# logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s', level=logging.INFO)
-logging.basicConfig(filename=".data/log.log", 
-                    filemode='a', 
-                    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s', 
-                    level=logging.INFO)
+logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s', level=logging.INFO)
+# logging.basicConfig(filename=".data/log.log", 
+#                     filemode='a', 
+#                     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s', 
+#                     level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 
@@ -124,6 +124,9 @@ def add_worker_info_to_staff(worker: dict, db: Database):
     return worker_id
 
 
+
+
+
 def clean_project_title(user_input: str) -> str:
     """
     Clean title typed by user from unnesesary spaces and so on.
@@ -141,6 +144,57 @@ def clean_project_title(user_input: str) -> str:
         raise ValueError("Text absent")
     
     return title[:max_title_len]
+
+
+def get_active_project(pm_tg_id: str, db: Database) -> dict:
+    """ 
+    Gets active project (without tasks) by given PM telegram id.
+    And fixes if something not right:
+    - makes one project active if there were not,
+    - if more than one active: leave only one active.
+    Raises ValueError if no projects found for such user
+    """
+
+    project = {}
+
+    # Сount projects of PM
+    docs_count = db.projects.count_documents({"pm_tg_id": pm_tg_id})
+    if docs_count > 0:
+
+    # If more than 0 then count actives, otherwise raise ValueError
+        actives_count = db.projects.count_documents({"pm_tg_id": pm_tg_id, "active": True})
+        
+        # If one active get this one
+        if actives_count == 1:
+            project = db.projects.find_one({"pm_tg_id": pm_tg_id, 'active': True}, {"tasks": 0})
+
+        # Otherwise if not one -  make one active and remember it
+        elif actives_count == 0:
+            project = db.projects.find_one_and_update(
+                {"pm_tg_id": pm_tg_id, 'active': True}, 
+                {'$set': {'active': True}},
+                {"tasks": 0}
+                )
+            
+        # If more than one make all inactive except 1
+        else:
+            project = db.projects.find_one({"pm_tg_id": pm_tg_id, 'active': True}, {"tasks": 0})
+
+        # Check if there is project to return
+        if (project and type(project) == dict and 
+            'title' in project.keys() and project['title']):
+            deactivated = db.projects.update_many(
+                {"pm_tg_id": pm_tg_id, 
+                    "active": True, 
+                    "_id": {"$ne": project["_id"]}},
+                    {"$set": {"active": False}}
+                    )
+        else:
+            raise ValueError
+    else:
+        raise ValueError
+
+    return project
 
 
 def get_assignees(task: dict, db: Database):
@@ -391,7 +445,7 @@ def get_keyboard_and_msg(db, level: int, user_id: str, project: dict, branch: st
     return keyboard, msg
 
 
-def get_project(db: Database, pm_tg_id: str, title: str) -> dict:
+def get_project_by_title(db: Database, pm_tg_id: str, title: str) -> dict:
     """
     Get project from database by name for given telegram id of PM
     """
