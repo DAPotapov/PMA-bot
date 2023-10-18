@@ -212,9 +212,7 @@ def compose_tasks_list(tasks, task, allocations, resources, property_id, db: Dat
 
     # Dictionary of id of actioners and their last reaction
     # Completeness of task assignments will be controlled in /status function
-    # pprint(f"Function got these parameters:\n {list}\n{task['name']}\n{allocations}")
     actioners = [] 
-    # pprint(f"Whats in resources? {resources}")
     for allocation in allocations:
         if task['id'] == allocation['task-id']:
             # Memo: GanntProject starts numeration of resources from 0, MS Project - from 1
@@ -247,18 +245,6 @@ def compose_tasks_list(tasks, task, allocations, resources, property_id, db: Dat
             except IndexError as e:
                 raise ValueError(f"Unknown dependency type ('{follower['type']}')of successor task: {int(follower['id'])}")
             else:
-
-            # match follower['type']:
-            #     case '1':
-            #         depend_type = 3
-            #     case '2':
-            #         depend_type = 1
-            #     case '3':
-            #         depend_type = 0
-            #     case '4':
-            #         depend_type = 2
-            #     case _:
-            #         raise ValueError(f"Unknown dependency type ('{follower['type']}')of successor task: {int(follower['id'])}")
                 successors.append({
                     'id': int(follower['id']),
                     'depend_type': depend_type,
@@ -398,12 +384,13 @@ def load_xml(fp, db: Database):
             # Add record to DB and see result
             try:
                 if not add_worker_info_to_staff(worker, db):
-                    logger.warning("Something went wrong while adding worker to staff collection")
+                    logger.warning(f"Something went wrong while adding worker {worker} to staff collection")
             except ValueError as e:
                 logger.error(f"{e}")
 
     # Gathering tasks from XML
     if 'Task' in obj.Project.Tasks:
+
         # Because 1st element in MS Project XML format represents project itself so skip it
         for i, task in enumerate(obj.Project.Tasks.Task):
             if i == 0:
@@ -424,6 +411,7 @@ def load_xml(fp, db: Database):
             actioners = []
             for allocation in allocations:
                 if task.UID.cdata == allocation.TaskUID.cdata and task.Milestone.cdata == '0':
+                    
                     # MS Project store value '-65535' in case no resource assigned. I'll leave this list empty
                     if int(allocation.ResourceUID.cdata) > 0:
                         tg_username = get_tg_un_from_xml_resources(allocation.ResourceUID.cdata, resources, property_id)
@@ -478,7 +466,6 @@ def load_xml(fp, db: Database):
             for task in obj.Project.Tasks.Task:
                 if 'PredecessorLink' in task:
                     for predecessor in task.PredecessorLink:            
-                        # pprint(predecessor)
                         if record['id'] == int(predecessor.PredecessorUID.cdata):
                             # Recalculate offset from LinkLag, which expressed in tenth of minutes (sic!), so 4800 is 8 hours
                             if int(predecessor.LinkLag.cdata) == 0:
@@ -486,7 +473,6 @@ def load_xml(fp, db: Database):
                             else:
                                 # For project management purposes it's better to be aware of smth earlier than later
                                 offset = int(floor(int(predecessor.LinkLag.cdata) / 4800))
-                            # print(f"Type of offset: {type(offset)}")
                             successors.append({
                                 'id': int(task.UID.cdata),
                                 # Type of link (depend_type): Values are 0=FF, 1=FS, 2=SF and 3=SS 

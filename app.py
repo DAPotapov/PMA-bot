@@ -79,25 +79,14 @@ logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s
 #                     level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-# Project constants, should be stored in DB tied to project and PM TODO
+# TODO Inform actioners of milestones (by default only PM)  INFORM_ACTIONERS_OF_MILESTONES = False
 
-# TODO determine which of those I don't need anymore
-# This setting control whether bot will send status report for PM in private chat 
-# or in group chat if /status command executed in group chat
-ALLOW_POST_STATUS_TO_GROUP = False 
-# Inform actioners of milestones (by default only PM) 
-INFORM_ACTIONERS_OF_MILESTONES = False
 # Default values for daily reminders
 MORNING = "10:00"
 ONTHEEVE = "16:00"
 FRIDAY = "15:00"
 
-# TODO: change according to starter of the bot
-# PROJECTTITLE = 'TESTING PROJECT'
-# KNOWN_USERS = {}
 load_dotenv()
-# PM = os.environ.get("PM")
-# PROJECTJSON = os.environ.get("PROJECTJSON")
 DEV_TG_ID = os.environ.get('DEV_TG_ID')
 # Link to DB for storing jobs
 BOT_NAME = os.environ.get('BOT_NAME')
@@ -127,7 +116,6 @@ upload_cmd = BotCommand("upload", "загрузка нового файла пр
 FIRST_LVL, SECOND_LVL, THIRD_LVL, FOURTH_LVL, FIFTH_LVL, SIXTH_LVL, SEVENTH_LVL = range(7)
 # Callback data for settings menu
 ONE, TWO, THREE, FOUR, FIVE, SIX = range(6)
-
 
 
 async def day_before_update(context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -528,7 +516,7 @@ def schedule_jobs(context: ContextTypes.DEFAULT_TYPE) -> dict:
         or a new copy of the job will be created every time application restarts! '''
     job_kwargs = {'replace_existing': True}
     
-    # Use default values from constants
+    # Use default values from constants for time
     try:
         hour, minute = map(int, MORNING.split(":"))                    
         time2check = time(hour, minute, tzinfo=datetime.now().astimezone().tzinfo)
