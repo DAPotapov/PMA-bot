@@ -1725,7 +1725,9 @@ async def reminder_time_setter(update: Update, context: ContextTypes.DEFAULT_TYP
 
     # Try to convert user provided input (time) to hours and minutes
     try:
-        hour, minute = map(int, update.message.text.split(":"))                    
+        # hour, minute = map(int, update.message.text.split(":"))
+        hour, minute = map(int, re.split("[\s:_-]", update.message.text))
+
     except ValueError as e:
 
         # Prepare message if not succeded
@@ -1745,7 +1747,7 @@ async def reminder_time_setter(update: Update, context: ContextTypes.DEFAULT_TYP
         # Reschedule the job
         try:
             job = job.reschedule(trigger='cron', hour=hour, minute=minute, day_of_week=day_of_week, timezone=tz)
-        except Exception as e:
+        except ValueError as e:
             bot_msg = (f"Unable to reschedule the reminder")
             logger.info(f'{e}')
         else:
