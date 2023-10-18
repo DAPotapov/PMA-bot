@@ -948,7 +948,7 @@ async def settings(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
                 str(update.message.from_user.id), 
                 context.user_data['project']
                 )
-            if not keyboard and not msg:
+            if not keyboard and not bot_msg:
                 bot_msg = "Some error happened. Unable to show a menu."
                 await update.message.reply_text(bot_msg)
             else:
@@ -992,7 +992,7 @@ async def settings_back(update: Update, context: ContextTypes.DEFAULT_TYPE) -> i
             )
 
     # Call function which create keyboard and generate message to send to user. End conversation if that was unsuccessful.
-    if not keyboard and not msg:
+    if not keyboard and not bot_msg:
         bot_msg = "Some error happened. Unable to show a menu."
         await update.message.reply_text(bot_msg)
         return ConversationHandler.END
@@ -1042,7 +1042,7 @@ async def second_lvl_menu(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
             )
 
     # Check if we have message and keyboard and show them to user
-    if not keyboard and not msg:
+    if not keyboard and not bot_msg:
         bot_msg = "Some error happened. Unable to show a menu."
         await query.edit_message_text(bot_msg)
         return ConversationHandler.END
@@ -1084,7 +1084,7 @@ async def allow_status_to_group(update: Update, context: ContextTypes.DEFAULT_TY
         context.user_data['project'], 
         context.user_data['branch'][-1]
         ) 
-    if not keyboard and not msg:
+    if not keyboard and not bot_msg:
         bot_msg = "Some error happened. Unable to show a menu."
         await update.message.reply_text(bot_msg)
         return ConversationHandler.END
@@ -1123,7 +1123,7 @@ async def milestones_anounce(update: Update, context: ContextTypes.DEFAULT_TYPE)
         context.user_data['project'], 
         context.user_data['branch'][-1]
         ) 
-    if not keyboard and not msg:
+    if not keyboard and not bot_msg:
         bot_msg = "Some error happened. Unable to show a menu."
         await update.message.reply_text(bot_msg)
         return ConversationHandler.END
@@ -1163,7 +1163,7 @@ async def notify_of_all_projects(update: Update, context: ContextTypes.DEFAULT_T
         context.user_data['project'], 
         context.user_data['branch'][-1]
         ) 
-    if not keyboard and not msg:
+    if not keyboard and not bot_msg:
         bot_msg = "Some error happened. Unable to show a menu."
         await update.message.reply_text(bot_msg)
         return ConversationHandler.END
@@ -1272,7 +1272,7 @@ async def transfer_control(update: Update, context: ContextTypes.DEFAULT_TYPE) -
             )
         
         # Check if we have message and keyboard and show them to user
-        if not keyboard and not msg:
+        if not keyboard and not bot_msg:
             bot_msg = "Some error happened. Unable to show a menu."
             await query.edit_message_text(bot_msg)
             return ConversationHandler.END
@@ -1336,7 +1336,7 @@ async def project_activate(update: Update, context: ContextTypes.DEFAULT_TYPE) -
         )
     
     # Check if we have message and keyboard and show them to user
-    if not keyboard and not msg:
+    if not keyboard and not bot_msg:
         bot_msg = "Some error happened. Unable to show a menu."
         await query.edit_message_text(bot_msg)
         return ConversationHandler.END
@@ -1377,7 +1377,7 @@ async def project_delete_start(update: Update, context: ContextTypes.DEFAULT_TYP
             )
         
         # Check if we have message and keyboard and show them to user
-        if not keyboard and not msg:
+        if not keyboard and not bot_msg:
             bot_msg = "Some error happened. Unable to show a menu."
             await query.edit_message_text(bot_msg)
             return ConversationHandler.END
@@ -1424,7 +1424,7 @@ async def project_delete_finish(update: Update, context: ContextTypes.DEFAULT_TY
         )
 
     # Check if we have message and keyboard and show them to user
-    if not keyboard and not msg:
+    if not keyboard and not bot_msg:
         bot_msg = msg + '\n' + "Some error happened. Unable to show a menu."
         await query.edit_message_text(bot_msg)
         return ConversationHandler.END
@@ -1534,7 +1534,7 @@ async def project_rename_finish(update: Update, context: ContextTypes.DEFAULT_TY
             )
     
         # Check if we have message and keyboard and show them to user
-        if not keyboard and not msg:
+        if not keyboard and not bot_msg:
             bot_msg = "Some error happened. Unable to show a menu."
             await update.message.reply_text(bot_msg)
             return ConversationHandler.END
@@ -1576,7 +1576,7 @@ async def reminders_settings_item(update: Update, context: ContextTypes.DEFAULT_
             context.user_data['project']
             )
 
-    if not keyboard and not msg:
+    if not keyboard and not bot_msg:
         bot_msg = "Some error happened. Unable to show a menu."
         await  query.edit_message_text(bot_msg)
         return ConversationHandler.END
@@ -1616,7 +1616,7 @@ async def reminder_switcher(update: Update, context: ContextTypes.DEFAULT_TYPE) 
         context.user_data['branch'][-1]
         )
     preset = get_job_preset(job_id, context)
-    if not keyboard and not msg:
+    if not keyboard and not bot_msg:
         bot_msg = "Some error happened. Unable to show a menu."
         await update.message.reply_text(bot_msg)
         return ConversationHandler.END
@@ -1649,7 +1649,7 @@ async def reminder_time_pressed(update: Update, context: ContextTypes.DEFAULT_TY
             context.user_data['project'], 
             context.user_data['branch'][-1]
             )
-        if not keyboard and not msg:
+        if not keyboard and not bot_msg:
             bot_msg = f"{text}\nSome error happened. Unable to show a menu."
             await query.edit_message_text(bot_msg)
             return ConversationHandler.END
@@ -1693,7 +1693,7 @@ async def reminder_days_pressed(update: Update, context: ContextTypes.DEFAULT_TY
             context.user_data['project'], 
             context.user_data['branch'][-1]
             )
-        if not keyboard and not msg:
+        if not keyboard and not bot_msg:
             bot_msg = f"{text}\nSome error happened. Unable to show a menu."
             await query.edit_message_text(bot_msg)
             return ConversationHandler.END
@@ -1771,7 +1771,7 @@ async def reminder_time_setter(update: Update, context: ContextTypes.DEFAULT_TYP
     # And get current (updated) preset
     job_id = context.user_data['project']['reminders'][str(context.user_data['branch'][-1])]
     preset = get_job_preset(job_id, context)
-    if not keyboard and not msg:
+    if not keyboard and not bot_msg:
         bot_msg = "Some error happened. Unable to show a menu."
         await update.message.reply_text(bot_msg)
         return ConversationHandler.END
@@ -1860,7 +1860,7 @@ async def reminder_days_setter(update: Update, context: ContextTypes.DEFAULT_TYP
     # And get current preset (updated) of the reminder to show to user
     job_id = context.user_data['project']['reminders'][str(context.user_data['branch'][-1])]
     preset = get_job_preset(job_id, context)
-    if not keyboard and not msg:
+    if not keyboard and not bot_msg:
         bot_msg = "Some error happened. Unable to show a menu."
         await update.message.reply_text(bot_msg)
         return ConversationHandler.END
