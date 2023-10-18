@@ -193,7 +193,7 @@ async def echo(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
 
     # TODO I can use it to gather id from chat members and add them to project.
     result = add_user_info_to_db(user, DB)
-    pprint(result)
+    # pprint(result)
     if not result:
         logger.warning(f"User id ({user.id}) of {user.username} was not added to DB (maybe already present).")
 
@@ -318,7 +318,7 @@ async def start(update: Update, context: CallbackContext) -> int:
     }
 
     # Store information about PM in context
-    context.user_data['PM'] = pm #TODO Where it is used?
+    context.user_data['PM'] = pm 
 
     disclaimer = ("Disclaimer: All data provided by the user, " 
         "which may be considered personal data within the scope of applicable law, " 

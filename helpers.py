@@ -4,6 +4,7 @@ Some helper functions to help main functions to manupulate with data
 
 import json
 import logging
+from unittest.mock import NonCallableMagicMock
 import pymongo
 import os
 
@@ -311,7 +312,7 @@ def get_job_preset_dict(job_id: str, context: ContextTypes.DEFAULT_TYPE) -> dict
     return preset
 
 
-def get_keyboard_and_msg(db, level: int, user_id: str, project: dict, branch: str = None) -> Tuple[list, str]:
+def get_keyboard_and_msg(db, level: int, user_id: str, project: dict, branch: str = '') -> Tuple[list, str]:
     '''
     Helper function to provide specific keyboard on different levels of settings menu
     '''
@@ -474,7 +475,7 @@ def get_project_by_title(db: Database, pm_tg_id: str, title: str) -> dict:
 
 
 def get_projects_and_pms_for_user(user_oid: ObjectId, db: Database) -> str:
-    ''' Function to get string of projects (and their PMs) where user participate as actioner '''
+    ''' Function to get string of projects (and their PMs) where user participate as an actioner '''
     
     projects_and_pms = ''
     try:
@@ -592,7 +593,7 @@ def get_status_on_project(project: dict, user_oid: ObjectId, db: Database) -> st
     return bot_msg
 
 
-def get_worker_oid_from_db_by_tg_username(tg_username: str, db: Database):
+def get_worker_oid_from_db_by_tg_username(tg_username: str, db: Database) -> ObjectId | None:
     '''
     Search staff collection in DB for given telegram username and return DB-id.
     If something went wrong return None (should be checked on calling side)
@@ -612,7 +613,7 @@ def get_worker_oid_from_db_by_tg_username(tg_username: str, db: Database):
     return worker_id
 
 
-def get_worker_oid_from_db_by_tg_id(tg_id, db: Database):
+def get_worker_oid_from_db_by_tg_id(tg_id: str, db: Database) -> ObjectId | None:
     '''
     Search staff collection in DB for given telegram id and return DB-id.
     If something went wrong return None (should be checked on calling side)
@@ -623,7 +624,7 @@ def get_worker_oid_from_db_by_tg_id(tg_id, db: Database):
     try:
         result = db.staff.find_one({'tg_id': str(tg_id)})
     except Exception as e:
-        logger.error(f"There was error getting DB: {e}")
+        logger.error(f"There was error connecting to DB: {e}")
     else:
         if (result and type(result) == dict and 
             '_id' in result.keys() and result['_id']):
