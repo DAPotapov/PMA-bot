@@ -318,7 +318,13 @@ async def start(update: Update, context: CallbackContext) -> int:
     }
 
     # Store information about PM in context
-    context.user_data['PM'] = pm
+    context.user_data['PM'] = pm #TODO Where it is used?
+
+    disclaimer = ("Disclaimer: All data provided by the user, " 
+        "which may be considered personal data within the scope of applicable law, " 
+        "is used exclusively for the purposes for which this software is intended "
+         "and is not passed on to third parties.")
+    await update.message.reply_text(disclaimer)
 
     bot_msg = (f"Hello, {update.effective_user.first_name}!\n"
                f"You are starting a new project.\n"
