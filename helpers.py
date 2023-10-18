@@ -22,7 +22,7 @@ from typing import Tuple
 from urllib.parse import quote_plus
 
 # Callback data for settings menu
-ONE, TWO, THREE, FOUR, FIVE, SIX = range(6)
+ONE, TWO, THREE = range(3)
 
 # Configure logging
 logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s', level=logging.INFO)

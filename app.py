@@ -112,10 +112,10 @@ upload_cmd = BotCommand("upload", "загрузка нового файла пр
                         (например, если сдвинули сроки или заменили исполнителя в MS Project'е)\
                         (работает только в личных сообщениях)")
 
-# Stages of settings menu:
+# States of settings menu:
 FIRST_LVL, SECOND_LVL, THIRD_LVL, FOURTH_LVL, FIFTH_LVL, SIXTH_LVL, SEVENTH_LVL = range(7)
 # Callback data for settings menu
-ONE, TWO, THREE, FOUR, FIVE, SIX = range(6)
+ONE, TWO, THREE = range(3)
 
 
 async def day_before_update(context: ContextTypes.DEFAULT_TYPE) -> None:
