@@ -33,13 +33,13 @@ logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s
 logger = logging.getLogger(__name__)
 
 
-def add_user_id_to_db(user: User, db: Database) -> str:
+def add_user_id_to_db(user: User, db: Database) -> ObjectId | None:
     ''' 
     Helper function to add telegram id of username provided to DB. 
-    Returns empty string if telegram username not found in staff collection, did't updated or something went wrong.
+    Returns None if telegram username not found in staff collection, did't updated or something went wrong.
     Returns ObjectId if record updated
     '''
-    output = ''
+    output = None
 
     # Fill record with absent id with current one
     # For now I assume that users don't switch their usernames and such situation is force-major
@@ -50,22 +50,21 @@ def add_user_id_to_db(user: User, db: Database) -> str:
 
             # Remember: for update_one matched_count will not be more than one
             result = db.staff.update_one({"tg_username": user.username}, {"$set": {"tg_id": str(user.id)}})
-            if result.modified_count > 0:            
+            if result.modified_count > 0 and type(record['_id']) == ObjectId:            
                 output = record["_id"]
 
     return output
 
 
-def add_user_info_to_db(user: User, db: Database):
+def add_user_info_to_db(user: User, db: Database) -> ObjectId | None:
     """
     Adds missing user info (telegram id and name) to DB
     Returns None if telegram username not found in staff collection, did't updated or something went wrong.
     Returns ObjectId if record updated
     """
-    output = ''
+    output = None
 
     # Get user from DB
-
     db_user = db.staff.find_one({"tg_username": user.username})
 
     # Check if field is empty and fill it with corresponding field from User
@@ -80,21 +79,21 @@ def add_user_info_to_db(user: User, db: Database):
             elif user.name:
                 dict2update['name'] = user.name
 
-        # Make update in DB using list of collected list of should be modified fields converted to tuple
+        # Update DB record with information gathered
         if dict2update:
-            result = db.staff.update_one({"tg_username": user.username}, {"$set": dict2update})
-            
-            if result.modified_count > 0:    
+            result = db.staff.update_one({"tg_username": user.username}, {"$set": dict2update})            
+            if result.modified_count > 0 and type(db_user['_id']) == ObjectId:    
                 output = db_user['_id']
-
     return output
 
 
-def add_worker_info_to_staff(worker: dict, db: Database):
+def add_worker_info_to_staff(worker: dict, db: Database) -> ObjectId | None:
     ''' 
     Calls functions to check whether such worker exist in staff collection. 
     Adds given worker to staff collection if not exist already.
     Fill empty fields in case worker already present in staff (for ex. PM is actioner in other project)
+    Returns None if worker telegram id not found in staff collection. 
+    Return ObjectId otherwise.
     '''
     
     worker_id = None
@@ -119,19 +118,19 @@ def add_worker_info_to_staff(worker: dict, db: Database):
                 if not db_worker[key]:
                     db_worker[key] = worker[key]
             result = db.staff.replace_one({"_id": worker_id}, replacement=db_worker)
-            # TODO consider make it info rather than warning after development finished
-            logger.warning(f"Results of worker {db_worker['tg_username']} update: '{result.matched_count}' found, '{result.modified_count}' modified.")
+            logger.info(f"Results of worker {db_worker['tg_username']} update: '{result.matched_count}' found, '{result.modified_count}' modified.")
+
+    # Type check just in case
+    if type(worker_id) != ObjectId:
+        worker_id == None
 
     return worker_id
 
 
-
-
-
 def clean_project_title(user_input: str) -> str:
     """
-    Clean title typed by user from unnesesary spaces and so on.
-    Imagine someone copy-pasted project title here, what can be improved?
+    Clean title typed by user from unnecessary spaces and so on.
+    Imagine someone copy-pasted project title here,
     Should return string.
     If something went wrong raise value error to be managed on calling side.
     """
@@ -153,7 +152,7 @@ def get_active_project(pm_tg_id: str, db: Database) -> dict:
     And fixes if something not right:
     - makes one project active if there were not,
     - if more than one active: leave only one active.
-    Raises ValueError if no projects found for such user
+    Raises empty dictionary if no projects found for such user
     """
 
     project = {}
@@ -181,7 +180,7 @@ def get_active_project(pm_tg_id: str, db: Database) -> dict:
         else:
             project = db.projects.find_one({"pm_tg_id": pm_tg_id, 'active': True}, {"tasks": 0})
 
-        # Check if there is project to return
+        # Check if there is project of proper type to return
         if (project and type(project) == dict and 
             'title' in project.keys() and project['title']):
             deactivated = db.projects.update_many(
@@ -191,14 +190,12 @@ def get_active_project(pm_tg_id: str, db: Database) -> dict:
                     {"$set": {"active": False}}
                     )
         else:
-            raise ValueError
-    else:
-        raise ValueError
+            project = {}
 
     return project
 
 
-def get_assignees(task: dict, db: Database):
+def get_assignees(task: dict, db: Database)-> tuple[str, list]:
     '''
     Helper function for getting names and telegram usernames
     of person assigned to given task to insert in a bot message
@@ -226,7 +223,7 @@ def get_assignees(task: dict, db: Database):
     return people, user_ids # ids will be needed for buttons to ping users
 
 
-def get_db():
+def get_db() -> Database:
     """
     Creates connection to mongo server and returns database instance. Raises exception if not succeed.
     """
@@ -241,17 +238,11 @@ def get_db():
     if not BOT_NAME or not BOT_PASS:
         raise AttributeError("Can't get bot credentials from environment.")
     uri = "mongodb://%s:%s@%s" % (quote_plus(BOT_NAME), quote_plus(BOT_PASS), host)
-    # DB = None
-    # try:
-        # client = pymongo.MongoClient(f"mongodb://{BOT_NAME}:{BOT_PASS}@localhost:27017/admin?retryWrites=true&w=majority")
     client = pymongo.MongoClient(uri, serverSelectionTimeoutMS=1000) 
-    # except ConnectionError as e: # Нужно ли? или на той стороне только 
-    #     logger.error(f"There is problem with connecting to db '{DB_NAME}': {e}")
-    #     raise ConnectionError(e)
-    # else:
 
     # Check for connection
     try:
+        # There are different methods, choose the best one
         # client.admin.command('ping')
         # client.admin.command('ismaster')
         client.server_info()
@@ -263,7 +254,11 @@ def get_db():
 
 
 def get_job_preset(job_id: str, context: ContextTypes.DEFAULT_TYPE) -> str:
-    """ Returns current preset of job in text format to add to messages """
+    """ 
+    Returns current preset of job in text format to add to messages,
+    based on preset dictionary.
+    Returns empty string if subroutine returned empty dictionary.
+    """
 
     presets_dict = get_job_preset_dict(job_id, context)
     if presets_dict:
@@ -280,20 +275,22 @@ def get_job_preset(job_id: str, context: ContextTypes.DEFAULT_TYPE) -> str:
 
 def get_job_preset_dict(job_id: str, context: ContextTypes.DEFAULT_TYPE) -> dict:
     '''
-    Helper function that returns current reminder preset for given job id
-    Returns empty dict if nothing is found or error occured
+    Helper function that returns dictionary of current reminder preset for given job id
+    Returns empty dict if nothing is found or error occured.
     '''  
     
     preset = {}
 
     job = context.job_queue.scheduler.get_job(job_id)
-    try:
-        hour = job.trigger.fields[job.trigger.FIELD_NAMES.index('hour')]
-        minute = job.trigger.fields[job.trigger.FIELD_NAMES.index('minute')]
+    try: 
+        # Need to convert time values because they are BaseField type originally. 
+        # Better use integers for time in case I will need later to manipulate with them.
+        hour = int(str(job.trigger.fields[job.trigger.FIELD_NAMES.index('hour')]))
+        minute = int(str(job.trigger.fields[job.trigger.FIELD_NAMES.index('minute')]))
         days_preset = str(job.trigger.fields[job.trigger.FIELD_NAMES.index('day_of_week')])
-        # days_list = list(job.trigger.fields[job.trigger.FIELD_NAMES.index('day_of_week')])
-    except:
-        preset = {}       
+    except Exception as e:
+        preset = {}
+        logger.error(f"Error occured while getting preset for job_id '{job_id}': {e}")       
     else:
 
         # Determine if job is on or off
@@ -303,12 +300,11 @@ def get_job_preset_dict(job_id: str, context: ContextTypes.DEFAULT_TYPE) -> dict
             state = 'OFF'
         
         preset = {
-            'hour': int(str(hour)),
-            'minute': int(str(minute)),
+            'hour': hour,
+            'minute': minute,
             'day_of_week': days_preset,
             'state': state
-        }
-   
+        }   
     return preset
 
 
@@ -400,7 +396,9 @@ def get_keyboard_and_msg(db, level: int, user_id: str, project: dict, branch: st
 
                             # Get team members names with telegram ids, except PM
                             # Construct keyboard from that list
-                            # TODO TEST WHat if it's a sole project? Only PM is working?
+                            # TODO TEST WHat if it's a sole project? Only PM is working? 
+                            # Only Back and Finish will apear
+                            # TODO Refactor to inform user accordinly
                             team = get_project_team(project['_id'], db)
                             keyboard = []
                             if team:
@@ -448,8 +446,11 @@ def get_keyboard_and_msg(db, level: int, user_id: str, project: dict, branch: st
 
 def get_project_by_title(db: Database, pm_tg_id: str, title: str) -> dict:
     """
-    Get project from database by name for given telegram id of PM
+    Get project from database by title for given telegram id of PM.
+    Returns empty dict if nothing was found.
     """
+
+    project = {}
 
     # Get project from DB
     project = db.projects.find_one(
@@ -469,13 +470,17 @@ def get_project_by_title(db: Database, pm_tg_id: str, title: str) -> dict:
             project['tg_username'] = pm_username
         else:
             logger.error(f"PM (with tg_id: {pm_tg_id}) was not found in db.staff!") 
-        return project
     else:
-        return {}
+        project = {}
+
+    return project
 
 
 def get_projects_and_pms_for_user(user_oid: ObjectId, db: Database) -> str:
-    ''' Function to get string of projects (and their PMs) where user participate as an actioner '''
+    ''' 
+    Function to get string of projects (and their PMs) where user participate as an actioner 
+    Return empty string if nothing was found.
+    '''
     
     projects_and_pms = ''
     try:
@@ -492,11 +497,17 @@ def get_projects_and_pms_for_user(user_oid: ObjectId, db: Database) -> str:
             for project in projects:
                 if projects_and_pms:
                     projects_and_pms += ', '
-                pm_un = get_worker_tg_username_by_tg_id(project['pm_tg_id'], db)
-                if pm_un:
-                    projects_and_pms = projects_and_pms + f"'{project['title']}' (@{pm_un})"
-                else:
-                    projects_and_pms = projects_and_pms + f"'{project['title']}'"        
+                if (project and 
+                    type(project) == dict and 
+                    'title' in project.keys() and 
+                    'pm_tg_id' in project.keys() and
+                    project['title'] and
+                    project['pm_tg_id']):
+                    pm_un = get_worker_tg_username_by_tg_id(project['pm_tg_id'], db)
+                    if pm_un:
+                        projects_and_pms = projects_and_pms + f"'{project['title']}' (@{pm_un})"
+                    else:
+                        projects_and_pms = projects_and_pms + f"'{project['title']}'"        
 
     return projects_and_pms
 
@@ -504,7 +515,7 @@ def get_projects_and_pms_for_user(user_oid: ObjectId, db: Database) -> str:
 def get_project_team(prj_oid: ObjectId, db: Database) -> list[dict]:
     """
     Construct list of project team members.
-    Returns None if it is not possible to achieve or something went wrong.
+    Returns empty list if it is not possible to achieve or something went wrong.
     """
     team = []    
     
@@ -514,17 +525,18 @@ def get_project_team(prj_oid: ObjectId, db: Database) -> list[dict]:
         type(project) == dict and 
         'tasks' in project.keys() and 
         project['tasks']):
+
         # Loop through project tasks and gather information about project team
         for task in project['tasks']:
 
             # Process only tasks with actioners
-            if task['actioners']:
+            if 'actioners' in task.keys() and task['actioners']:
                 for actioner in task['actioners']:
 
                     # Proceed if such actioner not in team already
                     if not any(str(actioner['actioner_id']) in str(member['_id']) for member in team):
                         try:
-                            result = db.staff.find_one({'_id': actioner['actioner_id']}) # TODO what if no such record
+                            result = db.staff.find_one({'_id': actioner['actioner_id']}) 
                         except Exception as e:
                             logger.error(f"There was error getting DB: {e}")
                         else:
@@ -539,11 +551,11 @@ def get_project_team(prj_oid: ObjectId, db: Database) -> list[dict]:
 
 def get_status_on_project(project: dict, user_oid: ObjectId, db: Database) -> str:
     """
-    Function compose message contains status update on given project for given ObjectId of actioner.
-    Returns composed message to be sent
+    Function composes message which contains status update on given project for given ObjectId of actioner.
+    Returns composed message to be sent.
     """
 
-    bot_msg = f"Status of events for project '{project['title']}'"
+    bot_msg = f"Status of events for project '{project['title']}':"
 
     # Add PM username
     pm_username = get_worker_tg_username_by_tg_id(project['pm_tg_id'], db)
@@ -604,7 +616,7 @@ def get_status_on_project(project: dict, user_oid: ObjectId, db: Database) -> st
 
 def get_worker_oid_from_db_by_tg_username(tg_username: str, db: Database) -> ObjectId | None:
     '''
-    Search staff collection in DB for given telegram username and return DB-id.
+    Search staff collection in DB for given telegram username and return DB-oid.
     If something went wrong return None (should be checked on calling side)
     '''
 
@@ -616,7 +628,9 @@ def get_worker_oid_from_db_by_tg_username(tg_username: str, db: Database) -> Obj
         logger.error(f"There was error getting DB: {e}")
     else:
         if (result and type(result) == dict and 
-            '_id' in result.keys() and result['_id']):
+            '_id' in result.keys() and 
+            result['_id'] and
+            type(result['_id']) == ObjectId): # Just to be certain about type to return
             worker_id = result['_id']
 
     return worker_id
@@ -636,21 +650,21 @@ def get_worker_oid_from_db_by_tg_id(tg_id: str, db: Database) -> ObjectId | None
         logger.error(f"There was error connecting to DB: {e}")
     else:
         if (result and type(result) == dict and 
-            '_id' in result.keys() and result['_id']):
-            worker_id = result['_id'] # ObjectID
-            # print(type(worker_id))
+            '_id' in result.keys() and 
+            result['_id'] and
+            type(result['_id']) == ObjectId):
+            worker_id = result['_id']
 
     return worker_id
 
 
-def get_worker_tg_id_from_db_by_tg_username(tg_username: str, db: Database):
+def get_worker_tg_id_from_db_by_tg_username(tg_username: str, db: Database) -> str:
     '''
     Search staff collection in DB for given telegram username and return telegram-id.
-    If something went wrong return None (should be checked on calling side)
+    If something went wrong return empty string (should be checked on calling side)
     '''
 
-    tg_id = None
-    # DB = get_db()
+    tg_id = ''
   
     try:
         result = db.staff.find_one({'tg_username': tg_username})
@@ -660,7 +674,7 @@ def get_worker_tg_id_from_db_by_tg_username(tg_username: str, db: Database):
         if (result and type(result) == dict and 
             'tg_id' in result.keys() and result['tg_id']):
             tg_id = result['tg_id']
-    return tg_id
+    return str(tg_id)
 
 
 def get_worker_tg_username_by_oid(user_oid: ObjectId, db: Database) -> str:
@@ -668,7 +682,6 @@ def get_worker_tg_username_by_oid(user_oid: ObjectId, db: Database) -> str:
     If something went wrong return empty string (should be checked on calling side)"""
 
     tg_un = ''
-    # DB = get_db()
   
     try:
         result = db.staff.find_one({'_id': user_oid})
@@ -678,7 +691,7 @@ def get_worker_tg_username_by_oid(user_oid: ObjectId, db: Database) -> str:
         if (result and type(result) == dict and 
             'tg_username' in result.keys()):
             tg_un = result['tg_username']
-    return tg_un
+    return str(tg_un)
 
 
 def get_worker_tg_username_by_tg_id(tg_id: str, db: Database) -> str:
@@ -687,7 +700,6 @@ def get_worker_tg_username_by_tg_id(tg_id: str, db: Database) -> str:
     If something went wrong return empty string (should be checked on calling side)
     '''
     tg_un = ''
-    # DB = get_db()
   
     try:
         result = db.staff.find_one({'tg_id': tg_id})
@@ -698,12 +710,12 @@ def get_worker_tg_username_by_tg_id(tg_id: str, db: Database) -> str:
             'tg_username' in result.keys()):
             tg_un = result['tg_username']
 
-    return tg_un
+    return str(tg_un)
 
 
-def is_db(db):
+def is_db(db) -> bool:
     """ 
-    Function to check there is connection to DB. 
+    Function to check is there a connection to DB. 
     Return True if database reached, and False otherwise. 
     """
     
@@ -718,7 +730,9 @@ def is_db(db):
 
 def save_json(project: dict, PROJECTJSON: str) -> None:
     '''
-    Saves project in JSON format and returns
+    Saves project in JSON format and returns it.
+    Obsolete.
+    TODO remove
     '''
 
     json_fh = open(PROJECTJSON, 'w', encoding='utf-8')

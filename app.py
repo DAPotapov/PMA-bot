@@ -183,7 +183,6 @@ async def echo(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
 
     # TODO I can use it to gather id from chat members and add them to project.
     result = add_user_info_to_db(user, DB)
-    # pprint(result)
     if not result:
         logger.warning(f"User id ({user.id}) of {user.username} was not added to DB (maybe already present).")
 
@@ -330,6 +329,7 @@ async def start(update: Update, context: CallbackContext) -> int:
 async def naming_project(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     ''' Function for recognizing name of the project '''
     
+    # Try to clean project title from unnecessary symbols and if not succeed give him another try.
     try: 
         title = clean_project_title(update.message.text)
     except ValueError as e:
@@ -677,11 +677,7 @@ async def status(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
                 # if nothing found - Suggest him to start a project
                 user_oid = get_worker_oid_from_db_by_tg_id(user_id, DB)
                 if not user_oid and user_name:
-                    user_oid = get_worker_oid_from_db_by_tg_username(user_name, DB)
-                    
-                    # Add his id to DB since there is none
-                    add_user_id_to_db(update.effective_user, DB)
-
+                    user_oid = get_worker_oid_from_db_by_tg_username(user_name, DB)                  
                 if not user_oid:
                     bot_msg = ("No information found about you in database.\n"
                                 "If you think it's a mistake contact your project manager.\n"
@@ -689,6 +685,8 @@ async def status(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
                     )            
                     await context.bot.send_message(user_id, bot_msg)
                 else:
+                    # Add his id to DB since there is none
+                    add_user_id_to_db(update.effective_user, DB)
 
                     # Get all documents where user mentioned, cast cursor object to list to check if smth returned
                     projects = list(DB.projects.find(
@@ -934,9 +932,8 @@ async def settings(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
 
         # Let's control which level of settings we are at any given moment
         context.user_data['level'] = FIRST_LVL
-        try:
-            project = get_active_project(str(update.message.from_user.id), DB)
-        except ValueError:
+        project = get_active_project(str(update.message.from_user.id), DB)
+        if not project:
 
             # If user is not PM at least add his id in DB (if his telegram username is there)
             add_user_info_to_db(update.effective_user, DB)

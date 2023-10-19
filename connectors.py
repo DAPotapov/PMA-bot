@@ -147,8 +147,10 @@ def load_gan(fp, db: Database):
         raise AttributeError(f"Project file has invalid structure: no 'tg_username' field")
 
     if 'task' in obj.project.tasks:
+
         # Loop through tasks
         for task in obj.project.tasks.task:
+                
             # Add relevant data to list containing task information            
                 tasks = compose_tasks_list(tasks, task, allocations, resources, property_id, db)
                 if 'task' in task:
@@ -207,7 +209,7 @@ def get_tg_un_from_xml_resources(resource_id, resources, property_id):
     return tg_username
 
 
-def compose_tasks_list(tasks, task, allocations, resources, property_id, db: Database):
+def compose_tasks_list(tasks: list, task, allocations, resources, property_id, db: Database)-> list[dict]:
     ''' Function to append to list of tasks information of one task or subtask'''
 
     # Dictionary of id of actioners and their last reaction
@@ -232,7 +234,7 @@ def compose_tasks_list(tasks, task, allocations, resources, property_id, db: Dat
                                      f"and resource-id='{allocation['resource-id']}' in resources section of provided file"
                                      )
                              
-    # Dictionary of tasks which succeed from this one
+    # List of tasks which succeed from this one
     successors = []
     if 'depend' in dir(task):
         for follower in task.depend:
