@@ -121,7 +121,7 @@ ONE, TWO, THREE = range(3)
 async def day_before_update(context: ContextTypes.DEFAULT_TYPE) -> None:
     '''
     This reminder must be send to all team members on the day before of the important dates:
-    start of task, deadline
+    start of task, deadline, optionally milestones (according to setting)
     '''
     # TODO how to make observation of project a standalone function to be called elsewhere?
     # because every reminder function load project from file and looks through it
@@ -135,34 +135,36 @@ async def day_before_update(context: ContextTypes.DEFAULT_TYPE) -> None:
             for task in project['tasks']:
                 bot_msg = '' # Also acts as flag that there is something to inform user of
 
-                # TODO decide about milestones
+                # If delta_start <0 task not started, otherwise already started
+                delta_start = date.today() - date.fromisoformat(task['startdate'])
+
+                # If delta_end >0 task overdue, if <0 task in progress
+                delta_end = date.today() - date.fromisoformat(task['enddate'])
+
+                # Inform about task if it starts or has a deadline tomorrow
                 if task['complete'] < 100 and not task['include'] and not task['milestone']:
-
-                    # If delta_start <0 task not started, otherwise already started
-                    delta_start = date.today() - date.fromisoformat(task['startdate'])
-
-                    # If delta_end >0 task overdue, if <0 task in progress
-                    delta_end = date.today() - date.fromisoformat(task['enddate'])
-
-                    # If task starts tomorrow
                     if delta_start.days == -1:
                         bot_msg = f"task {task['id']} '{task['name']}' of '{project['title']}' (PM: @{project['tg_username']}) starts tomorrow."
                     elif delta_end.days == -1:
                         bot_msg = f"Tomorrow is deadline for task {task['id']} '{task['name']}' of '{project['title']}' (PM: @{project['tg_username']})!" 
 
-                    # If task worth talking, and tg_id could be found in staff and actioner not PM 
-                    # (will be informed separately) then send message to actioner
-                    if bot_msg:
-                        for actioner in task['actioners']:
-                            worker = DB.staff.find_one({"_id": actioner['actioner_id']}, {"tg_id":1, "_id": 0})                            
-                            if (worker and type(worker) == dict and 'tg_id' in worker.keys() and
-                                worker['tg_id'] and worker['tg_id'] != project['pm_tg_id']):
-                                # TODO I could easily add keyboard here which will send with callback_data:
-                                # project, task, actioner_id, and actioner decision (what else will be needed?..) 
-                                await context.bot.send_message(worker['tg_id'], bot_msg)
-                        
-                        # And inform PM
-                        await context.bot.send_message(project['pm_tg_id'], bot_msg)
+                # Inform about tomorrow milestone according to project's setting
+                if (project['settings']['INFORM_ACTIONERS_OF_MILESTONES'] and 
+                    task['milestone'] and 
+                    delta_end.days == -1):
+                    bot_msg = f"Tomorrow is the date of milestone {task['id']} '{task['name']}' of '{project['title']}' (PM: @{project['tg_username']})!" 
+
+                # If task worth talking, and tg_id could be found in staff and actioner not PM 
+                # (will be informed separately) then send message to actioner
+                if bot_msg:
+                    for actioner in task['actioners']:
+                        worker = DB.staff.find_one({"_id": actioner['actioner_id']}, {"tg_id":1, "_id": 0})                            
+                        if (worker and type(worker) == dict and 'tg_id' in worker.keys() and
+                            worker['tg_id'] and worker['tg_id'] != project['pm_tg_id']):
+                            await context.bot.send_message(worker['tg_id'], bot_msg)
+                    
+                    # And inform PM
+                    await context.bot.send_message(project['pm_tg_id'], bot_msg)
     else:
         bot_msg = f"Error occured while accessing database. Try again later or contact developer."
         logger.error(f"Error occured while accessing database.")
@@ -270,15 +272,17 @@ async def morning_update(context: ContextTypes.DEFAULT_TYPE) -> None:
                 # For each member compose status update on project and send
                 for member in team:
                     bot_msg = get_status_on_project(project, member['_id'], DB)
+                    # TODO I could easily add keyboard here which will send with callback_data:
+                    # project, task, actioner_id, and actioner decision (what else will be needed?..) 
                     await context.bot.send_message(member['tg_id'], bot_msg)
 
-                    # Send such update to PM too if it was not sent already like to an actioner
+                    # Send such update to PM too if it was not sent already as to an actioner
                     if member['tg_id'] != str(context.job.data['pm_tg_id']):                                          
                         await context.bot.send_message(str(context.job.data['pm_tg_id']), bot_msg)
 
             # If no team inform only PM about such situation
             else:
-                bot_msg = f"Project has no team or something is wrong with database - consult developer."
+                bot_msg = f"Project has no team or something is wrong with database - contact developer."
                 await context.bot.send_message(str(context.job.data['pm_tg_id']), bot_msg)
     else:
         bot_msg = f"Error occured while accessing database. Try again later or contact developer."
