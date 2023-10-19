@@ -625,10 +625,15 @@ async def status(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
 
                             # Information about milestones and other tasks composed slightly different
                             if task['milestone'] == True:
-                                if delta_end.days < 0:
 
-                                    # If milestone in future inform user
+                                # Inform PM of future milestones
+                                if delta_end.days < 0:             
                                     msg = msg + f"\nMilestone '{task['name']}' is near ({task['enddate']})!"
+
+                                # Inform PM of today's milestone
+                                if delta_end.days == 0:
+                                    msg = msg + f"\nToday is the day of planned milestone '{task['name']}'!"
+                                
                             else:
                                 people, user_ids = get_assignees(task, DB)
                                 if not people:

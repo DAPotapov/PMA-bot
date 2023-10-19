@@ -539,7 +539,8 @@ def get_project_team(prj_oid: ObjectId, db: Database) -> list[dict]:
 
 def get_status_on_project(project: dict, user_oid: ObjectId, db: Database) -> str:
     """
-    Function compose message contains status update on given project for given ObjectId (actioner)
+    Function compose message contains status update on given project for given ObjectId of actioner.
+    Returns composed message to be sent
     """
 
     bot_msg = f"Status of events for project '{project['title']}'"
@@ -552,6 +553,8 @@ def get_status_on_project(project: dict, user_oid: ObjectId, db: Database) -> st
         bot_msg = bot_msg + f" (PM: @{project['tg_username']}):"
     else:
         logger.error(f"PM (with tg_id: {project['pm_tg_id']}) was not found in db.staff!")
+
+    inform_of_milestone = project['settings']['INFORM_ACTIONERS_OF_MILESTONES']
 
     # Get user telegram username to add to message
     actioner_username = get_worker_tg_username_by_oid(user_oid, db)
@@ -579,10 +582,16 @@ def get_status_on_project(project: dict, user_oid: ObjectId, db: Database) -> st
                 elif delta_end.days == 0:
                     msg = msg + f"\nTask {task['id']}  '{task['name']}' must be completed today!"
                 elif delta_start.days > 0 and delta_end.days > 0:                                       
-                    msg = msg + f"\nTask {task['id']} '{task['name']}' is overdue! (had to be completed on {task['enddate']})"
+                    msg = msg + f"\nTask {task['id']} '{task['name']}' is overdue! (had to be completed on {task['enddate']})."
                 else:
                     # print(f"Future tasks as {task['id']} '{task['name']}' goes here")   
                     pass
+            
+            # Actioner should be informed about milestone if PM decided so and if it is today
+            if (inform_of_milestone and task['milestone'] and
+                date.today() == date.fromisoformat(task['enddate'])):
+                msg = msg + f"\nToday is the day of planned milestone: '{task['name']}'."
+
         if msg:
             bot_msg = bot_msg + f"\nTasks assigned to @{actioner_username}:\n" + msg
         else:
