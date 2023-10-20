@@ -11,6 +11,7 @@
 import logging
 import os
 import json
+from pathlib import Path
 import tempfile
 import asyncio
 import re
@@ -474,7 +475,7 @@ async def start_ended(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int
 
 
 ### HELPERS:
-def file_to_dict(fp):
+def file_to_dict(fp: Path):
     ''' 
     Get file with project, determine supported type, call dedicated function to convert to dictionary, return it to caller
     '''

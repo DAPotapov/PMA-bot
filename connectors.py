@@ -1,7 +1,8 @@
 import logging
+from pathlib import Path
 import pprint
 import re
-import untangle
+# import untangle
 import json
 
 from helpers import add_worker_info_to_staff, get_worker_oid_from_db_by_tg_username
@@ -9,6 +10,7 @@ from numpy import busday_offset, busday_count, floor, datetime64
 # For testing purposes
 from pprint import pprint
 from pymongo.database import Database
+from untangle import Element, parse
 
 # Because GanttProject and MS Project have different values for dependency type here is the adaptor
 # Will use MS Project values, because it's more popular program
@@ -56,51 +58,42 @@ def tg_validation():
 # TODO: Implement
     pass
 
-# TODO maybe don't need this
-def main():
-    '''
-    Module recieve PosixPath of downloaded file.
-    Returns dictionary of lists of dictionaries of project schedule and assignments
-    If error occured should return at least string of error message, but maybe there is better way of error handling
 
-    '''
-    
-    return
-
-
-def load_gan(fp, db: Database):
+def load_gan(fp: Path, db: Database) -> list[dict]:
     '''
     This is a connector from GanttProject format (.gan) to inner format.
     Get file pointer on input
     Validates and converts data to inner dict-list-dict.. format
     Saves actioners to staff collection in DB
-    Dictionary on output        
+    Returns list of tasks.        
     '''
     
-    # Using untangle on GAN - WORKING. This syntax cleaner and have some useful methods like 'children'
+    # Using untangle on GAN - WORKS. This syntax cleaner and have some useful methods like 'children'
     # Declare dictionary to store data
     tasks = []
     
     # Parse the file
-    obj = untangle.parse(str(fp))
+    obj = parse(str(fp))
 
     # Store resources
-    if 'resource' in obj.project.resources:
+    if ('project' in obj and 
+        'resources' in obj.project and
+        'resource' in obj.project.resources):
         resources = obj.project.resources
     else:
         raise AttributeError('Provided file does not contain information about staff')
     
     # Check if special field for telegram id exist and store id of this field
     property_id = ''
-    # for custom_property in obj.project.resources.custom_property_definition:
-    for custom_property in resources.custom_property_definition:
-        if custom_property['name'] == 'tg_username':
-            property_id = custom_property['id']
-            # no need to continue looking through custom properties
-            break
+    if 'custom_property_definition' in resources:
+        for custom_property in resources.custom_property_definition:
+            if custom_property['name'] == 'tg_username': # TODO check for id and name
+                property_id = custom_property['id']
+                # no need to continue looking through custom properties
+                break
 
     # Store allocations
-    if 'allocation' in obj.project.allocations:
+    if 'allocations' in obj.project and 'allocation' in obj.project.allocations:
         allocations = obj.project.allocations.allocation
     else:
         raise AttributeError('There are no assignments made. Whom are you gonna manage?')
@@ -114,9 +107,10 @@ def load_gan(fp, db: Database):
 
             # Looking in custom properties of each resource for property assosiated with telegram
             tg_username = ''
-            for property in actioner.custom_property:
-                if property['definition-id'] == property_id:
-                    tg_username = property['value']
+            if 'custom_property' in actioner:
+                for property in actioner.custom_property:
+                    if property['definition-id'] == property_id:
+                        tg_username = property['value']
 
             # Check if username was collected
             if not tg_username:
@@ -146,16 +140,16 @@ def load_gan(fp, db: Database):
     else:
         raise AttributeError(f"Project file has invalid structure: no 'tg_username' field")
 
-    if 'task' in obj.project.tasks:
+    if 'tasks' in obj.project and 'task' in obj.project.tasks:
 
         # Loop through tasks
         for task in obj.project.tasks.task:
                 
             # Add relevant data to list containing task information            
-                tasks = compose_tasks_list(tasks, task, allocations, resources, property_id, db)
-                if 'task' in task:
-                    for subtask in task.task:
-                        tasks = compose_tasks_list(tasks, subtask, allocations, resources, property_id, db)
+            tasks.append(compose_tasks_list(task, allocations, resources, property_id, db))
+            if 'task' in task:
+                for subtask in task.task:
+                    tasks.append(compose_tasks_list(subtask, allocations, resources, property_id, db))
 
     else:
         raise AttributeError('There are no tasks in provided file. Nothing to do.')
@@ -166,7 +160,7 @@ def load_gan(fp, db: Database):
     return tasks 
 
 
-def get_tg_un_from_gan_resources(resource_id, resources, property_id):
+def get_tg_un_from_gan_resources(resource_id: str, resources: Element, property_id: str):
     ''' 
     Find telegram username in dictionary of resources (from .gan file) which corresponds provided id.
     Return None if nothing found. Should be controlled on calling side.
@@ -209,16 +203,20 @@ def get_tg_un_from_xml_resources(resource_id, resources, property_id):
     return tg_username
 
 
-def compose_tasks_list(tasks: list, task, allocations, resources, property_id, db: Database)-> list[dict]:
+def compose_tasks_list(task: Element, allocations: Element, resources: Element, property_id: str, db: Database)-> dict:
     ''' Function to append to list of tasks information of one task or subtask'''
+
+    output_task = {}
 
     # Dictionary of id of actioners and their last reaction
     # Completeness of task assignments will be controlled in /status function
     actioners = [] 
     for allocation in allocations:
-        if task['id'] == allocation['task-id']:
+        if task['id'] and allocation['task-id'] and task['id'] == allocation['task-id']:
             # Memo: GanntProject starts numeration of resources from 0, MS Project - from 1
-            tg_username = get_tg_un_from_gan_resources(allocation['resource-id'], resources, property_id)
+            tg_username = ''
+            if allocation['resource_id']:
+                tg_username = get_tg_un_from_gan_resources(str(allocation['resource-id']), resources, property_id)
             if tg_username:
                 actioner_id = get_worker_oid_from_db_by_tg_username(tg_username, db)
                 if actioner_id:
@@ -240,63 +238,69 @@ def compose_tasks_list(tasks: list, task, allocations, resources, property_id, d
         for follower in task.depend:
 
             # If dependency translation not possible better aware user than import with somehow
-            if int(follower['type']) == 0:
-                raise ValueError(f"Unknown dependency type ('{follower['type']}')of successor task: {int(follower['id'])}")
+            if int(str(follower['type'])) == 0:
+                raise ValueError(f"Unknown dependency type ('{follower['type']}')of successor task: {follower['id']}")
             try:
-                depend_type = GAN_DEPEND_TYPES[int(follower['type'])-1] 
+                depend_type = GAN_DEPEND_TYPES[int(str(follower['type']))-1] 
             except IndexError as e:
-                raise ValueError(f"Unknown dependency type ('{follower['type']}')of successor task: {int(follower['id'])}")
+                raise ValueError(f"Unknown dependency type ('{follower['type']}')of successor task: {follower['id']}")
             else:
                 successors.append({
-                    'id': int(follower['id']),
+                    'id': int(str(follower['id'])),
                     'depend_type': depend_type,
-                    'depend_offset': int(follower['difference'])
+                    'depend_offset': int(str(follower['difference']))
                     })
 
     # Dictionary of subtasks' id of this one. This way helpful to almost infinitely decompose tasks. 
     include = []
     if 'task' in task:
         for subtask in task.task:
-            include.append(int(subtask['id']))
+            include.append(int(str(subtask['id'])))
     
     # Construct dictionary of task and append to list of tasks   
-    if task['meeting'].lower() == "false":
-        milestone = False
-    elif task['meeting'].lower() == "true":
-        milestone = True
+    if 'meeting' in task:
+        if str(task['meeting']).lower() == "false":
+            milestone = False
+        elif str(task['meeting']).lower() == "true":
+            milestone = True
+        else:
+            raise ValueError('File may be damaged: milestone field contains invalid value ' + str(task['meeting']))
     else:
-        raise ValueError('File may be damaged: milestone field contains invalid value ' + str(task['meeting']))
-    
+        # Composite tasks don't have this field, and they are certainly not milestones
+        milestone = False
+
     # Construct end date from start date, duration and numpy function.
     # Numpy function returns sees duration as days _between_ dates, 
     # but in project management enddate must be a date of deadline, 
     # so correct expected return value by decreasing duration by one day.
-    if int(task['duration']) == 0:
+    if int(str(task['duration'])) == 0:
         enddate = task['start']
     else:
-        enddate = str(busday_offset(datetime64(task['start']), int(task['duration']) - 1, roll='forward'))
+        enddate = str(busday_offset(datetime64(task['start']), int(str(task['duration'])) - 1, roll='forward'))
 
-    tasks.append({
-                'id': int(task['id']),
-                'WBS': None, # For compatibility with MS Project
+    # tasks.append(
+        output_task = {
+                'id': int(str(task['id'])),
+                'WBS': '',          # For compatibility with MS Project
                 'name': task['name'],
                 'startdate': task['start'],
                 'enddate': enddate, 
-                'duration': int(task['duration']),
+                'duration': int(str(task['duration'])),
                 'predecessors': [], # For compatibility with MS Project
                 'successors': successors,
                 'milestone': milestone,
-                'complete': int(task['complete']),
-                'curator': '', # not using for now, but it may become usefull later
-                'basicplan_startdate': task['start'], # equal to start date on a start of the project
-                'basicplan_enddate': enddate, # equal to end date on a start of the project
+                'complete': int(str(task['complete'])),
+                'curator': '',      # not using for now, but it may become usefull later
+                'basicplan_startdate': task['start'],   # equal to start date on a start of the project
+                'basicplan_enddate': enddate,           # equal to end date on a start of the project
                 'include': include,
                 'actioners': actioners
-            })
-    return tasks
+            }
+        # )
+    return output_task
 
 
-def load_json(fp):
+def load_json(fp: Path):
     '''
     Loads JSON data from file into dictionary.
     This connector useful in case we downloaded JSON, manually made some changes, 
@@ -306,7 +310,7 @@ def load_json(fp):
     # 1. Limit size of data to load to prevent attacks
     # 2. 
     
-    project = json.load(fp)
+    # project = json.load(fp)
     tasks = []
     staff = []
     # TODO check if it seems like project. Look for inner format structure
@@ -314,17 +318,17 @@ def load_json(fp):
     return tasks
 
 
-def load_xml(fp, db: Database):
+def load_xml(fp: Path, db: Database):
     """ 
     Function to import from MS Project XML file 
-    Get file pointer on input
+    Get file pointer and database instance on input.
     Validates and converts data to inner dict-list-dict.. format
-    Saves actioners to staff collection in DB
-    Dictionary on output    
+    Saves actioners to staff collection in DB.
+    Returns list of tasks. And empty list if no tasks in file.
     """
 
     tasks = []
-    obj = untangle.parse(str(fp))
+    obj = parse(str(fp))
 
     # Store resources
     if 'Resource' in obj.Project.Resources:
@@ -499,20 +503,16 @@ def load_xml(fp, db: Database):
     return tasks
 
 
-def xml_date_conversion(datestring):
+def xml_date_conversion(input_date: str) -> str:
     """
     Convert Project dateTime format (2023-05-15T08:00:00) to inner date format (2023-05-15)
     """
 
     # Given date from XML, expect dateTime Project format
-    datestring = re.search('^\d{4}-\d{2}-\d{2}', datestring)
+    datestring = re.search('^\d{4}-\d{2}-\d{2}', input_date)
     if not datestring:
         raise ValueError (f"Error in start date found ({datestring})")
     else:
         datestring = datestring.group()
 
     return datestring
-
-
-if __name__ == '__main__':
-    main()
