@@ -128,7 +128,11 @@ async def day_before_update(context: ContextTypes.DEFAULT_TYPE) -> None:
     # because every reminder function load project from file and looks through it
 
 
-    if DB != None and is_db(DB):
+    if (DB != None and 
+        is_db(DB) and 
+        context.job and 
+        context.job.data and 
+        type(context.job.data) == dict): # TODO use this check in other places
         project = get_project_by_title(DB, str(context.job.data['pm_tg_id']), context.job.data['project_title'])
         if project:
            
