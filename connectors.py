@@ -318,7 +318,7 @@ def load_json(fp: Path):
     return tasks
 
 
-def load_xml(fp: Path, db: Database):
+def load_xml(fp: Path, db: Database)-> list[dict]:
     """ 
     Function to import from MS Project XML file 
     Get file pointer and database instance on input.
@@ -331,25 +331,25 @@ def load_xml(fp: Path, db: Database):
     obj = parse(str(fp))
 
     # Store resources
-    if 'Resource' in obj.Project.Resources:
+    if 'Project' in obj and 'Resource' in obj.Project.Resources:
         resources = obj.Project.Resources
     else:
         raise AttributeError('Provided file does not contain information about staff')
 
     # Check for telegram username field in XML provided
     property_id = ''
-    if 'ExtendedAttribute' in obj.Project.ExtendedAttributes:
+    if ('ExtendedAttributes' in obj.Project and 
+        'ExtendedAttribute' in obj.Project.ExtendedAttributes):
         for attr in obj.Project.ExtendedAttributes.ExtendedAttribute:
-            if attr.Alias.cdata == 'tg_username':
+            if 'Alias' in attr and 'FieldID' in attr and attr.Alias.cdata == 'tg_username':
                 property_id = attr.FieldID.cdata
-        # If telegram username field is not found then inform user
-        if not property_id:
-            raise AttributeError("Project file has invalid structure: no 'tg_username' field")
-    else:
+
+    # If telegram username field is not found then inform user
+    if not property_id:
         raise AttributeError("Project file has invalid structure: no 'tg_username' field")
 
     # Store allocations
-    if 'Assignment' in obj.Project.Assignments:
+    if 'Assignments' in obj.Project and 'Assignment' in obj.Project.Assignments:
         allocations = obj.Project.Assignments.Assignment
     else:
         raise AttributeError('There are no assignments made. Whom are you gonna manage?')
@@ -357,14 +357,20 @@ def load_xml(fp: Path, db: Database):
     # Adding workers to DB - should be at first place, before proceeding allocations for tasks
     for actioner in resources.Resource:
         
-        # Because collection of resources must contain at least one resource (from docs) seems like MS Project adds one with id=0
-        # But it lacks some of the fields like ExtendedAttribute, so it's better to check if current resource has one
-        if 'ExtendedAttribute' in actioner:
+        # Because collection of resources must contain at least one resource (from docs) 
+        # seems like MS Project adds one with id=0
+        # But it lacks some of the fields like ExtendedAttribute, 
+        # so it's better to check if current resource has one
+        if ('ExtendedAttribute' in actioner and
+            'Name' in actioner and
+            'EmailAddress' in actioner):
             
             # Get telegram username from XML for this actioner
             tg_username = ''
             for property in actioner.ExtendedAttribute:
-                if property.FieldID.cdata == property_id:
+                if ('FieldID' in property and 
+                    'Value' in property and 
+                    property.FieldID.cdata == property_id):
                     tg_username = property.Value.cdata
             
             # Check if username was collected
@@ -395,76 +401,88 @@ def load_xml(fp: Path, db: Database):
                 logger.error(f"{e}")
 
     # Gathering tasks from XML
-    if 'Task' in obj.Project.Tasks:
+    if 'Tasks' in obj.Project and 'Task' in obj.Project.Tasks:
 
         # Because 1st element in MS Project XML format represents project itself so skip it
-        for i, task in enumerate(obj.Project.Tasks.Task):
-            if i == 0:
-                continue            
-            
-            # Calculate duration from start and end dates using only business days 
-            # and considering that end date (aka deadline) should be included
-            # Calculating duration from presented duration in XML (in hours) may provide not right results: 
-            # actually its effort - assume work only need 1 hour but sometime during the week
-            # And milestones have zero duration
-            if task.Milestone.cdata == '1':
-                duration = 0
-            else:
-                duration = int(busday_count(xml_date_conversion(task.Start.cdata), xml_date_conversion(task.Finish.cdata)) + 1)
-
-            # make actioners list for this task, skipping milestones
-            # Completeness of task assignments will be controlled in /status function
+        tasks_from_xml = iter(obj.Project.Tasks.Task)
+        next(tasks_from_xml)
+        for task in tasks_from_xml:      
+            duration = 0
             actioners = []
-            for allocation in allocations:
-                if task.UID.cdata == allocation.TaskUID.cdata and task.Milestone.cdata == '0':
-                    
-                    # MS Project store value '-65535' in case no resource assigned. I'll leave this list empty
-                    if int(allocation.ResourceUID.cdata) > 0:
-                        tg_username = get_tg_un_from_xml_resources(allocation.ResourceUID.cdata, resources, property_id)
-                        if tg_username:
-                            actioner_id = get_worker_oid_from_db_by_tg_username(tg_username, db)
-                            if actioner_id:
-                                actioners.append({
-                                    # Memo: GanntProject starts numeration of resources from 0, MS Project - from 1
-                                    'actioner_id': actioner_id,
-                                    'nofeedback': False # Default. Will be changed to True if person didn't answer to bot
-                                })
-                            else:
-                                raise AttributeError(f"Couldn't get ObjectId from DB for '{tg_username} while processing task-id='{task.UID.cdata}'"
-                                                    f"and resource-id='{allocation.ResourceUID.cdata}' in resources section of provided file"
-                                                    )
-                        else:
-                            raise AttributeError(f"Telegram username not found for task-id='{task.UID.cdata}'" 
-                                                f"and resource-id='{allocation.ResourceUID.cdata}' in resources section of provided file"
-                                                )
+            # First check all needed fields
+            if ('Milestone' in task and
+                'UID' in task and
+                'WBS' in task and
+                'Name' in task and
+                'PercentComplete' in task and
+                'Start' in task and
+                'Finish' in task): 
 
-            # Besides successors will store predecessors for backward compatibility with MS Project
-            predecessors = []
-            if 'PredecessorLink' in task:
-                for predecessor in task.PredecessorLink:
-                    predecessors.append({
-                        'id': int(predecessor.PredecessorUID.cdata),
-                        'depend_type': int(predecessor.Type.cdata),
-                        'depend_offset': 0 if predecessor.LinkLag.cdata == '0' else int(floor(int(predecessor.LinkLag.cdata) / 4800)),
-                        })
+                # Calculate duration from start and end dates using only business days 
+                # and considering that end date (aka deadline) should be included
+                # Calculating duration from presented duration in XML (in hours) may provide not right results: 
+                # actually its effort - assume work only need 1 hour but sometime during the week
+                # And milestones have zero duration
+                if task.Milestone.cdata == '0':
+                    duration = int(busday_count(xml_date_conversion(task.Start.cdata), xml_date_conversion(task.Finish.cdata)) + 1)
 
-            tasks.append({
-                'id': int(task.UID.cdata),
-                'WBS': task.WBS.cdata, # this field is useful for determining inclusion of tasks
-                'name': task.Name.cdata,
-                'startdate': xml_date_conversion(task.Start.cdata), 
-                'enddate': xml_date_conversion(task.Finish.cdata),
-                'duration': duration,
-                'predecessors': predecessors,
-                'successors': [], # will be calculated below from PredecessorLink 
-                'milestone': True if task.Milestone.cdata == '1' else False, 
-                'complete': int(task.PercentComplete.cdata),
-                'curator': '', # not using for now, but it may become usefull later
-                'basicplan_startdate': xml_date_conversion(task.Start.cdata), # equal to start date on a start of the project
-                'basicplan_enddate': xml_date_conversion(task.Finish.cdata), # equal to end date on a start of the project
-                'include': [],  # will be calculated later from WBS and OutlineLevel
-                'actioners': actioners
-            })
+                    # Make actioners list for this task, skipping milestones
+                    # Completeness of task assignments will be controlled in /status function
+                    for allocation in allocations:
+                        if ('TaskUID' in allocation and
+                            'ResourceUID' in allocation and
+                            task.UID.cdata == allocation.TaskUID.cdata):
+                            
+                            # MS Project store value '-65535' in case no resource assigned. I'll leave this list empty
+                            if int(allocation.ResourceUID.cdata) > 0:
+                                tg_username = get_tg_un_from_xml_resources(allocation.ResourceUID.cdata, resources, property_id)
+                                if tg_username:
+                                    actioner_id = get_worker_oid_from_db_by_tg_username(tg_username, db)
+                                    if actioner_id:
+                                        actioners.append({
+                                            # Memo: GanntProject starts numeration of resources from 0, MS Project - from 1
+                                            'actioner_id': actioner_id,
+                                            'nofeedback': False # Default. Will be changed to True if person didn't answer to bot
+                                        })
+                                    else:
+                                        raise AttributeError(f"Couldn't get ObjectId from DB for '{tg_username} while processing task-id='{task.UID.cdata}'"
+                                                            f"and resource-id='{allocation.ResourceUID.cdata}' in resources section of provided file"
+                                                            )
+                                else:
+                                    raise AttributeError(f"Telegram username not found for task-id='{task.UID.cdata}'" 
+                                                        f"and resource-id='{allocation.ResourceUID.cdata}' in resources section of provided file"
+                                                        )
+
+                # Besides successors will store predecessors for backward compatibility with MS Project
+                predecessors = []
+                if 'PredecessorLink' in task:
+                    for predecessor in task.PredecessorLink:
+                        depend_offset = 0
+                        if 'LinkLag' in predecessor and predecessor.LinkLag.cdata != '0':
+                            depend_offset = int(floor(int(predecessor.LinkLag.cdata) / 4800))
+                        predecessors.append({
+                            'id': int(predecessor.PredecessorUID.cdata) if 'PredecessorUID' in predecessor else None,
+                            'depend_type': int(predecessor.Type.cdata) if 'Type' in predecessor else None,
+                            'depend_offset': depend_offset
+                            })
+
+                tasks.append({
+                    'id': int(task.UID.cdata),
+                    'WBS': task.WBS.cdata, # this field is useful for determining inclusion of tasks
+                    'name': task.Name.cdata,
+                    'startdate': xml_date_conversion(task.Start.cdata), 
+                    'enddate': xml_date_conversion(task.Finish.cdata),
+                    'duration': duration,
+                    'predecessors': predecessors,
+                    'successors': [], # will be calculated below from PredecessorLink 
+                    'milestone': True if task.Milestone.cdata == '1' else False, 
+                    'complete': int(task.PercentComplete.cdata),
+                    'curator': '', # not using for now, but it may become usefull later
+                    'basicplan_startdate': xml_date_conversion(task.Start.cdata), # equal to start date on a start of the project
+                    'basicplan_enddate': xml_date_conversion(task.Finish.cdata), # equal to end date on a start of the project
+                    'include': [],  # will be calculated later from WBS and OutlineLevel
+                    'actioners': actioners
+                })
 
         # Go through collection of tasks and find it is a someone predecessor
         for record in tasks:
@@ -472,7 +490,11 @@ def load_xml(fp: Path, db: Database):
             for task in obj.Project.Tasks.Task:
                 if 'PredecessorLink' in task:
                     for predecessor in task.PredecessorLink:            
-                        if record['id'] == int(predecessor.PredecessorUID.cdata):
+                        if ('PredecessorUID' in predecessor and
+                            'LinkLag' in predecessor and
+                            'Type' in predecessor and 
+                            record['id'] == int(predecessor.PredecessorUID.cdata)):
+                            
                             # Recalculate offset from LinkLag, which expressed in tenth of minutes (sic!), so 4800 is 8 hours
                             if int(predecessor.LinkLag.cdata) == 0:
                                 offset = 0
@@ -489,9 +511,12 @@ def load_xml(fp: Path, db: Database):
 
                 # Also find included tasks
                 # Look at outline level to comprehend level of WBS to look for - more than one
-                if int(task.OutlineLevel.cdata) > 1:
+                if ('OutlineLevel' in task and
+                    'WBS' in task and
+                    'UID' in task and
+                    int(task.OutlineLevel.cdata) > 1):
 
-                # Take part of WBS of task before last dot - this is WBS of Parent task
+                    # Take part of WBS of task before last dot - this is WBS of Parent task
                     parentWBS = task.WBS.cdata[:task.WBS.cdata.rindex('.')]
                     
                     # Find in gathered tasks list task with such WBS and add UID of task to 'include' sublist
