@@ -122,7 +122,7 @@ def add_worker_info_to_staff(worker: dict, db: Database) -> ObjectId | None:
 
     # Type check just in case
     if type(worker_id) != ObjectId:
-        worker_id == None
+        worker_id = None
 
     return worker_id
 
@@ -280,31 +280,32 @@ def get_job_preset_dict(job_id: str, context: ContextTypes.DEFAULT_TYPE) -> dict
     '''  
     
     preset = {}
+    if context.job_queue:
+        job = context.job_queue.scheduler.get_job(job_id)
+        if job:
+            try: 
+                # Need to convert time values because they are BaseField type originally. 
+                # Better use integers for time in case I will need later to manipulate with them.
+                hour = int(str(job.trigger.fields[job.trigger.FIELD_NAMES.index('hour')]))
+                minute = int(str(job.trigger.fields[job.trigger.FIELD_NAMES.index('minute')]))
+                days_preset = str(job.trigger.fields[job.trigger.FIELD_NAMES.index('day_of_week')])
+            except Exception as e:
+                preset = {}
+                logger.error(f"Error occured while getting preset for job_id '{job_id}': {e}")       
+            else:
 
-    job = context.job_queue.scheduler.get_job(job_id)
-    try: 
-        # Need to convert time values because they are BaseField type originally. 
-        # Better use integers for time in case I will need later to manipulate with them.
-        hour = int(str(job.trigger.fields[job.trigger.FIELD_NAMES.index('hour')]))
-        minute = int(str(job.trigger.fields[job.trigger.FIELD_NAMES.index('minute')]))
-        days_preset = str(job.trigger.fields[job.trigger.FIELD_NAMES.index('day_of_week')])
-    except Exception as e:
-        preset = {}
-        logger.error(f"Error occured while getting preset for job_id '{job_id}': {e}")       
-    else:
-
-        # Determine if job is on or off
-        if job.next_run_time:
-            state = 'ON'
-        else:
-            state = 'OFF'
-        
-        preset = {
-            'hour': hour,
-            'minute': minute,
-            'day_of_week': days_preset,
-            'state': state
-        }   
+                # Determine if job is on or off
+                if job.next_run_time:
+                    state = 'ON'
+                else:
+                    state = 'OFF'
+                
+                preset = {
+                    'hour': hour,
+                    'minute': minute,
+                    'day_of_week': days_preset,
+                    'state': state
+                }   
     return preset
 
 
