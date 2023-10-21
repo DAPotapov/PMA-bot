@@ -29,36 +29,6 @@ logging.basicConfig(filename=".data/log.log",
 logger = logging.getLogger(__name__)
 
 
-# TODO below checks should be only for information only during file uploads (in start and while /upload)
-# They should not raise any errors. Just make PM aware that he may face troubles when contacting someone
-def email_validation(email):
-    '''
-    Function to validate an email address and gently inform user if smth not right, like:
-    ' Hey, I could not send email to that address later'
-    It's for future function to inform user via email
-    '''
-    # TODO: implement
-    pass
-
-
-def phone_validation():
-    '''
-    Function to validate phone number and gently inform PM if smth is not right, like
-    'Hey, it seems we couldn't call such number later'
-    It's for future function to inform user via phone
-    '''
-    # TODO: Implement
-    pass
-
-
-def tg_validation():
-    ''' 
-    Function to validate telegram username
-    '''
-# TODO: Implement
-    pass
-
-
 def load_gan(fp: Path, db: Database) -> list[dict]:
     '''
     This is a connector from GanttProject format (.gan) to inner format.
@@ -160,7 +130,7 @@ def load_gan(fp: Path, db: Database) -> list[dict]:
     return tasks 
 
 
-def get_tg_un_from_gan_resources(resource_id: str, resources: Element, property_id: str):
+def get_tg_un_from_gan_resources(resource_id: str, resources: Element, property_id: str) -> str:
     ''' 
     Find telegram username in dictionary of resources (from .gan file) which corresponds provided id.
     Return None if nothing found. Should be controlled on calling side.
@@ -169,26 +139,26 @@ def get_tg_un_from_gan_resources(resource_id: str, resources: Element, property_
     tg_username = ''
 
     for actioner in resources.resource:
-        if resource_id == actioner['id']:
-
+        if 'custom_property' in actioner and resource_id == actioner['id']:
             for property in actioner.custom_property:
                 if property['definition-id'] == property_id:
 
                     # If such property not filled then abort and tell user to do his job and make a proper file
-                    if not property['value']:
-                        raise ValueError(f"'{actioner['name']}' have no tg_username value")
+                    if property['value']:
+                        tg_username = str(property['value'])
                     else:
-                        tg_username = property['value']
+                        raise ValueError(f"'{actioner['name']}' have no tg_username value")
+
     return tg_username
 
 
-def get_tg_un_from_xml_resources(resource_id, resources, property_id):
+def get_tg_un_from_xml_resources(resource_id: str, resources: Element, property_id: str) -> str:
     ''' 
     Find telegram username in dictionary of resources (from .xml file) which corresponds provided id.
     Return None if nothing found. Should be controlled on calling side.
     '''
 
-    tg_username = None
+    tg_username = ''
     for actioner in resources.Resource:
         if resource_id == actioner.UID.cdata:
 
@@ -203,7 +173,12 @@ def get_tg_un_from_xml_resources(resource_id, resources, property_id):
     return tg_username
 
 
-def compose_tasks_list(task: Element, allocations: Element, resources: Element, property_id: str, db: Database)-> dict:
+def compose_tasks_list(
+        task: Element, 
+        allocations: Element, 
+        resources: Element, 
+        property_id: str, 
+        db: Database) -> dict:
     ''' Function to append to list of tasks information of one task or subtask'''
 
     output_task = {}
