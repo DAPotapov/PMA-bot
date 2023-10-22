@@ -16,7 +16,7 @@ from pprint import pprint
 from pymongo.errors import ConnectionFailure, ServerSelectionTimeoutError
 from pymongo.database import Database
 from re import sub
-from telegram import User, InlineKeyboardButton
+from telegram import InlineKeyboardMarkup, User, InlineKeyboardButton
 from telegram.ext import ContextTypes
 from typing import Tuple
 from urllib.parse import quote_plus
@@ -444,6 +444,58 @@ def get_keyboard_and_msg(db, level: int, user_id: str, project: dict, branch: st
 
     return keyboard, msg
 
+
+def get_message_and_button_for_task(task: dict, project_id: ObjectId, db: Database) -> tuple[str, InlineKeyboardMarkup | None]:
+    """
+    Helper function to provide status update on task with a button (InlineKeyboardReplyMarkup to be sent) to mark such task as complete.
+    Returns empty tuple of empty string and Nonetype object if task not worth mention.
+    """
+    msg = ''
+    keyboard = []
+    reply_markup = None
+    if task['complete'] < 100 and not task['include']:                            
+
+        # If delta_start <0 task not started, otherwise already started
+        delta_start = date.today() - date.fromisoformat(task['startdate'])
+
+        # If delta_end >0 task overdue, if <0 task in progress
+        delta_end = date.today() - date.fromisoformat(task['enddate'])
+
+        # Information about milestones and other tasks composed slightly different
+        if task['milestone'] == True:
+
+            # Inform PM of future milestones
+            if delta_end.days < 0:             
+                msg = f"Milestone '{task['name']}' is near ({task['enddate']})!"
+
+            # Inform PM of today's milestone
+            if delta_end.days == 0:
+                msg = f"Today is the day of planned milestone '{task['name']}'!"
+        else:
+            people, user_ids = get_assignees(task, db)
+            if not people:
+                people = "can't say, better check assignments in project file."
+
+            # Check dates and compose message including information about human resources
+            if delta_start.days == 0:
+                msg = f"Task {task['id']} '{task['name']}' started today. Assigned to: {people}."
+            elif delta_start.days > 0  and delta_end.days < 0:
+                msg = f"Task {task['id']} '{task['name']}' is intermidiate. Due date is {task['enddate']}. Assigned to: {people}."
+            elif delta_end.days == 0:
+                msg = f"Task {task['id']}  '{task['name']}' must be completed today! Assigned to: {people}."
+            elif delta_start.days > 0 and delta_end.days > 0:         
+                msg = f"Task {task['id']} '{task['name']}' is overdue! (had to be completed on {task['enddate']}). Assigned to: {people}."
+            else:
+                logger.info(f"Loop through future task '{task['id']}' '{task['name']}'")
+                pass
+
+    # If task worth mention add a button to message
+    if msg:
+        button = InlineKeyboardButton("Mark as completed", callback_data=f"task_{project_id}_{task['id']}")
+        keyboard.append([button])
+        reply_markup = InlineKeyboardMarkup(keyboard)
+    return msg, reply_markup
+    
 
 def get_project_by_title(db: Database, pm_tg_id: str, title: str) -> dict:
     """
