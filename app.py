@@ -292,7 +292,18 @@ async def morning_update(context: ContextTypes.DEFAULT_TYPE) -> None:
                 await context.bot.send_message(str(context.job.data['pm_tg_id']), bot_msg)
 
             # Make status update with buttons for PM
-
+            bot_msg = f"Morning status update for project '{context.job.data['project_title']}':"
+            await context.bot.send_message(str(context.job.data['pm_tg_id']), bot_msg)
+            task_counter = 0            
+            for task in project['tasks']:
+                task_counter += 1
+                bot_msg, reply_markup = get_message_and_button_for_task(task, project['_id'], DB)
+                if bot_msg and reply_markup:
+                    await context.bot.send_message(str(context.job.data['pm_tg_id']), bot_msg, reply_markup=reply_markup)
+            if task_counter == 0:
+                bot_msg = 'Seems like there are no events to inform about at this time.'
+                await context.bot.send_message(str(context.job.data['pm_tg_id']), bot_msg)
+                      
     else:
         bot_msg = f"Error occured while accessing database. Try again later or contact developer."
         logger.error(f"Error occured while accessing database.")
