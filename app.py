@@ -294,6 +294,44 @@ async def morning_update(context: ContextTypes.DEFAULT_TYPE) -> None:
         await context.bot.send_message(context.job.data['pm_tg_id'], bot_msg)
 
 
+async def set_task_accomplished(update: Update, context: CallbackContext):
+    """ Function to proceed pressed button of setting task accomplished """
+    bot_msg = 'Unsuccessful'
+    query = update.callback_query
+    await query.answer()
+
+    # Prepare data to find
+    if query and query.data:
+        data = query.data.split("_", 2)
+        project_to_find = ObjectId(data[1])
+        task_to_find = int(data[2])
+
+        # Update the database: set completeness of task to 100%
+        if is_db(DB):
+            project = DB.projects.find_one_and_update({"_id": project_to_find},   # search for project is here
+                                                      {"$set": {"tasks.$[elem].complete": 100}}, 
+                                                      # Below we choose which element of array to update
+                                                      array_filters=[{"elem.id": task_to_find}],    
+                                                      return_document=pymongo.ReturnDocument.AFTER,
+                                                      # Below we set which fields of document to show
+                                                      projection = {                                
+                                                          "title":1, 
+                                                          "tasks": {
+                                                                # and select first and only element of array which satisfy condition
+                                                                "$elemMatch": {"id": task_to_find}           
+                                                              }})
+            if (project and 
+                'tasks' in project.keys() and 
+                project['tasks'] and
+                'name' in project['tasks'][0].keys() and
+                'complete' in project['tasks'][0].keys() and
+                project['tasks'][0]['complete'] == 100):
+                bot_msg = f"Task №{project['tasks'][0]['id']} '{project['tasks'][0]['name']}' marked completed. Congratulations!"
+
+        # Send message
+        await query.edit_message_text(bot_msg)
+
+
 ######### START section ########################
 async def start(update: Update, context: CallbackContext) -> int:
     '''
@@ -619,12 +657,21 @@ async def status(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
 
                 # Iterate through list
                 for project in projects:
-                    msg_title = f"Status of events for project '{project['title']}':"
-                    msg = ''
+                    bot_msg = f"Status of events for project '{project['title']}':"
+                    if project['settings']['ALLOW_POST_STATUS_TO_GROUP'] and update.message.chat_id != update.effective_user.id:
+                        await update.message.reply_text(bot_msg)
+                    else:                        
+                        await context.bot.send_message(user_id, bot_msg)
+
+                    # Lets keep track of messages sent to user about tasks
+                    task_counter = 0
 
                     # Find task to inform about 
                     for task in project['tasks']:
-                        if task['complete'] < 100 and not task['include']:
+                        # Empty message at the start of checking task
+                        msg = '' 
+                        if task['complete'] < 100 and not task['include']:                            
+                            keyboard = []
 
                             # If delta_start <0 task not started, otherwise already started
                             delta_start = date.today() - date.fromisoformat(task['startdate'])
@@ -643,14 +690,22 @@ async def status(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
                                 if delta_end.days == 0:
                                     msg = msg + f"\nToday is the day of planned milestone '{task['name']}'!"
                                 
+                                if msg:
+                                    task_counter += 1
+                                    # Check current setting and chat where update came from to decide where to send answer
+                                    if project['settings']['ALLOW_POST_STATUS_TO_GROUP'] and update.message.chat_id != update.effective_user.id:
+                                        await update.message.reply_text(bot_msg)
+                                    else:                        
+                                        # Buttons should be send only in direct message to PM,
+                                        await context.bot.send_message(user_id, bot_msg)
+
                             else:
                                 people, user_ids = get_assignees(task, DB)
                                 if not people:
                                     people = "can't say, better check assignments in project file."
 
-                                # Check dates and compose message including information about human resurces
+                                # Check dates and compose message including information about human resources
                                 if delta_start.days == 0:
-                                    # TODO: I can compose not only message here but also a keyboard to send to user to interact with
                                     msg = msg + f"\nTask {task['id']} '{task['name']}' started today. Assigned to: {people}."
                                 elif delta_start.days > 0  and delta_end.days < 0:
                                     msg = msg + f"\nTask {task['id']} '{task['name']}' is intermidiate. Due date is {task['enddate']}. Assigned to: {people}."
@@ -661,20 +716,31 @@ async def status(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
                                 else:
                                     logger.info(f"Loop through future task '{task['id']}' '{task['name']}'")
                                     pass
-                    
-                    # Check if there is smth to inform
-                    if msg:
-                        bot_msg = msg_title + msg
-                    else:
-                        bot_msg = msg_title + 'Seems like there are no events to inform about at this time.'
 
-                    # Check current setting and chat where update came from to decide where to send answer
-                    if project['settings']['ALLOW_POST_STATUS_TO_GROUP'] and update.message.chat_id != update.effective_user.id:
-                        await update.message.reply_text(bot_msg)
-                    else:                        
-                        # TODO buttons should be send only in direct message to PM,
-                        # so maybe move the above check somewhere before composing keyboard
-                        await context.bot.send_message(user_id, bot_msg)
+                                # TODO test it: I predict that only last button will work (callback data from last button will be passed)
+                                # Если так, то сначала буду выводить большое сообщение, а потом большую клавиатуру
+                                # If task worth mention add a button to message
+                                if msg:
+                                    task_counter += 1
+                                    button = InlineKeyboardButton("Mark as completed", callback_data=f"task_{project['_id']}_{task['id']}")
+                                    keyboard.append([button])
+                                    reply_markup = InlineKeyboardMarkup(keyboard)
+                                    bot_msg = msg 
+
+                                    # Check current setting and chat where update came from to decide where to send answer
+                                    if project['settings']['ALLOW_POST_STATUS_TO_GROUP'] and update.message.chat_id != update.effective_user.id:
+                                        await update.message.reply_text(bot_msg)
+                                    else:                        
+                                        # Buttons should be send only in direct message to PM,
+                                        await context.bot.send_message(user_id, bot_msg, reply_markup=reply_markup)
+                    if task_counter == 0:
+                        bot_msg = 'Seems like there are no events to inform about at this time.'
+                        # Check current setting and chat where update came from to decide where to send answer
+                        if project['settings']['ALLOW_POST_STATUS_TO_GROUP'] and update.message.chat_id != update.effective_user.id:
+                            await update.message.reply_text(bot_msg)
+                        else:                        
+                            # Buttons should be send only in direct message to PM,
+                            await context.bot.send_message(user_id, bot_msg)
 
             else:
                 # If current user not found in project managers 
@@ -1926,6 +1992,10 @@ def main() -> None:
     
     # Echo any message that is text and not a command
     # application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, echo))
+
+    # Try to catch which tasks accomplished
+    application.add_handler(CallbackQueryHandler(set_task_accomplished, pattern="^task"))
+    
 
     # Conversation handler for /start
     start_conv = ConversationHandler(

@@ -118,14 +118,14 @@ First of all: the project file sent to bot should contain field 'tg_username' co
                 "name": "Some milestone",
                 "startdate": "2023-05-15",
                 "enddate": "2023-05-15",
-                "duration": 0,                          # Milestones have zero duration
+                "duration": 0,                  # Milestones have zero duration
                 "predecessor": [],
-                "successors": [                         # Achiving this milestone means "successors" task started
+                "successors": [                 # Achiving this milestone means "successors" task started
                     {
-                        "id": 2,                        # id of such task
-                        "depend_type": 1,               # Type of dependency (see below)
-                        "depend_offset": 0              # Offset in days from current task (negative number means its earlier in time)
-                    },
+                        "id": 2,                # id of such task
+                        "depend_type": 1,       # Type of dependency (see below)
+                        "depend_offset": 0      # Offset in days from current task (negative number 
+                    },                          # means its earlier in time)
                     {
                         "id": 5,
                         "depend_type": 1,
