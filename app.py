@@ -1759,7 +1759,7 @@ async def reminder_time_setter(update: Update, context: ContextTypes.DEFAULT_TYP
     # Try to convert user provided input (time) to hours and minutes
     try:
         # hour, minute = map(int, update.message.text.split(":"))
-        hour, minute = map(int, re.split("[\s:_-]", update.message.text))
+        hour, minute = map(int, re.split("[\s:;_-]", update.message.text))
 
     except ValueError as e:
 
