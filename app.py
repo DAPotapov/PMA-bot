@@ -8,33 +8,17 @@
 # Post init
 # Main function
 
+import connectors
 import logging
 import os
-import tempfile
-import re
-import connectors
 import pymongo
+import re
 import sys
+import tempfile
 
+from bson import ObjectId
 from dotenv import load_dotenv
 from datetime import datetime, date, time
-from pathlib import Path
-from telegram import (
-                        BotCommand, 
-                        Update, 
-                        InlineKeyboardMarkup, 
-                        InlineKeyboardButton)
-from telegram.ext import (
-                            Application, 
-                            CommandHandler, 
-                            MessageHandler, 
-                            CallbackContext, 
-                            CallbackQueryHandler, 
-                            ContextTypes,  
-                            ConversationHandler,
-                            filters)
-from bson import ObjectId
-from ptbcontrib.ptb_jobstores import PTBMongoDBJobStore
 from helpers import (
     add_user_id_to_db,
     add_user_info_to_db,
@@ -52,6 +36,22 @@ from helpers import (
     get_worker_oid_from_db_by_tg_id,
     get_worker_oid_from_db_by_tg_username, 
     is_db)
+from pathlib import Path
+from ptbcontrib.ptb_jobstores import PTBMongoDBJobStore
+from telegram import (
+                        BotCommand, 
+                        Update, 
+                        InlineKeyboardMarkup, 
+                        InlineKeyboardButton)
+from telegram.ext import (
+                            Application, 
+                            CommandHandler, 
+                            MessageHandler, 
+                            CallbackContext, 
+                            CallbackQueryHandler, 
+                            ContextTypes,  
+                            ConversationHandler,
+                            filters)
 
 
 # Configure logging
@@ -637,13 +637,13 @@ async def status(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
 
     # Read setting for effective user if there is connection to database
     if DB != None and is_db(DB):  
-        record = DB.staff.find_one({"tg_username": user_name}, {"settings.INFORM_OF_ALL_PROJECTS":1, "_id": 0})
-        if (record and type(record) == dict and
-            'settings' in record.keys() and record['settings']):
+        pm = DB.staff.find_one({"tg_username": user_name}, {"settings.INFORM_OF_ALL_PROJECTS":1, "_id": 0})
+        if (pm and type(pm) == dict and
+            'settings' in pm.keys() and pm['settings']):
 
             # Get 'list' of projects, which depending on preset consists of one project or many
             # Cursor object never None, so cast it to list first
-            if record['settings']['INFORM_OF_ALL_PROJECTS']:
+            if pm['settings']['INFORM_OF_ALL_PROJECTS']:
                 projects = list(DB.projects.find({"pm_tg_id": user_id}))
             else:
                 projects = list(DB.projects.find({"pm_tg_id": user_id, "active": True}))
