@@ -10,7 +10,6 @@
 
 import logging
 import os
-from pathlib import Path
 import tempfile
 import re
 import connectors
@@ -19,6 +18,7 @@ import sys
 
 from dotenv import load_dotenv
 from datetime import datetime, date, time
+from pathlib import Path
 from telegram import (
                         BotCommand, 
                         Update, 
@@ -62,8 +62,6 @@ logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s
 #                     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s', 
 #                     level=logging.INFO)
 logger = logging.getLogger(__name__)
-
-# TODO Inform actioners of milestones (by default only PM)  INFORM_ACTIONERS_OF_MILESTONES = False
 
 # Default values for daily reminders
 MORNING = "10:00"
