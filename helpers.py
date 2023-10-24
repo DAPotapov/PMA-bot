@@ -4,15 +4,12 @@ Some helper functions to help main functions to manupulate with data
 
 import json
 import logging
-from unittest.mock import NonCallableMagicMock
 import pymongo
 import os
 
-from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from bson import ObjectId
 from datetime import date
 from dotenv import load_dotenv
-from pprint import pprint
 from pymongo.errors import ConnectionFailure, ServerSelectionTimeoutError
 from pymongo.database import Database
 from re import sub
@@ -141,7 +138,7 @@ def clean_project_title(user_input: str) -> str:
     # Replace whitespaces and their doubles with spaces, cut leading and ending spaces
     title = sub("\s+", " ", user_input).strip()
     if not title:
-        raise ValueError("Text absent")
+        raise ValueError("Title absent")
     
     return title[:max_title_len]
 
@@ -649,7 +646,7 @@ def get_status_on_project(project: dict, user_oid: ObjectId, db: Database) -> st
                 elif delta_start.days > 0 and delta_end.days > 0:                                       
                     msg = msg + f"\nTask {task['id']} '{task['name']}' is overdue! (had to be completed on {task['enddate']})."
                 else:
-                    # print(f"Future tasks as {task['id']} '{task['name']}' goes here")   
+                    # Future tasks goes here
                     pass
             
             # Actioner should be informed about milestone if PM decided so and if it is today

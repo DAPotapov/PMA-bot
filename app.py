@@ -10,10 +10,8 @@
 
 import logging
 import os
-import json
 from pathlib import Path
 import tempfile
-import asyncio
 import re
 import connectors
 import pymongo
@@ -21,21 +19,13 @@ import sys
 
 from dotenv import load_dotenv
 from datetime import datetime, date, time
-# from io import BufferedIOBase
 from telegram import (
-                        Bot, 
                         BotCommand, 
                         Update, 
-                        ForceReply, 
                         InlineKeyboardMarkup, 
-                        InlineKeyboardButton, 
-                        ReplyKeyboardMarkup, 
-                        ReplyKeyboardRemove)
-from telegram.constants import ParseMode
+                        InlineKeyboardButton)
 from telegram.ext import (
                             Application, 
-                            ExtBot, 
-                            Updater, 
                             CommandHandler, 
                             MessageHandler, 
                             CallbackContext, 
@@ -43,8 +33,6 @@ from telegram.ext import (
                             ContextTypes,  
                             ConversationHandler,
                             filters)
-from urllib.parse import quote_plus
-from uuid import uuid4
 from bson import ObjectId
 from ptbcontrib.ptb_jobstores import PTBMongoDBJobStore
 from helpers import (
@@ -53,10 +41,8 @@ from helpers import (
     add_worker_info_to_staff, 
     clean_project_title,
     get_active_project,
-    get_assignees,
     get_db, 
     get_job_preset,
-    get_job_preset_dict,
     get_keyboard_and_msg,
     get_message_and_button_for_task,
     get_project_by_title,
@@ -65,12 +51,8 @@ from helpers import (
     get_status_on_project,
     get_worker_oid_from_db_by_tg_id,
     get_worker_oid_from_db_by_tg_username, 
-    get_worker_tg_username_by_tg_id,
-    is_db,
-    save_json)
+    is_db)
 
-# For testing purposes
-from pprint import pprint
 
 # Configure logging
 logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s', level=logging.INFO)

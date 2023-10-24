@@ -1,14 +1,11 @@
 import logging
 from pathlib import Path
-import pprint
 import re
 # import untangle
 import json
 
 from helpers import add_worker_info_to_staff, get_worker_oid_from_db_by_tg_username
 from numpy import busday_offset, busday_count, floor, datetime64
-# For testing purposes
-from pprint import pprint
 from pymongo.database import Database
 from untangle import Element, parse
 
@@ -287,7 +284,6 @@ def load_json(fp: Path):
     
     # project = json.load(fp)
     tasks = []
-    staff = []
     # TODO check if it seems like project. Look for inner format structure
     # TODO parse project to corresponding lists
     return tasks
