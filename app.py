@@ -158,6 +158,37 @@ async def day_before_update(context: ContextTypes.DEFAULT_TYPE) -> None:
         await context.bot.send_message(context.job.data['pm_tg_id'], bot_msg) # type: ignore
 
 
+async def download(update: Update, context: CallbackContext) -> int:
+    '''
+    Let user download (updated) project.
+    First of all: in json format.
+    '''
+
+    # Check if user is PM and remember what project to update
+    if DB != None and is_db(DB):
+        # Get whole active project for user
+        project = get_active_project(str(update.effective_user.id), DB, include_tasks=True)
+        if project:
+            context.user_data['project'] = project
+
+            # TODO save to json and provide it to user
+
+            
+
+        # If user is not PM at least add his id in DB (if his telegram username is there)
+        else:
+            if update.effective_user: # silence pylance
+                add_user_info_to_db(update.effective_user, DB)
+            bot_msg = f"Change in project can be made only after starting one: use /start command to start a project."
+            await update.message.reply_text(bot_msg)
+            return ConversationHandler.END
+    else:
+        bot_msg = f"Error occured while accessing database. Try again later or contact developer."
+        logger.error(f"Error occured while accessing database.")
+        await context.bot.send_message(update.effective_user.id, bot_msg)
+        return ConversationHandler.END
+
+
 # TURNED OFF because conflicting with handlers which use input from user (naming project in /start, for example)
 async def echo(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """
@@ -826,35 +857,18 @@ async def upload(update: Update, context: CallbackContext) -> int:
 
     # Check if user is PM and remember what project to update
     if DB != None and is_db(DB):
-        docs_count = DB.projects.count_documents({"pm_tg_id": str(update.effective_user.id)})
-        if docs_count > 0:
+        project = get_active_project(str(update.effective_user.id), DB)
+        if project:
+            context.user_data['project'] = project
 
-            # Get active project title and store in user_data (because now PROJECTTITLE contain default value not associated with project)
-            result = DB.projects.find_one(
-                {"pm_tg_id": str(update.effective_user.id), 
-                 "active": True}, 
-                 {"title": 1, "_id": 0}
-                 )
-            if (result and type(result) == dict and 
-                'title' in result.keys() and result['title']):
-                project = {
-                    "title" : result['title']
-                }
-                context.user_data['project'] = project
-
-                # Message to return to user
-                bot_msg = (f"This function will replace existing schedule for '{result['title']}' project. Reminders will not change.\n"
-                        "If you are sure just upload file with new schedule.\n"
-                            "If you changed your mind press a button")
-                cancel_btn = InlineKeyboardButton("Cancel", callback_data=str(ONE))
-                kbd = InlineKeyboardMarkup([[cancel_btn]])
-                await update.message.reply_text(bot_msg, reply_markup=kbd)#InlineKeyboardMarkup.from_button(cancel_btn))
-                return FIRST_LVL
-            else:
-                logger.error(f"User '{update.effective_user.id}' has projects, but none of them active. Check the DB.")
-                bot_msg = "Houston, we have a problems. Contact the developer."
-                await update.message.reply_text(bot_msg)
-                return ConversationHandler.END
+            # Message to return to user
+            bot_msg = (f"This function will replace existing schedule for '{project['title']}' project. Reminders will not change.\n"
+                    "If you are sure just upload file with new schedule.\n"
+                        "If you changed your mind press a button")
+            cancel_btn = InlineKeyboardButton("Cancel", callback_data=str(ONE))
+            kbd = InlineKeyboardMarkup([[cancel_btn]])
+            await update.message.reply_text(bot_msg, reply_markup=kbd)
+            return FIRST_LVL
 
         # If user is not PM at least add his id in DB (if his telegram username is there)
         else:
@@ -872,6 +886,7 @@ async def upload(update: Update, context: CallbackContext) -> int:
 
 async def upload_file_recieved(update: Update, context: CallbackContext) -> int:
     """Function to proceed uploaded new project file and updating corresponding record in DB"""
+    
     with tempfile.TemporaryDirectory() as tdp:
         gotfile = await context.bot.get_file(update.message.document)
         fp = await gotfile.download_to_drive(os.path.join(tdp, update.message.document.file_name)) # type: ignore

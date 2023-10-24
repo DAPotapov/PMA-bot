@@ -143,13 +143,13 @@ def clean_project_title(user_input: str) -> str:
     return title[:max_title_len]
 
 
-def get_active_project(pm_tg_id: str, db: Database) -> dict:
+def get_active_project(pm_tg_id: str, db: Database, include_tasks: bool = False) -> dict:
     """ 
     Gets active project (without tasks) by given PM telegram id.
     And fixes if something not right:
     - makes one project active if there were not,
     - if more than one active: leave only one active.
-    Raises empty dictionary if no projects found for such user
+    Returns empty dictionary if no projects found for user
     """
 
     project = {}
@@ -163,7 +163,10 @@ def get_active_project(pm_tg_id: str, db: Database) -> dict:
         
         # If one active get this one
         if actives_count == 1:
-            project = db.projects.find_one({"pm_tg_id": pm_tg_id, 'active': True}, {"tasks": 0})
+            if include_tasks:
+                project = db.projects.find_one({"pm_tg_id": pm_tg_id, 'active': True})
+            else:
+                project = db.projects.find_one({"pm_tg_id": pm_tg_id, 'active': True}, {"tasks": 0})
 
         # Otherwise if not one -  make one active and remember it
         elif actives_count == 0:
