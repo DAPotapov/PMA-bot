@@ -188,9 +188,10 @@ async def echo(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     logger.info(f'{user.id} ({user.username}): {text}')
 
     # TODO I can use it to gather id from chat members and add them to project.
-    result = add_user_info_to_db(user, DB)
-    if not result:
-        logger.warning(f"User id ({user.id}) of {user.username} was not added to DB (maybe already present).")
+    if user:
+        result = add_user_info_to_db(user, DB)
+        if not result:
+            logger.warning(f"User id ({user.id}) of {user.username} was not added to DB (maybe already present).")
 
     # reply only to personal messages
     if update.message.chat_id == user.id:
@@ -390,7 +391,7 @@ async def naming_project(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
     
     # Try to clean project title from unnecessary symbols and if not succeed give him another try.
     try: 
-        title = clean_project_title(update.message.text)
+        title = clean_project_title(str(update.message.text)) # to silence type error
     except ValueError as e:
         bot_msg = "Title is not very suitable for human reading. {e}"
         await update.message.reply_text(bot_msg)
@@ -591,15 +592,13 @@ def schedule_jobs(context: ContextTypes.DEFAULT_TYPE) -> dict:
 
         # Create job with configured parameters
         morning_update_job = context.job_queue.run_daily(morning_update, 
-                                                            user_id=str(context.user_data['PM']['tg_id']), 
+                                                            user_id=int(context.user_data['PM']['tg_id']), 
                                                             time=time2check, 
                                                             data=data, 
                                                             job_kwargs=job_kwargs)
         
         # and enable it.
-        morning_update_job.enabled = True 
-        # print(f"{morning_update_job.job.id} of type: {type(morning_update_job.job.id)}")
-        # print(f"Next time: {morning_update_job.next_t}, is it on? {morning_update_job.enabled}")      
+        morning_update_job.enabled = True   
             
     # 2nd - daily on the eve of task reminder               
     try:
@@ -611,7 +610,7 @@ def schedule_jobs(context: ContextTypes.DEFAULT_TYPE) -> dict:
     # Add job to queue and enable it
     else:                            
         day_before_update_job = context.job_queue.run_daily(day_before_update, 
-                                                            user_id=str(context.user_data['PM']['tg_id']), 
+                                                            user_id=int(context.user_data['PM']['tg_id']), 
                                                             time=time2check, 
                                                             data=data, 
                                                             job_kwargs=job_kwargs)
@@ -627,7 +626,7 @@ def schedule_jobs(context: ContextTypes.DEFAULT_TYPE) -> dict:
     # Add job to queue and enable it
     else:
         file_update_job = context.job_queue.run_daily(file_update, 
-                                                        user_id=str(context.user_data['PM']['tg_id']), 
+                                                        user_id=int(context.user_data['PM']['tg_id']), 
                                                         time=time2check, 
                                                         days=(5,), 
                                                         data=data, 
@@ -719,7 +718,8 @@ async def status(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
                     await context.bot.send_message(user_id, bot_msg)
                 else:
                     # Add his id to DB since there is none
-                    add_user_id_to_db(update.effective_user, DB)
+                    if update.effective_user: # silence pylance
+                        add_user_id_to_db(update.effective_user, DB)
 
                     # Get all documents where user mentioned, cast cursor object to list to check if smth returned
                     projects = list(DB.projects.find(
@@ -877,7 +877,8 @@ async def upload(update: Update, context: CallbackContext) -> int:
 
         # If user is not PM at least add his id in DB (if his telegram username is there)
         else:
-            add_user_info_to_db(update.effective_user, DB)
+            if update.effective_user: # silence pylance
+                add_user_info_to_db(update.effective_user, DB)
             bot_msg = f"Change in project can be made only after starting one: use /start command to start a project."
             await update.message.reply_text(bot_msg)
             return ConversationHandler.END
@@ -1055,8 +1056,8 @@ async def second_lvl_menu(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
     # End conversation if that was unsuccessful.
     if query.data:
         context.user_data['level'] += 1
-        if not 'branch' in context.user_data:
-            context.user_data['branch'] = []
+        if not 'branch' in context.user_data: # type: ignore
+            context.user_data['branch'] = [] 
         context.user_data['branch'].append(query.data)
         keyboard, bot_msg = get_keyboard_and_msg(
             DB,
@@ -1217,7 +1218,7 @@ async def transfer_control(update: Update, context: ContextTypes.DEFAULT_TYPE) -
     # Write to DB new owner of project and update corresponding jobs
     # Send message to user and
     # End conversation because only PM should change settings but current user isn't a PM already 
-    if query and 'data' in dir(query) and query.data: # TODO test and on success use in other places
+    if query and 'data' in dir(query) and query.data:
         if DB != None and is_db(DB):
             
             # Check if reciever has other projects, and deactivate given project if so
@@ -1431,6 +1432,7 @@ async def project_delete_finish(update: Update, context: ContextTypes.DEFAULT_TY
     """ Deletes selected project with reminders from database and returns to projects menu"""
     query = update.callback_query
     await query.answer()
+    msg = ''
 
     # Delete project and associated jobs from DB 
     if is_db(DB):
@@ -1502,7 +1504,7 @@ async def project_rename_finish(update: Update, context: ContextTypes.DEFAULT_TY
     """
 
     try:
-        new_title = clean_project_title(update.message.text) 
+        new_title = clean_project_title(str(update.message.text))  # to silence pylance
     except ValueError as e:
         bot_msg = f"Try another name for project. Maybe more human readable this time. {e}"
 
@@ -1758,8 +1760,7 @@ async def reminder_time_setter(update: Update, context: ContextTypes.DEFAULT_TYP
 
     # Try to convert user provided input (time) to hours and minutes
     try:
-        # hour, minute = map(int, update.message.text.split(":"))
-        hour, minute = map(int, re.split("[\s:;_-]", update.message.text))
+        hour, minute = map(int, re.split("[\s:;_-]", str(update.message.text))) # convert to string to silence pylance
 
     except ValueError as e:
 
@@ -1770,26 +1771,30 @@ async def reminder_time_setter(update: Update, context: ContextTypes.DEFAULT_TYP
         # Find a job by id for further rescheduling
         job_id = context.user_data['project']['reminders'][str(context.user_data['branch'][-1])]
         job = context.job_queue.scheduler.get_job(job_id)
+        if job:
 
-        # Get timezone attribute from current job
-        tz = job.trigger.timezone
+            # Get timezone attribute from current job
+            tz = job.trigger.timezone
 
-        # Get list of days of week by index of this attribute in list of fields
-        day_of_week = job.trigger.fields[job.trigger.FIELD_NAMES.index('day_of_week')]
+            # Get list of days of week by index of this attribute in list of fields
+            day_of_week = job.trigger.fields[job.trigger.FIELD_NAMES.index('day_of_week')]
 
-        # Reschedule the job
-        try:
-            job = job.reschedule(trigger='cron', hour=hour, minute=minute, day_of_week=day_of_week, timezone=tz)
-        except ValueError as e:
-            bot_msg = (f"Unable to reschedule the reminder")
-            logger.info(f'{e}')
+            # Reschedule the job
+            try:
+                job = job.reschedule(trigger='cron', hour=hour, minute=minute, day_of_week=day_of_week, timezone=tz)
+            except ValueError as e:
+                bot_msg = (f"Unable to reschedule the reminder")
+                logger.info(f'{e}')
+            else:
+
+                # Get job by id again because next_run_time didn't updated after reschedule (no matter what docs says)
+                job = context.job_queue.scheduler.get_job(job_id)
+                bot_msg = (f"Time updated. Next time: "
+                        f"{job.next_run_time}"
+                        )       
         else:
-
-            # Get job by id again because next_run_time didn't updated after reschedule (no matter what docs says)
-            job = context.job_queue.scheduler.get_job(job_id)
-            bot_msg = (f"Time updated. Next time: "
-                    f"{job.next_run_time}"
-                    )       
+            logger.error(f"Suddenly can't find job (id='{job_id}') while setting a time for it.")
+            bot_msg = f"Something went wrong. Try again later."
 
     # Inform the user how reschedule went
     await update.message.reply_text(bot_msg)
@@ -1926,6 +1931,8 @@ async def post_init(application: Application):
 def main() -> None:
 
     BOT_TOKEN = os.environ.get("BOT_TOKEN")
+    if not BOT_TOKEN:
+        sys.exit("Bot token not found")
 
     # Create a builder via Application.builder() and then specifies all required arguments via that builder.
     #  Finally, the Application is created by calling builder.build()
@@ -1939,25 +1946,17 @@ def main() -> None:
         )
     )
 
-    # Then, we register each handler and the conditions the update must meet to trigger it
-    # Register commands
-
-    # /stop should make bot 'forget' about this user and stop jobs
-    # application.add_handler(CommandHandler(stop_cmd.command, stop))
+    # Register commands' handlers
     application.add_handler(CommandHandler(help_cmd.command, help)) 
 
     # Command to trigger project status check.
     application.add_handler(CommandHandler(status_cmd.command, status))
 
-    # And if changes were made inside the bot, PM could download updated schedule (original format?)
-    # dispatcher.add_handler(CommandHandler("download", download))
-    
     # Echo any message that is text and not a command
     # application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, echo))
 
     # Try to catch which tasks accomplished
     application.add_handler(CallbackQueryHandler(set_task_accomplished, pattern="^task"))
-    
 
     # Conversation handler for /start
     start_conv = ConversationHandler(
