@@ -272,7 +272,7 @@ def compose_tasks_list(
     return output_task
 
 
-def load_json(fp: Path):
+def load_json(fp: Path, db: Database):
     '''
     Loads JSON data from file into dictionary.
     This connector useful in case we downloaded JSON, manually made some changes, 
