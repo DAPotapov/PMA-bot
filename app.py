@@ -93,6 +93,7 @@ stop_cmd = BotCommand("stop", "прекращение работы бота")
 upload_cmd = BotCommand("upload", "загрузка нового файла проекта для активного проекта \
                         (например, если сдвинули сроки или заменили исполнителя в MS Project'е)\
                         (работает только в личных сообщениях)")
+download_cmd = BotCommand("download", "скачать файл проекта (пока в формате .json)")
 
 # States of settings menu:
 FIRST_LVL, SECOND_LVL, THIRD_LVL, FOURTH_LVL, FIFTH_LVL, SIXTH_LVL, SEVENTH_LVL = range(7)
@@ -1896,16 +1897,17 @@ async def reminder_days_setter(update: Update, context: ContextTypes.DEFAULT_TYP
 ### END OF SETTINGS PART #################################
                   
 
-async def post_init(application: Application):
+async def post_init(application: Application) -> None:
     """Function to control list of commands in bot itself. Commands itself are global """
     await application.bot.set_my_commands([
-                                        help_cmd,
-                                        start_cmd,
-                                        status_cmd,
-                                        settings_cmd,
-                                        feedback_cmd,
-                                        stop_cmd,
-                                        upload_cmd
+        download_cmd,
+        feedback_cmd,
+        help_cmd,
+        settings_cmd,
+        start_cmd,
+        status_cmd,
+        stop_cmd,
+        upload_cmd
     ])
 
 
@@ -1932,6 +1934,9 @@ def main() -> None:
 
     # Command to trigger project status check.
     application.add_handler(CommandHandler(status_cmd.command, status))
+
+    # Command to allow user to save project file to local computer
+    application.add_handler(CommandHandler(download_cmd.command, download))
 
     # Echo any message that is text and not a command
     # application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, echo))
