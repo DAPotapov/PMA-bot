@@ -117,10 +117,6 @@ def add_worker_info_to_staff(worker: dict, db: Database) -> str:
             result = db.staff.replace_one({"_id": ObjectId(worker_id)}, replacement=db_worker)
             logger.info(f"Results of worker {db_worker['tg_username']} update: '{result.matched_count}' found, '{result.modified_count}' modified.")
 
-    # Type check just in case
-    # if type(worker_id) != ObjectId:
-    #     worker_id = None
-
     return worker_id
 
 

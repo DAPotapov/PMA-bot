@@ -305,6 +305,19 @@ def load_json(fp: Path, db: Database)-> list[dict]:
                 # Check staff members for consistency and add to database (if tg_id or tg_username not present already) 
                 # And store new oid to same dictionary for later use in actioners of tasks
                 staff = project['staff']
+                staff_keys = ['_id', 'program_id', 'name', 'email', 'phone', 'tg_username', 'tg_id', 'account_type', 'settings']
+                for worker in staff:
+
+                    # Check that provided staff list contains all necessary keys
+                    if all(x in staff_keys for x in worker.keys()):
+                        oid = add_worker_info_to_staff(worker, db) # TODO TEST valueError raised inside should be captured on calling side
+                        if oid:
+                            worker['new_oid'] = oid
+                        else:
+                            raise ValueError(f"Unable to add following staff member to database: '{worker}'")
+                    else:
+                        raise AttributeError(f"Member of staff doesn't have all necessary keys ({worker})")
+                
                 # Check each task for values needed and ...
 
             else:
