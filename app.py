@@ -167,19 +167,21 @@ async def download(update: Update, context: CallbackContext):
 
     # Check if user is PM and remember what project to update
     if DB != None and is_db(DB):
+
         # Get whole active project for user
         project = get_active_project(str(update.effective_user.id), DB, include_tasks=True)
         if project:
+
             # Get project team for this project
             staff = get_project_team(project['_id'], DB)
             
-            # This line will be useful in future development when this function become conversation with multiple choice
+            # This approach will be useful in future development when this function become conversation with multiple choice
             # Store project with staff in it in user_data in context
             context.user_data['project'] = project            
             if staff:
                 context.user_data['project']['staff'] = staff
 
-            # Save to json and provide it to user
+            # Save to json using temporary file to save space and provide it to user
             with tempfile.NamedTemporaryFile(mode="w+t", encoding='utf-8', prefix="project_", suffix=".json") as fp:
                 json.dump(context.user_data['project'], fp, ensure_ascii=False, indent=4)
                 fp.seek(0)
