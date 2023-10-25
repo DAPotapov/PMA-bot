@@ -272,7 +272,7 @@ def compose_tasks_list(
     return output_task
 
 
-def load_json(fp: Path, db: Database):
+def load_json(fp: Path, db: Database)-> list[dict]:
     '''
     Loads JSON data from file into dictionary.
     This connector useful in case we downloaded JSON, manually made some changes, 
@@ -282,7 +282,7 @@ def load_json(fp: Path, db: Database):
     # 1. Limit size of data to load to prevent attacks
     # 2. 
     
-    # project = json.load(fp)
+    project = json.load(fp)
     tasks = []
     # TODO check if it seems like project. Look for inner format structure
     # TODO parse project to corresponding lists
