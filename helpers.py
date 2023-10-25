@@ -535,18 +535,27 @@ def get_project_by_title(db: Database, pm_tg_id: str, title: str) -> dict:
     return project
 
 
-def get_projects_and_pms_for_user(user_oid: ObjectId, db: Database) -> str:
+def get_projects_and_pms_for_user(user_oid: ObjectId | str, db: Database) -> str:
     ''' 
     Function to get string of projects (and their PMs) where user participate as an actioner 
     Return empty string if nothing was found.
     '''
     
     projects_and_pms = ''
+
+    # Check type of user_oid
+    if type(user_oid) == str:
+        oid = ObjectId(user_oid)
+    elif type(user_oid) == ObjectId:
+        oid = user_oid
+    else:
+        return projects_and_pms
+    
     try:
         projects = list(db.projects.find(
             {"tasks.actioners": 
                 {"$elemMatch":
-                    {"actioner_id": user_oid}}}, 
+                    {"actioner_id": oid}}}, 
             {"title":1, "pm_tg_id":1, "_id":0})
             )
     except Exception as e:
@@ -616,7 +625,7 @@ def get_project_team(prj_oid: ObjectId | str, db: Database) -> list[dict]:
     return team
 
 
-def get_status_on_project(project: dict, user_oid: ObjectId, db: Database) -> str:
+def get_status_on_project(project: dict, user_oid: ObjectId | str, db: Database) -> str:
     """
     Function composes message which contains status update on given project for given ObjectId of actioner.
     Returns composed message to be sent.
@@ -744,14 +753,20 @@ def get_worker_tg_id_from_db_by_tg_username(tg_username: str, db: Database) -> s
     return str(tg_id)
 
 
-def get_worker_tg_username_by_oid(user_oid: ObjectId, db: Database) -> str:
+def get_worker_tg_username_by_oid(user_oid: ObjectId | str, db: Database) -> str:
     """Search staff collection in DB for given ObjectId and return telegram username.
     If something went wrong return empty string (should be checked on calling side)"""
 
     tg_un = ''
   
     try:
-        result = db.staff.find_one({'_id': user_oid})
+        if type(user_oid) == str:
+            result = db.staff.find_one({'_id': ObjectId(user_oid)})
+        elif type(user_oid) == ObjectId:
+            result = db.staff.find_one({'_id': user_oid})
+        else:
+            result = {}
+    
     except Exception as e:
         logger.error(f"There was error getting DB: {e}")
     else:
