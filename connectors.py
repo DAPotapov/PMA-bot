@@ -281,9 +281,35 @@ def load_json(fp: Path, db: Database)-> list[dict]:
     # TODO: Do this connector when i'm sure scheme doesn't changes
     # 1. Limit size of data to load to prevent attacks
     # 2. 
-    
-    project = json.load(fp)
+
     tasks = []
+    
+    # Open file
+    with open(fp, "r") as json_file:
+        try:
+            project = json.load(json_file)
+        except Exception as e: # TODO test it
+            pass
+        else:
+
+            # Check and get two lists: tasks and staff
+            if (project and 
+                type(project) == dict and
+                'tasks' in project.keys() and
+                'staff' in project.keys() and
+                type(project['tasks']) == list and
+                type(project['staff']) == list and
+                project['tasks'] and
+                project['staff']):
+
+                # Check staff members for consistency and add to database (if tg_id or tg_username not present already) 
+                # And store new oid to same dictionary for later use in actioners of tasks
+                staff = project['staff']
+                # Check each task for values needed and ...
+
+            else:
+                raise AttributeError("File malformed: project dictionary must contain 'tasks' and 'staff' lists, each contains corresponding dictionaries. See example.")
+
     # TODO check if it seems like project. Look for inner format structure
     # TODO parse project to corresponding lists
     return tasks
