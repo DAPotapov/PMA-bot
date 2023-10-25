@@ -186,7 +186,7 @@ def compose_tasks_list(
         if task['id'] and allocation['task-id'] and task['id'] == allocation['task-id']:
             # Memo: GanntProject starts numeration of resources from 0, MS Project - from 1
             tg_username = ''
-            if allocation['resource_id']:
+            if allocation['resource-id']:
                 tg_username = get_tg_un_from_gan_resources(str(allocation['resource-id']), resources, property_id)
             if tg_username:
                 actioner_id = get_worker_oid_from_db_by_tg_username(tg_username, db)

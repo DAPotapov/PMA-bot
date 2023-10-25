@@ -9,6 +9,7 @@
 # Main function
 
 import connectors
+import json
 import logging
 import os
 import pymongo
@@ -158,7 +159,7 @@ async def day_before_update(context: ContextTypes.DEFAULT_TYPE) -> None:
         await context.bot.send_message(context.job.data['pm_tg_id'], bot_msg) # type: ignore
 
 
-async def download(update: Update, context: CallbackContext) -> int:
+async def download(update: Update, context: CallbackContext):
     '''
     Let user download (updated) project.
     First of all: in json format.
@@ -168,12 +169,18 @@ async def download(update: Update, context: CallbackContext) -> int:
     if DB != None and is_db(DB):
         # Get whole active project for user
         project = get_active_project(str(update.effective_user.id), DB, include_tasks=True)
+        # Get project team for this project
+        staff = ""
         if project:
+            
+            # This line will be useful in future development when this function become conversation with multiple choice
             context.user_data['project'] = project
 
-            # TODO save to json and provide it to user
-
-            
+            # Save to json and provide it to user
+            with tempfile.NamedTemporaryFile(mode="w+t", encoding='utf-8', prefix="project_", suffix=".json") as fp:
+                json.dump(project, fp, ensure_ascii=False, indent=4)
+                fp.seek(0)
+                await update.message.reply_document(document=fp.name, caption="Here is your project file:")
 
         # If user is not PM at least add his id in DB (if his telegram username is there)
         else:

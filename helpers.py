@@ -84,16 +84,16 @@ def add_user_info_to_db(user: User, db: Database) -> ObjectId | None:
     return output
 
 
-def add_worker_info_to_staff(worker: dict, db: Database) -> ObjectId | None:
+def add_worker_info_to_staff(worker: dict, db: Database) -> str:
     ''' 
     Calls functions to check whether such worker exist in staff collection. 
     Adds given worker to staff collection if not exist already.
     Fill empty fields in case worker already present in staff (for ex. PM is actioner in other project)
-    Returns None if worker telegram id not found in staff collection. 
-    Return ObjectId otherwise.
+    Returns empty string if worker telegram id not found in staff collection. 
+    Return ObjectId as a string otherwise.
     '''
     
-    worker_id = None
+    worker_id = ''
 
     # Check DB if worker already present via telegram id
     if worker['tg_id']:
@@ -109,17 +109,17 @@ def add_worker_info_to_staff(worker: dict, db: Database) -> ObjectId | None:
     if not worker_id:
         worker_id = db.staff.insert_one(worker).inserted_id
     else:
-        db_worker = db.staff.find_one({"_id": worker_id})
+        db_worker = db.staff.find_one({"_id": ObjectId(worker_id)})
         if db_worker and type(db_worker) == dict:
             for key in worker.keys():
                 if not db_worker[key]:
                     db_worker[key] = worker[key]
-            result = db.staff.replace_one({"_id": worker_id}, replacement=db_worker)
+            result = db.staff.replace_one({"_id": ObjectId(worker_id)}, replacement=db_worker)
             logger.info(f"Results of worker {db_worker['tg_username']} update: '{result.matched_count}' found, '{result.modified_count}' modified.")
 
     # Type check just in case
-    if type(worker_id) != ObjectId:
-        worker_id = None
+    # if type(worker_id) != ObjectId:
+    #     worker_id = None
 
     return worker_id
 
@@ -183,12 +183,18 @@ def get_active_project(pm_tg_id: str, db: Database, include_tasks: bool = False)
         # Check if there is project of proper type to return
         if (project and type(project) == dict and 
             'title' in project.keys() and project['title']):
+
+            # Make other projects inactive
             deactivated = db.projects.update_many(
                 {"pm_tg_id": pm_tg_id, 
                     "active": True, 
                     "_id": {"$ne": project["_id"]}},
                     {"$set": {"active": False}}
                     )
+            
+            # Convert ObjectId of project to string, so it can be serialized to json
+            project["_id"] = str(project['_id'])
+
         else:
             project = {}
 
@@ -667,13 +673,13 @@ def get_status_on_project(project: dict, user_oid: ObjectId, db: Database) -> st
     return bot_msg
 
 
-def get_worker_oid_from_db_by_tg_username(tg_username: str, db: Database) -> ObjectId | None:
+def get_worker_oid_from_db_by_tg_username(tg_username: str, db: Database) -> str:
     '''
-    Search staff collection in DB for given telegram username and return DB-oid.
-    If something went wrong return None (should be checked on calling side)
+    Search staff collection in DB for given telegram username and return DB-oid as string.
+    If something went wrong return empty string (should be checked on calling side)
     '''
 
-    worker_id = None
+    worker_id = ''
   
     try:
         result = db.staff.find_one({'tg_username': tg_username})
@@ -684,18 +690,18 @@ def get_worker_oid_from_db_by_tg_username(tg_username: str, db: Database) -> Obj
             '_id' in result.keys() and 
             result['_id'] and
             type(result['_id']) == ObjectId): # Just to be certain about type to return
-            worker_id = result['_id']
+            worker_id = str(result['_id'])
 
     return worker_id
 
 
-def get_worker_oid_from_db_by_tg_id(tg_id: str, db: Database) -> ObjectId | None:
+def get_worker_oid_from_db_by_tg_id(tg_id: str, db: Database) -> str:
     '''
-    Search staff collection in DB for given telegram id and return DB-id.
-    If something went wrong return None (should be checked on calling side)
+    Search staff collection in DB for given telegram id and return DB-oid as string.
+    If something went wrong return empty string (should be checked on calling side)
     '''
 
-    worker_id = None
+    worker_id = ''
   
     try:
         result = db.staff.find_one({'tg_id': str(tg_id)})
@@ -706,7 +712,7 @@ def get_worker_oid_from_db_by_tg_id(tg_id: str, db: Database) -> ObjectId | None
             '_id' in result.keys() and 
             result['_id'] and
             type(result['_id']) == ObjectId):
-            worker_id = result['_id']
+            worker_id = str(result['_id'])
 
     return worker_id
 
