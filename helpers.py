@@ -145,7 +145,7 @@ def clean_project_title(user_input: str) -> str:
 
 def get_active_project(pm_tg_id: str, db: Database, include_tasks: bool = False) -> dict:
     """ 
-    Gets active project (without tasks) by given PM telegram id.
+    Gets active project (without tasks by default) by given PM telegram id.
     And fixes if something not right:
     - makes one project active if there were not,
     - if more than one active: leave only one active.
@@ -571,14 +571,19 @@ def get_projects_and_pms_for_user(user_oid: ObjectId, db: Database) -> str:
     return projects_and_pms
 
 
-def get_project_team(prj_oid: ObjectId, db: Database) -> list[dict]:
+def get_project_team(prj_oid: ObjectId | str, db: Database) -> list[dict]:
     """
     Construct list of project team members.
     Returns empty list if it is not possible to achieve or something went wrong.
     """
     team = []    
     
-    project = db.projects.find_one({'_id': prj_oid})
+    if type(prj_oid) == str:
+        project = db.projects.find_one({'_id': ObjectId(prj_oid)})
+    elif type(prj_oid) == ObjectId:
+        project = db.projects.find_one({'_id': prj_oid})
+    else:
+        project = {}
 
     if (project and 
         type(project) == dict and 
@@ -595,11 +600,14 @@ def get_project_team(prj_oid: ObjectId, db: Database) -> list[dict]:
                     # Proceed if such actioner not in team already
                     if not any(str(actioner['actioner_id']) in str(member['_id']) for member in team):
                         try:
-                            result = db.staff.find_one({'_id': actioner['actioner_id']}) 
+                            result = db.staff.find_one({'_id': ObjectId(actioner['actioner_id'])}) 
                         except Exception as e:
                             logger.error(f"There was error getting DB: {e}")
                         else:
                             if result and type(result) == dict:
+                                
+                                # Convert ObjectId to string for further serialization to json
+                                result["_id"] = str(result["_id"])
                                 team.append(result)
     
         if not team:

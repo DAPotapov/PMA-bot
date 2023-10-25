@@ -229,16 +229,17 @@ def compose_tasks_list(
             include.append(int(str(subtask['id'])))
     
     # Construct dictionary of task and append to list of tasks   
-    if 'meeting' in task:
-        if str(task['meeting']).lower() == "false":
-            milestone = False
-        elif str(task['meeting']).lower() == "true":
-            milestone = True
-        else:
-            raise ValueError('File may be damaged: milestone field contains invalid value ' + str(task['meeting']))
-    else:
-        # Composite tasks don't have this field, and they are certainly not milestones
+    # if 'meeting' in task:
+    if str(task['meeting']).lower() == "false":
         milestone = False
+    elif str(task['meeting']).lower() == "true":
+        milestone = True
+    else:
+        milestone = False
+
+        # raise ValueError('File may be damaged: milestone field contains invalid value ' + str(task['meeting']))
+    # else:
+    #     milestone = False
 
     # Construct end date from start date, duration and numpy function.
     # Numpy function returns sees duration as days _between_ dates, 
@@ -250,23 +251,23 @@ def compose_tasks_list(
         enddate = str(busday_offset(datetime64(task['start']), int(str(task['duration'])) - 1, roll='forward'))
 
     # tasks.append(
-        output_task = {
-                'id': int(str(task['id'])),
-                'WBS': '',          # For compatibility with MS Project
-                'name': task['name'],
-                'startdate': task['start'],
-                'enddate': enddate, 
-                'duration': int(str(task['duration'])),
-                'predecessors': [], # For compatibility with MS Project
-                'successors': successors,
-                'milestone': milestone,
-                'complete': int(str(task['complete'])),
-                'curator': '',      # not using for now, but it may become usefull later
-                'basicplan_startdate': task['start'],   # equal to start date on a start of the project
-                'basicplan_enddate': enddate,           # equal to end date on a start of the project
-                'include': include,
-                'actioners': actioners
-            }
+    output_task = {
+            'id': int(str(task['id'])),
+            'WBS': '',          # For compatibility with MS Project
+            'name': task['name'],
+            'startdate': task['start'],
+            'enddate': enddate, 
+            'duration': int(str(task['duration'])),
+            'predecessors': [], # For compatibility with MS Project
+            'successors': successors,
+            'milestone': milestone,
+            'complete': int(str(task['complete'])),
+            'curator': '',      # not using for now, but it may become usefull later
+            'basicplan_startdate': task['start'],   # equal to start date on a start of the project
+            'basicplan_enddate': enddate,           # equal to end date on a start of the project
+            'include': include,
+            'actioners': actioners
+        }
         # )
     return output_task
 
