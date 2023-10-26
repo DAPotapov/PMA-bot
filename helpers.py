@@ -4,13 +4,14 @@ Some helper functions to help main functions to manupulate with data
 
 import json
 import logging
+import bson
 import pymongo
 import os
 
 from bson import ObjectId
 from datetime import date
 from dotenv import load_dotenv
-from pymongo.errors import ConnectionFailure, ServerSelectionTimeoutError
+from pymongo.errors import ConnectionFailure, ServerSelectionTimeoutError, PyMongoError
 from pymongo.database import Database
 from re import sub
 from telegram import InlineKeyboardMarkup, User, InlineKeyboardButton
@@ -211,8 +212,8 @@ def get_assignees(task: dict, db: Database)-> tuple[str, list]:
     for doer in task['actioners']:
         try:
             team_member = db.staff.find_one({"_id": ObjectId(doer['actioner_id'])})
-        except Exception as e:
-            logger.error(f"There was error getting DB: {e}")
+        except PyMongoError as e:
+            logger.error(f"Error using DB: {e}")
         else:
             if team_member and type(team_member) == dict:
                 if 'tg_id' in team_member.keys() and team_member['tg_id']:
@@ -291,7 +292,7 @@ def get_job_preset_dict(job_id: str, context: ContextTypes.DEFAULT_TYPE) -> dict
                 hour = int(str(job.trigger.fields[job.trigger.FIELD_NAMES.index('hour')]))
                 minute = int(str(job.trigger.fields[job.trigger.FIELD_NAMES.index('minute')]))
                 days_preset = str(job.trigger.fields[job.trigger.FIELD_NAMES.index('day_of_week')])
-            except Exception as e:
+            except (LookupError, AttributeError, ValueError) as e:
                 preset = {}
                 logger.error(f"Error occured while getting preset for job_id '{job_id}': {e}")       
             else:
@@ -344,8 +345,8 @@ def get_keyboard_and_msg(db, level: int, user_id: str, project: dict, branch: st
                         if is_db(db):
                             try: 
                                 pm_settings = db.staff.find_one({"tg_id": str(user_id)}, {"settings":1, "_id":0})
-                            except Exception as e:
-                                logger.error(f"There was error getting DB: {e}")
+                            except PyMongoError as e:
+                                logger.error(f"Error using DB: {e}")
                             else:
                                 if (pm_settings and 
                                     type(pm_settings) == dict and
@@ -554,8 +555,8 @@ def get_projects_and_pms_for_user(user_oid: ObjectId | str, db: Database) -> str
                     {"actioner_id": oid}}}, 
             {"title":1, "pm_tg_id":1, "_id":0})
             )
-    except Exception as e:
-        logger.error(f"There was error getting DB: {e}")
+    except PyMongoError as e:
+        logger.error(f"Error using DB: {e}")
     else:
         if projects:
             for project in projects:
@@ -606,8 +607,8 @@ def get_project_team(prj_oid: ObjectId | str, db: Database) -> list[dict]:
                     if not any(str(actioner['actioner_id']) in str(member['_id']) for member in team):
                         try:
                             result = db.staff.find_one({'_id': ObjectId(actioner['actioner_id'])}) 
-                        except Exception as e:
-                            logger.error(f"There was error getting DB: {e}")
+                        except PyMongoError as e:
+                            logger.error(f"Error using DB: {e}")
                         else:
                             if result and type(result) == dict:
                                 
@@ -696,8 +697,8 @@ def get_worker_oid_from_db_by_tg_username(tg_username: str, db: Database) -> str
   
     try:
         result = db.staff.find_one({'tg_username': tg_username})
-    except Exception as e:
-        logger.error(f"There was error getting DB: {e}")
+    except PyMongoError as e:
+        logger.error(f"Error using DB: {e}")
     else:
         if (result and type(result) == dict and 
             '_id' in result.keys() and 
@@ -718,8 +719,8 @@ def get_worker_oid_from_db_by_tg_id(tg_id: str, db: Database) -> str:
   
     try:
         result = db.staff.find_one({'tg_id': str(tg_id)})
-    except Exception as e:
-        logger.error(f"There was error connecting to DB: {e}")
+    except PyMongoError as e:
+        logger.error(f"Error using DB: {e}")
     else:
         if (result and type(result) == dict and 
             '_id' in result.keys() and 
@@ -740,8 +741,8 @@ def get_worker_tg_id_from_db_by_tg_username(tg_username: str, db: Database) -> s
   
     try:
         result = db.staff.find_one({'tg_username': tg_username})
-    except Exception as e:
-        logger.error(f"There was error getting DB: {e}")
+    except PyMongoError as e:
+        logger.error(f"Error using DB: {e}")
     else:
         if (result and type(result) == dict and 
             'tg_id' in result.keys() and result['tg_id']):
@@ -763,8 +764,8 @@ def get_worker_tg_username_by_oid(user_oid: ObjectId | str, db: Database) -> str
         else:
             result = {}
     
-    except Exception as e:
-        logger.error(f"There was error getting DB: {e}")
+    except PyMongoError as e:
+        logger.error(f"Error using DB: {e}")
     else:
         if (result and type(result) == dict and 
             'tg_username' in result.keys()):
@@ -781,8 +782,8 @@ def get_worker_tg_username_by_tg_id(tg_id: str, db: Database) -> str:
   
     try:
         result = db.staff.find_one({'tg_id': tg_id})
-    except Exception as e:
-        logger.error(f"There was error getting DB: {e}")
+    except PyMongoError as e:
+        logger.error(f"Error using DB: {e}")
     else:
         if (result and type(result) == dict and
             'tg_username' in result.keys()):
