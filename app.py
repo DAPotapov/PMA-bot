@@ -580,9 +580,7 @@ def file_to_dict(fp: Path):
         # else log what was tried to be loaded
             case _:
                 logger.warning(f"Someone tried to load '{fp.suffix}' file.")      
-    except (AttributeError, IndexError, ValueError) as e:
-        logger.error(f'{e}')
-    except Exception as e: # TODO delete
+    except (AttributeError, IndexError, ValueError, json.JSONDecodeError) as e:
         logger.error(f'{e}')
     finally:
         return tasks

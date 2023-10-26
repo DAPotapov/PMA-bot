@@ -281,93 +281,88 @@ def load_json(fp: Path, db: Database)-> list[dict]:
     
     # Open file
     with open(fp, "r") as json_file:
-        try:
-            project = json.load(json_file)
-        except Exception as e: # TODO test it
-            pass
-        else:
+        project = json.load(json_file)
 
-            # Check and get two lists: tasks and staff
-            if (project and 
-                type(project) == dict and
-                'tasks' in project.keys() and
-                'staff' in project.keys() and
-                type(project['tasks']) == list and
-                type(project['staff']) == list and
-                project['tasks'] and
-                project['staff']):
+        # Check and get two lists: tasks and staff
+        if (project and 
+            type(project) == dict and
+            'tasks' in project.keys() and
+            'staff' in project.keys() and
+            type(project['tasks']) == list and
+            type(project['staff']) == list and
+            project['tasks'] and
+            project['staff']):
 
-                # Check staff members for consistency and add to database (if tg_id or tg_username not present already) 
-                # And store new oid to same dictionary for later use in actioners of tasks
-                # staff = project['staff']
-                staff_keys = ['_id', 'program_id', 'name', 'email', 'phone', 'tg_username', 'tg_id', 'account_type', 'settings']
-                for worker in project['staff']:
+            # Check staff members for consistency and add to database (if tg_id or tg_username not present already) 
+            # And store new oid to same dictionary for later use in actioners of tasks
+            staff_keys = ['_id', 'program_id', 'name', 'email', 'phone', 'tg_username', 'tg_id', 'account_type', 'settings']
+            for worker in project['staff']:
 
-                    # Check that provided staff list contains all necessary keys
-                    if all(x in staff_keys for x in worker.keys()):
-                        oid = add_worker_info_to_staff(worker, db) 
-                        if oid:
-                            worker['new_oid'] = oid
-                        else:
-                            raise ValueError(f"Unable to add following staff member to database: '{worker}'")
+                # Check that provided staff list contains all necessary keys
+                if all(x in staff_keys for x in worker.keys()):
+                    oid = add_worker_info_to_staff(worker, db) 
+                    if oid:
+                        worker['new_oid'] = oid
                     else:
-                        raise AttributeError(f"Member of staff doesn't have all necessary keys ({worker})")
+                        raise ValueError(f"Unable to add following staff member to database: '{worker}'")
+                else:
+                    raise AttributeError(f"Member of staff doesn't have all necessary keys ({worker})")
+            
+            
+            # Check each task for presence of keys and values
+            # Order of this list matter! See check below.
+            task_keys = ['name', 'startdate', 'enddate', 
+                        'complete', 
+                        # Can be False that will spoil check below
+                        'milestone', 
+                        # Duration will be recalculated; id=0 becomes False in check below
+                        'duration', 'id',
+                        # These could be empty and will fail check below as well
+                        'predecessors', 'successors', 
+                        'actioners', 'WBS', 'include'
+                            ]
+            for task in project['tasks']:
+
+                # Check for keys
+                if not all(x in task.keys() for x in task_keys):
+                    raise AttributeError(f"Task #{task['id']} doesn't have all necessary keys \n({task_keys})")
                 
+                # Check that necessary parameters are filled
+                if not all(str(task[x]) for x in task_keys[:5]):                        
+                    raise AttributeError(f"Not all necessary parameters ({task_keys[:5]}) of task {task['id']} are filled.")
+
+                # Complete have type integer
+                if type(task['complete']) != int and task['complete'] >= 0 and task['complete'] < 101:
+                    raise ValueError("Completeness of task should be an integer from 0 to 100 percent.")
                 
-                # Check each task for presence of keys and values
-                # Order of this list matter! See check below.
-                task_keys = ['name', 'startdate', 'enddate', 
-                            'complete', 
-                            # Can be False that will spoil check below
-                            'milestone', 
-                            # Duration will be recalculated; id=0 becomes False in check below
-                            'duration', 'id',
-                            # These could be empty and will fail check below as well
-                            'predecessors', 'successors', 
-                            'actioners', 'WBS', 'include'
-                             ]
-                for task in project['tasks']:
+                # Dates have right order
+                if datetime64(task['startdate']) > datetime64(task['enddate']):
+                    raise ValueError(f"Taks #{task['id']} '{task['name']}' starts later than finishes.")
 
-                    # Check for keys
-                    if not all(x in task.keys() for x in task_keys):
-                        raise AttributeError(f"Task #{task['id']} doesn't have all necessary keys \n({task_keys})")
+                # Regular task should have actioners and enddate later than startdate
+                if task['milestone'] == False and not task['include']:
+                    if not task['actioners']:
+                        raise ValueError(f"Taks #{task['id']} '{task['name']}' has no actioners.")
                     
-                    # Check that necessary parameters are filled
-                    if not all(str(task[x]) for x in task_keys[:5]):                        
-                        raise AttributeError(f"Not all necessary parameters ({task_keys[:5]}) of task {task['id']} are filled.")
+                # Recalculate duration with dates provided
+                task['duration'] = int(busday_count(datetime64(task['startdate']), datetime64(task['enddate'])))
 
-                    # Complete have type integer
-                    if type(task['complete']) != int and task['complete'] >= 0 and task['complete'] < 101:
-                        raise ValueError("Completeness of task should be an integer from 0 to 100 percent.")
-                    
-                    # Dates have right order
-                    if datetime64(task['startdate']) > datetime64(task['enddate']):
-                        raise ValueError(f"Taks #{task['id']} '{task['name']}' starts later than finishes.")
+                # Update actioners with ids from database if its not actual
+                if task['actioners']:
+                    for actioner in task['actioners']:
+                        for worker in project['staff']:
+                            if (actioner['actioner_id'] == worker['_id'] and 
+                                worker['_id'] != worker['new_oid']):
+                                actioner['actioner_id'] = worker['new_oid']
 
-                    # Regular task should have actioners and enddate later than startdate
-                    if task['milestone'] == False and not task['include']:
-                        if not task['actioners']:
-                            raise ValueError(f"Taks #{task['id']} '{task['name']}' has no actioners.")
-                        
-                    # Recalculate duration with dates provided
-                    task['duration'] = int(busday_count(datetime64(task['startdate']), datetime64(task['enddate'])))
+                # That's enough checks for sake of example, 
+                # but serious schedule management will need more checks:
+                # taking in account dependent tasks and their dates and other
+                
+            tasks = project['tasks']
 
-                    # Update actioners with ids from database if its not actual
-                    if task['actioners']:
-                        for actioner in task['actioners']:
-                            for worker in project['staff']:
-                                if (actioner['actioner_id'] == worker['_id'] and 
-                                    worker['_id'] != worker['new_oid']):
-                                    actioner['actioner_id'] = worker['new_oid']
-
-                    # That's enough checks for sake of example, 
-                    # but serious schedule management will need more checks:
-                    # taking in account dependent tasks and their dates and other
-                    
-                tasks = project['tasks']
-
-            else:
-                raise AttributeError("File malformed: project dictionary must contain 'tasks' and 'staff' lists, each contains corresponding dictionaries. See example.")
+        else:
+            raise AttributeError("File malformed: project dictionary must contain 'tasks' and 'staff' lists, each contains corresponding dictionaries. See example.")
 
     return tasks
 
