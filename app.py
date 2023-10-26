@@ -395,18 +395,18 @@ async def start(update: Update, context: CallbackContext) -> int:
     # Store information about PM in context
     context.user_data['PM'] = pm 
 
-    disclaimer = ("Disclaimer: All data provided by the user, " 
+    disclaimer = ("<i>Disclaimer: All data provided by the user, " 
         "which may be considered personal data within the scope of applicable law, " 
         "is used exclusively for the purposes for which this software is intended "
-         "and is not passed on to third parties.")
-    await update.message.reply_text(disclaimer)
+         "and is not passed on to third parties.</i>")
+    await update.message.reply_text(disclaimer, parse_mode="HTML")
 
-    bot_msg = (f"Hello, {update.effective_user.first_name}!\n"
+    bot_msg = (f"Hello, <b>{update.effective_user.first_name}</b>!\n"
                f"You are starting a new project.\n"
                f"Provide a name for it (less than 128 characters).\n"
-               f"(type 'cancel' if you changed you mind during this process)"
+               f"(type '<u>cancel</u>' if you changed you mind during this process)"
     )
-    await update.message.reply_text(bot_msg)
+    await update.message.reply_text(bot_msg, parse_mode="HTML")
     return FIRST_LVL
 
 
@@ -461,14 +461,14 @@ async def naming_project(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
                      )
                 if (prj_id and type(prj_id) == dict and 
                     '_id' in prj_id.keys() and prj_id['id']):
-                    bot_msg = f"You've already started project with name {project['title']}. Try another one."
-                    await update.message.reply_text(bot_msg)
+                    bot_msg = f"You've already started project with name <b>{project['title']}</b>. Try another one."
+                    await update.message.reply_text(bot_msg, parse_mode="HTML")
                     return FIRST_LVL
                 else:
-                    bot_msg = (f"Title was refurbushed to: '{title}'.\nYou can change it later in /settings.\n"
-                        f"Now you can upload your project file. Supported formats are: .gan (GanttProject), .json, .xml (MS Project)"
+                    bot_msg = (f"Title was refurbushed to: '<b>{title}</b>'.\nYou can change it later in /settings.\n"
+                        f"Now you can upload your project file. Supported formats are: <u>.gan</u> (GanttProject), <u>.json</u>, <u>.xml</u> (MS Project)"
                     )
-                    await update.message.reply_text(bot_msg)
+                    await update.message.reply_text(bot_msg, parse_mode="HTML")
                     return SECOND_LVL
         else:
             logger.error(f"Error occured while accessing database.")
@@ -499,8 +499,8 @@ async def file_recieved(update: Update, context: ContextTypes.DEFAULT_TYPE) -> i
                 bot_msg = bot_msg + "\nCouldn't create reminders. Contact developer."
                 logger.error(f"Couldn't create reminders for project '{context.user_data['project']}'")
             else:
-                bot_msg = (bot_msg + f"\nReminders were created: on the day before event ({ONTHEEVE}),"
-                        f" in the morning of event ({MORNING}) and reminder for friday file update ({FRIDAY}). "
+                bot_msg = (bot_msg + f"\nReminders were created: on the day before event (<i>{ONTHEEVE}</i>),"
+                        f" in the morning of event (<i>{MORNING}</i>) and reminder for friday file update (<i>{FRIDAY}</i>). "
                         f"You can change them or turn off in /settings."
                         f"\nAlso you can update the schedule by uploading new file via /upload command."
                         f"\nRemember that you can /start a new project anytime.")
@@ -539,12 +539,12 @@ async def file_recieved(update: Update, context: ContextTypes.DEFAULT_TYPE) -> i
         else:
             logger.warning(f"User '{update.effective_user.id}' tried to upload unsupported file: '{update.message.document.file_name}'")
             bot_msg = (f"Couldn't process given file.\n"
-                        f"Supported formats are: .gan (GanttProject), .json, .xml (MS Project)\n"
-                        f"Make sure these files contain custom field named 'tg_username', which store usernames of project team members.\n"
+                        f"Supported formats are: <u>.gan</u> (GanttProject), <u>.json</u>, <u>.xml</u> (MS Project)\n"
+                        f"Make sure these files contain custom field named '<i>tg_username</i>, which store usernames of project team members.\n"
                         f"If you would like to see other formats supported feel free to message bot developer via /feedback command.\n"
                         f"Try upload another one."
             )
-        await update.message.reply_text(bot_msg)
+        await update.message.reply_text(bot_msg, parse_mode="HTML")
         return SECOND_LVL
 
 
