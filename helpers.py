@@ -206,23 +206,23 @@ def get_assignees(task: dict, db: Database)-> tuple[str, list]:
     '''
 
     people = ""
-    user_ids = []
+    user_tg_ids = []
 
     for doer in task['actioners']:
         try:
-            team_member = db.staff.find_one({"_id": doer['actioner_id']})
+            team_member = db.staff.find_one({"_id": ObjectId(doer['actioner_id'])})
         except Exception as e:
             logger.error(f"There was error getting DB: {e}")
         else:
             if team_member and type(team_member) == dict:
                 if 'tg_id' in team_member.keys() and team_member['tg_id']:
-                    user_ids.append(team_member['tg_id'])
+                    user_tg_ids.append(team_member['tg_id'])
                 if len(people) > 0:
                     people = people + "and @" + team_member['tg_username'] + " (" + team_member['name'] + ")"
                 else:
                     people = f"{people}@{team_member['tg_username']} ({team_member['name']})"
 
-    return people, user_ids # ids will be needed for buttons to ping users
+    return people, user_tg_ids # ids will be needed for buttons to ping users
 
 
 def get_db() -> Database:
@@ -474,19 +474,19 @@ def get_message_and_button_for_task(task: dict, project_id: ObjectId, db: Databa
             if delta_end.days == 0:
                 msg = f"Today is the day of planned milestone '{task['name']}'!"
         else:
-            people, user_ids = get_assignees(task, db)
+            people, user_tg_ids = get_assignees(task, db)
             if not people:
                 people = "can't say, better check assignments in project file."
 
             # Check dates and compose message including information about human resources
             if delta_start.days == 0:
-                msg = f"Task {task['id']} '{task['name']}' started today. Assigned to: {people}."
+                msg = f"Task #{task['id']} '{task['name']}' started today. Assigned to: {people}."
             elif delta_start.days > 0  and delta_end.days < 0:
-                msg = f"Task {task['id']} '{task['name']}' is intermidiate. Due date is {task['enddate']}. Assigned to: {people}."
+                msg = f"Task #{task['id']} '{task['name']}' is intermidiate. Due date is {task['enddate']}. Assigned to: {people}."
             elif delta_end.days == 0:
-                msg = f"Task {task['id']}  '{task['name']}' must be completed today! Assigned to: {people}."
+                msg = f"Task #{task['id']}  '{task['name']}' must be completed today! Assigned to: {people}."
             elif delta_start.days > 0 and delta_end.days > 0:         
-                msg = f"Task {task['id']} '{task['name']}' is overdue! (had to be completed on {task['enddate']}). Assigned to: {people}."
+                msg = f"Task #{task['id']} '{task['name']}' is overdue! (had to be completed on {task['enddate']}). Assigned to: {people}."
             else:
                 logger.info(f"Loop through future task '{task['id']}' '{task['name']}'")
                 pass
