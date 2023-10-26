@@ -1641,10 +1641,11 @@ async def reminder_switcher(update: Update, context: ContextTypes.DEFAULT_TYPE) 
     job_id = context.user_data['project']['reminders'][str(context.user_data['branch'][-1])]
     
     job = context.job_queue.scheduler.get_job(job_id)
-    if job.next_run_time:
-        job = job.pause()
-    else:
-        job = job.resume()
+    if job:
+        if job.next_run_time:
+            job = job.pause()
+        else:
+            job = job.resume()
     
     # Return previous menu:
     # Call function which create keyboard and generate message to send to user. 
@@ -1789,7 +1790,7 @@ async def reminder_time_setter(update: Update, context: ContextTypes.DEFAULT_TYP
             # Reschedule the job
             try:
                 job = job.reschedule(trigger='cron', hour=hour, minute=minute, day_of_week=day_of_week, timezone=tz)
-            except ValueError as e:
+            except (AttributeError, ValueError) as e:
                 bot_msg = (f"Unable to reschedule the reminder")
                 logger.info(f'{e}')
             else:
@@ -1874,20 +1875,24 @@ async def reminder_days_setter(update: Update, context: ContextTypes.DEFAULT_TYP
             job_id = context.user_data['project']['reminders'][context.user_data['branch'][-1]]
             job = context.job_queue.scheduler.get_job(job_id)
 
-            # Get current parameters of job
-            tz = job.trigger.timezone
-            hour = job.trigger.fields[job.trigger.FIELD_NAMES.index('hour')]
-            minute = job.trigger.fields[job.trigger.FIELD_NAMES.index('minute')]  
+            if job:
+                # Get current parameters of job 
+                tz = job.trigger.timezone
+                hour = job.trigger.fields[job.trigger.FIELD_NAMES.index('hour')]
+                minute = job.trigger.fields[job.trigger.FIELD_NAMES.index('minute')]  
 
-            # Reschedule the job
-            try:
-                job.reschedule(trigger='cron', hour=hour, minute=minute, day_of_week=','.join(new_days), timezone=tz)
-            except Exception as e:
-                bot_msg = (f"Unable to reschedule the reminder")
-                logger.error(f'{e}')
-            bot_msg = (f"Time updated. Next time: \n"
-                        f"{job.next_run_time}"
-                        ) 
+                # Reschedule the job
+                try:
+                    job.reschedule(trigger='cron', hour=hour, minute=minute, day_of_week=','.join(new_days), timezone=tz)
+                except (ValueError, AttributeError) as e:
+                    bot_msg = (f"Unable to reschedule the reminder")
+                    logger.error(f'{e}')
+                bot_msg = (f"Time updated. Next time: \n"
+                            f"{job.next_run_time}"
+                            ) 
+            else:
+                bot_msg = "Sorry, couldn't reschedule. Contact developer."
+                logger.error(f"Couldn't find job with id '{job_id}'.")
         else:
             bot_msg = (f"No correct names for days of week found in you message.\n")                       
     else:
