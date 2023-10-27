@@ -469,11 +469,11 @@ def get_message_and_button_for_task(task: dict, project_id: ObjectId, db: Databa
 
             # Inform PM of future milestones
             if delta_end.days < 0:             
-                msg = f"Milestone '{task['name']}' is near ({task['enddate']})!"
+                msg = f"🎌Milestone '{task['name']}' is near ({task['enddate']})!🎌"
 
             # Inform PM of today's milestone
             if delta_end.days == 0:
-                msg = f"Today is the day of planned milestone '{task['name']}'!"
+                msg = f"🎌Today is the day of planned milestone '{task['name']}'!🎌"
         else:
             people, user_tg_ids = get_assignees(task, db)
             if not people:
@@ -481,20 +481,20 @@ def get_message_and_button_for_task(task: dict, project_id: ObjectId, db: Databa
 
             # Check dates and compose message including information about human resources
             if delta_start.days == 0:
-                msg = f"Task #{task['id']} '{task['name']}' started today. Assigned to: {people}."
+                msg = f"🚥🛣Task №{task['id']} '<i>{task['name']}</i>' started today. Assigned to: {people}."
             elif delta_start.days > 0  and delta_end.days < 0:
-                msg = f"Task #{task['id']} '{task['name']}' is intermidiate. Due date is {task['enddate']}. Assigned to: {people}."
+                msg = f"⏳🛠Task №{task['id']} '<i>{task['name']}</i>' is intermidiate. Due date is <u>{task['enddate']}</u>. Assigned to: {people}."
             elif delta_end.days == 0:
-                msg = f"Task #{task['id']}  '{task['name']}' must be completed today! Assigned to: {people}."
+                msg = f"⌛⏰Task №{task['id']} '<i>{task['name']}</i>' must be completed today! Assigned to: {people}."
             elif delta_start.days > 0 and delta_end.days > 0:         
-                msg = f"Task #{task['id']} '{task['name']}' is overdue! (had to be completed on {task['enddate']}). Assigned to: {people}."
+                msg = f"🚽🔥Task №{task['id']} '<i>{task['name']}</i>' is overdue! (had to be completed on <u>{task['enddate']}</u>). Assigned to: {people}."
             else:
                 logger.info(f"Loop through future task '{task['id']}' '{task['name']}'")
                 pass
 
     # If task worth mention add a button to message
     if msg:
-        button = InlineKeyboardButton("Mark as completed", callback_data=f"task_{project_id}_{task['id']}")
+        button = InlineKeyboardButton("Mark as completed🏁", callback_data=f"task_{project_id}_{task['id']}")
         keyboard.append([button])
         reply_markup = InlineKeyboardMarkup(keyboard)
     return msg, reply_markup
@@ -628,7 +628,7 @@ def get_status_on_project(project: dict, user_oid: ObjectId | str, db: Database)
     Returns composed message to be sent.
     """
 
-    bot_msg = f"Status of events for project '{project['title']}':"
+    bot_msg = f"Status of events for project '<b>{project['title']}<b>':"
 
     # Add PM username
     pm_username = get_worker_tg_username_by_tg_id(project['pm_tg_id'], db)
@@ -661,13 +661,13 @@ def get_status_on_project(project: dict, user_oid: ObjectId | str, db: Database)
                 delta_end = date.today() - date.fromisoformat(task['enddate'])
 
                 if delta_start.days == 0:
-                    msg = msg + f"\nTask {task['id']} '{task['name']}' started today."
+                    msg = msg + f"\n🚥🛣Task №{task['id']} '<i>{task['name']}</i>' started <u>today</u> 🚥🛣"
                 elif delta_start.days > 0  and delta_end.days < 0:
-                    msg = msg + f"\nTask {task['id']} '{task['name']}' is intermidiate. Due date is {task['enddate']}."
+                    msg = msg + f"\n⏳🛠Task №{task['id']} '<i>{task['name']}</i>' is intermidiate.  Due date is <u>{task['enddate']}</u>⏳🛠."
                 elif delta_end.days == 0:
-                    msg = msg + f"\nTask {task['id']}  '{task['name']}' must be completed today!"
+                    msg = msg + f"\n⌛⏰Task №{task['id']}  '<i>{task['name']}</i>' must be completed <u>today</u>! ⌛⏰"
                 elif delta_start.days > 0 and delta_end.days > 0:                                       
-                    msg = msg + f"\nTask {task['id']} '{task['name']}' is overdue! (had to be completed on {task['enddate']})."
+                    msg = msg + f"\n🚽🔥Task №{task['id']} '<i>{task['name']}</i>' is overdue!  (had to be completed on <u>{task['enddate']}</u>)"
                 else:
                     # Future tasks goes here
                     pass
@@ -675,7 +675,7 @@ def get_status_on_project(project: dict, user_oid: ObjectId | str, db: Database)
             # Actioner should be informed about milestone if PM decided so and if it is today
             if (inform_of_milestone and task['milestone'] and
                 date.today() == date.fromisoformat(task['enddate'])):
-                msg = msg + f"\nToday is the day of planned milestone: '{task['name']}'."
+                msg = msg + f"\n🎌Today is the day of planned milestone: '<i>{task['name']}</i>'🎌."
 
         if msg:
             bot_msg = bot_msg + f"\nTasks assigned to @{actioner_username}:\n" + msg

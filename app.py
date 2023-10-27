@@ -132,15 +132,15 @@ async def day_before_update(context: ContextTypes.DEFAULT_TYPE) -> None:
                 # Inform about task if it starts or has a deadline tomorrow
                 if task['complete'] < 100 and not task['include'] and not task['milestone']:
                     if delta_start.days == -1:
-                        bot_msg = f"task {task['id']} '{task['name']}' of '{project['title']}' (PM: @{project['tg_username']}) starts tomorrow."
+                        bot_msg = f"🚥🛣Task №{task['id']} '<i>{task['name']}</i>' of '<b>{project['title']}</b>' (PM: @{project['tg_username']}) starts <u>tomorrow</u>."
                     elif delta_end.days == -1:
-                        bot_msg = f"Tomorrow is deadline for task {task['id']} '{task['name']}' of '{project['title']}' (PM: @{project['tg_username']})!" 
+                        bot_msg = f"⏰⌛<u>Tomorrow</u> is deadline  for task {task['id']} '<i>{task['name']}</i>' of '<b>{project['title']}</b>' (PM: @{project['tg_username']})!" 
 
                 # Inform about tomorrow milestone according to project's setting
                 if (project['settings']['INFORM_ACTIONERS_OF_MILESTONES'] and 
                     task['milestone'] and 
                     delta_end.days == -1):
-                    bot_msg = f"Tomorrow is the date of milestone {task['id']} '{task['name']}' of '{project['title']}' (PM: @{project['tg_username']})!" 
+                    bot_msg = f"🎌<u>Tomorrow</u> is the date of milestone  {task['id']} '<i>{task['name']}</i>' of '<b>{project['title']}</b>' (PM: @{project['tg_username']})!" 
 
                 # If task worth talking, and tg_id could be found in staff and actioner not PM 
                 # (will be informed separately) then send message to actioner
@@ -149,10 +149,10 @@ async def day_before_update(context: ContextTypes.DEFAULT_TYPE) -> None:
                         worker = DB.staff.find_one({"_id": actioner['actioner_id']}, {"tg_id":1, "_id": 0})                            
                         if (worker and type(worker) == dict and 'tg_id' in worker.keys() and
                             worker['tg_id'] and worker['tg_id'] != project['pm_tg_id']):
-                            await context.bot.send_message(worker['tg_id'], bot_msg)
+                            await context.bot.send_message(worker['tg_id'], bot_msg, parse_mode="HTML")
                     
                     # And inform PM
-                    await context.bot.send_message(project['pm_tg_id'], bot_msg)
+                    await context.bot.send_message(project['pm_tg_id'], bot_msg, parse_mode="HTML")
     else:
         bot_msg = f"Error occured while accessing database. Try again later or contact developer."
         logger.error(f"Error occured while accessing database.")
@@ -256,10 +256,10 @@ async def file_update(context: ContextTypes.DEFAULT_TYPE) -> None:
             if team:
                 for member in team:
                     if member['tg_id']:
-                        bot_msg = (f"{member['name']}, remember to update common files for project '{project['title']}'!\n"
+                        bot_msg = (f"💾💻{member['name']}, remember to update common files for project '<b>{project['title']}</b>'!\n"
                                 f"Other team members should have actual information!"
                         )
-                        await context.bot.send_message(member['tg_id'], bot_msg)
+                        await context.bot.send_message(member['tg_id'], bot_msg, parse_mode="HTML")
     else:
         bot_msg = f"Error occured while accessing database. Try again later or contact developer."
         logger.error(f"Error occured while accessing database.")
@@ -309,7 +309,7 @@ async def morning_update(context: ContextTypes.DEFAULT_TYPE) -> None:
                         bot_msg = get_status_on_project(project, member['_id'], DB)
                         # TODO I could easily add keyboard here which will send with callback_data:
                         # project, task, actioner_id, and actioner decision (what else will be needed?..) 
-                        await context.bot.send_message(member['tg_id'], bot_msg)
+                        await context.bot.send_message(member['tg_id'], bot_msg, parse_mode = "HTML")
 
             # If no team inform only PM about such situation
             else:
@@ -317,14 +317,14 @@ async def morning_update(context: ContextTypes.DEFAULT_TYPE) -> None:
                 await context.bot.send_message(str(context.job.data['pm_tg_id']), bot_msg) # type: ignore
 
             # Make status update with buttons for PM
-            bot_msg = f"Morning status update for project '{context.job.data['project_title']}':" # type: ignore
-            await context.bot.send_message(str(context.job.data['pm_tg_id']), bot_msg) # type: ignore
+            bot_msg = f"Morning status update for project '<b>{context.job.data['project_title']}</b>':" # type: ignore
+            await context.bot.send_message(str(context.job.data['pm_tg_id']), bot_msg, parse_mode="HTML") # type: ignore
             task_counter = 0            
             for task in project['tasks']:
                 task_counter += 1
                 bot_msg, reply_markup = get_message_and_button_for_task(task, project['_id'], DB)
                 if bot_msg and reply_markup:
-                    await context.bot.send_message(str(context.job.data['pm_tg_id']), bot_msg, reply_markup=reply_markup) # type: ignore
+                    await context.bot.send_message(str(context.job.data['pm_tg_id']), bot_msg, reply_markup=reply_markup, parse_mode="HTML") # type: ignore
             if task_counter == 0:
                 bot_msg = 'Seems like there are no events to inform about at this time.'
                 await context.bot.send_message(str(context.job.data['pm_tg_id']), bot_msg) # type: ignore
@@ -367,7 +367,7 @@ async def set_task_accomplished(update: Update, context: CallbackContext):
                 'name' in project['tasks'][0].keys() and
                 'complete' in project['tasks'][0].keys() and
                 project['tasks'][0]['complete'] == 100):
-                bot_msg = f"Task №{project['tasks'][0]['id']} '{project['tasks'][0]['name']}' marked completed. Congratulations!"
+                bot_msg = f"Task №{project['tasks'][0]['id']} '<i>{project['tasks'][0]['name']}</i>' marked completed🏁. Congratulations! 🎉🍾"
 
         # Send message
         await query.edit_message_text(bot_msg)
@@ -395,7 +395,7 @@ async def start(update: Update, context: CallbackContext) -> int:
     # Store information about PM in context
     context.user_data['PM'] = pm 
 
-    disclaimer = ("<i>Disclaimer: All data provided by the user, " 
+    disclaimer = ("❕<i>Disclaimer: All data provided by the user, " 
         "which may be considered personal data within the scope of applicable law, " 
         "is used exclusively for the purposes for which this software is intended "
          "and is not passed on to third parties.</i>")
@@ -694,11 +694,11 @@ async def status(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
 
                 # Iterate through list
                 for project in projects:
-                    bot_msg = f"Status of events for project '{project['title']}':"
+                    bot_msg = f"Status of events for project '<b>{project['title']}</b>':"
                     if project['settings']['ALLOW_POST_STATUS_TO_GROUP'] and update.message.chat_id != update.effective_user.id:
-                        await update.message.reply_text(bot_msg)
+                        await update.message.reply_text(bot_msg, parse_mode="HTML")
                     else:                        
-                        await context.bot.send_message(user_id, bot_msg)
+                        await context.bot.send_message(user_id, bot_msg, parse_mode="HTML")
 
                     # Lets keep track of messages sent to user about tasks
                     task_counter = 0
@@ -713,17 +713,17 @@ async def status(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
 
                             # Check current setting and chat where update came from to decide where to send answer
                             if project['settings']['ALLOW_POST_STATUS_TO_GROUP'] and update.message.chat_id != update.effective_user.id:
-                                await update.message.reply_text(bot_msg)
+                                await update.message.reply_text(bot_msg, parse_mode="HTML")
                             else:                        
                                 # Buttons should be send only in direct message to PM
-                                await context.bot.send_message(user_id, bot_msg, reply_markup=reply_markup)
+                                await context.bot.send_message(user_id, bot_msg, reply_markup=reply_markup, parse_mode="HTML")
                     if task_counter == 0:
                         bot_msg = 'Seems like there are no events to inform about at this time.'
                         # Check current setting and chat where update came from to decide where to send answer
                         if project['settings']['ALLOW_POST_STATUS_TO_GROUP'] and update.message.chat_id != update.effective_user.id:
-                            await update.message.reply_text(bot_msg)
+                            await update.message.reply_text(bot_msg, parse_mode="HTML")
                         else:                        
-                            await context.bot.send_message(user_id, bot_msg)
+                            await context.bot.send_message(user_id, bot_msg, parse_mode="HTML")
 
             else:
                 # If current user not found in project managers 
@@ -755,7 +755,7 @@ async def status(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
 
                             # Compose message from tasks of the project and send to user
                             bot_msg = get_status_on_project(project, user_oid, DB)
-                            await context.bot.send_message(user_id, bot_msg)
+                            await context.bot.send_message(user_id, bot_msg, parse_mode = "HTML")
 
                     # Inform user if he is in staff, but not in any project participants
                     else:
@@ -789,7 +789,7 @@ async def stop(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     if DB != None and is_db(DB): 
         docs_count = DB.projects.count_documents({"pm_tg_id": str(update.effective_user.id)})
         if docs_count > 0:
-            bot_msg = (f"Are you sure? This will delete all of your projects from bot." 
+            bot_msg = (f"🛑 Are you sure? This will <b>delete all of your projects<b> from bot.🛑\n" 
                         "You can disable reminders in /settings if they are bothering you"
                             " (but this will made bot pointless)")
             keyboard = [        
@@ -797,7 +797,7 @@ async def stop(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
                     [InlineKeyboardButton("No, I want to keep data and bot running", callback_data=str(TWO))],
             ]
             reply_markup = InlineKeyboardMarkup(keyboard)
-            await context.bot.send_message(update.effective_user.id, bot_msg, reply_markup=reply_markup)
+            await context.bot.send_message(update.effective_user.id, bot_msg, reply_markup=reply_markup, parse_mode="HTML")
             return FIRST_LVL
         else:
 
@@ -819,12 +819,12 @@ async def stop(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
             # If he don't participate in any project - be quiet
             if not user_oid or projects_count == 0:
                 bot_msg = f"Bot stopped"
-            await context.bot.send_message(update.effective_user.id, bot_msg)
+            await context.bot.send_message(update.effective_user.id, bot_msg, parse_mode="HTML")
             return ConversationHandler.END
     else:
         bot_msg = f"Error occured while accessing database. Try again later or contact developer."
         logger.error(f"Error occured while accessing database.")
-        await context.bot.send_message(update.effective_user.id, bot_msg)
+        await context.bot.send_message(update.effective_user.id, bot_msg, parse_mode="HTML")
         return ConversationHandler.END
 
 
