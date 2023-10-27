@@ -107,15 +107,11 @@ async def day_before_update(context: ContextTypes.DEFAULT_TYPE) -> None:
     This reminder must be send to all team members on the day before of the important dates:
     start of task, deadline, optionally milestones (according to setting)
     '''
-    # TODO how to make observation of project a standalone function to be called elsewhere?
-    # because every reminder function load project from file and looks through it
-
-
     if (DB != None and 
         is_db(DB) and 
         context.job and 
         context.job.data and 
-        type(context.job.data) == dict): # TODO use this check in other places
+        type(context.job.data) == dict): 
         project = get_project_by_title(DB, str(context.job.data['pm_tg_id']), context.job.data['project_title'])
         if project:
            
@@ -211,7 +207,6 @@ async def echo(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     text = str(update.message.text)
     logger.info(f'{user.id} ({user.username}): {text}')
 
-    # TODO I can use it to gather id from chat members and add them to project.
     if user:
         result = add_user_info_to_db(user, DB)
         if not result:
@@ -238,6 +233,7 @@ async def feedback_answer(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
     logger.warning(msg)
     bot_msg = "Feedback sent to developer."
     await update.message.reply_text(bot_msg)
+
     # Send message to developer
     if DEV_TG_ID:
         await context.bot.send_message(DEV_TG_ID, msg)
@@ -307,8 +303,6 @@ async def morning_update(context: ContextTypes.DEFAULT_TYPE) -> None:
                 for member in team:                    
                     if member['tg_id'] != str(context.job.data['pm_tg_id']):  # type: ignore
                         bot_msg = get_status_on_project(project, member['_id'], DB)
-                        # TODO I could easily add keyboard here which will send with callback_data:
-                        # project, task, actioner_id, and actioner decision (what else will be needed?..) 
                         await context.bot.send_message(member['tg_id'], bot_msg, parse_mode = "HTML")
 
             # If no team inform only PM about such situation
@@ -425,9 +419,8 @@ async def naming_project(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
             'title': title,
             'active': True,
             'pm_tg_id': str(context.user_data['PM']['tg_id']),
-            'tg_chat_id': '', # TODO store here group chat where project members discuss project
+            'tg_chat_id': '', # group chat where project members discuss project will be stored here
             'settings': {
-                # TODO decide after user testing whether these settings should be stored in here or in PM's settings
                 'ALLOW_POST_STATUS_TO_GROUP': False,
                 'INFORM_ACTIONERS_OF_MILESTONES': False,
                 },
@@ -589,7 +582,6 @@ def file_to_dict(fp: Path):
 def schedule_jobs(context: ContextTypes.DEFAULT_TYPE) -> dict:
     ''' 
     Schedule jobs for main reminders. Return false if not succeded
-    TODO v2: When custom reminders functionality will be added this function must be revised
     '''    
 
     morning_update_job, day_before_update_job, file_update_job = None, None, None
@@ -958,17 +950,8 @@ async def settings(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     This function handles /settings command, entry point for menu
     """
 
-    # Every user could be PM, but project-PM pair is unique
-    # TODO: Add buttons to change project settings, such as:
-    # + change of PM (see below) (Need to remake Jobs (because of ID))
-    # + change of project name (Needs jobs remake because of job ID)
-    # + Allow status update in group chat
-    # 4. interval of intermidiate reminders
-    # For this purpose I will need ConversationHandler
-    # + Time of daily update of starting and deadline tasks, and days too
-
     # Check if current user is acknowledged PM then proceed otherwise suggest to start a new project
-    if DB != None and is_db(DB): #  and DB != None: could be added to silence pylance (see below)
+    if DB != None and is_db(DB): 
 
         # Let's control which level of settings we are at any given moment
         context.user_data['level'] = FIRST_LVL

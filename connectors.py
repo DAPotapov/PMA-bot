@@ -53,7 +53,9 @@ def load_gan(fp: Path, db: Database) -> list[dict]:
     property_id = ''
     if 'custom_property_definition' in resources:
         for custom_property in resources.custom_property_definition:
-            if custom_property['name'] == 'tg_username': # TODO check for id and name
+            if (custom_property['id'] and 
+                custom_property['name'] and 
+                custom_property['name'] == 'tg_username'): 
                 property_id = custom_property['id']
                 # no need to continue looking through custom properties
                 break
@@ -119,10 +121,6 @@ def load_gan(fp: Path, db: Database) -> list[dict]:
 
     else:
         raise AttributeError('There are no tasks in provided file. Nothing to do.')
-
-    # TODO Resolving GanttProject bug of duplication of resource allocation. 
-    # Better use standalone function in case they will fix this bug
-    
     return tasks 
 
 
@@ -273,9 +271,6 @@ def load_json(fp: Path, db: Database)-> list[dict]:
     This connector useful in case we downloaded JSON, manually made some changes, 
     and upload it again to bot 
     '''
-    # TODO: Do this connector when i'm sure scheme doesn't changes
-    # 1. Limit size of data to load to prevent attacks
-    # 2. 
 
     tasks = []
     

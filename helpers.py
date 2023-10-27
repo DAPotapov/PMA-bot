@@ -365,6 +365,7 @@ def get_keyboard_and_msg(db, level: int, user_id: str, project: dict, branch: st
                     case "projects":
                         if is_db(db):
                             msg = f"You can manage these projects (active project could only be renamed): "
+                            
                             # Get list of projects for user
                             projects = list(db.projects.find({"pm_tg_id": str(user_id)}))
                             
@@ -400,9 +401,6 @@ def get_keyboard_and_msg(db, level: int, user_id: str, project: dict, branch: st
 
                             # Get team members names with telegram ids, except PM
                             # Construct keyboard from that list
-                            # TODO TEST WHat if it's a sole project? Only PM is working? 
-                            # Only Back and Finish will apear
-                            # TODO Refactor to inform user accordinly
                             team = get_project_team(project['_id'], db)
                             keyboard = []
                             if team:
@@ -805,17 +803,3 @@ def is_db(db) -> bool:
         return False
     else:
         return True
-    
-
-def save_json(project: dict, PROJECTJSON: str) -> None:
-    '''
-    Saves project in JSON format and returns it.
-    Obsolete.
-    TODO remove
-    '''
-
-    json_fh = open(PROJECTJSON, 'w', encoding='utf-8')
-    bot_msg = json.dump(project, json_fh, ensure_ascii=False, indent=4)
-    json_fh.close()
-
-    return bot_msg
