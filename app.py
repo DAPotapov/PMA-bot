@@ -364,7 +364,7 @@ async def set_task_accomplished(update: Update, context: CallbackContext):
                 bot_msg = f"Task №{project['tasks'][0]['id']} '<i>{project['tasks'][0]['name']}</i>' marked completed🏁. Congratulations! 🎉🍾"
 
         # Send message
-        await query.edit_message_text(bot_msg)
+        await query.edit_message_text(bot_msg, parse_mode = "HTML")
 
 
 ######### START section ########################

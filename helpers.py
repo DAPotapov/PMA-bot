@@ -357,7 +357,7 @@ def get_keyboard_and_msg(db, level: int, user_id: str, project: dict, branch: st
                                     keyboard = [        
                                         [InlineKeyboardButton(f"Allow status update in group chat: {'On' if project['settings']['ALLOW_POST_STATUS_TO_GROUP'] == True else 'Off'}", callback_data=str(ONE))],
                                         [InlineKeyboardButton(f"Users get anounces about milestones: {'On' if project['settings']['INFORM_ACTIONERS_OF_MILESTONES'] == True else 'Off'}", callback_data=str(TWO))],
-                                        [InlineKeyboardButton(f"/status command notify PM of all projects (not only active): {'On' if pm_settings['settings']['INFORM_OF_ALL_PROJECTS'] == True else 'Off'}", callback_data=str(THREE))],
+                                        [InlineKeyboardButton(f"/status notify PM of all projects: {'On' if pm_settings['settings']['INFORM_OF_ALL_PROJECTS'] == True else 'Off'}", callback_data=str(THREE))],
                                         [InlineKeyboardButton("Back", callback_data='back')], 
                                         [InlineKeyboardButton("Finish settings", callback_data='finish')],        
                                     ]
@@ -629,7 +629,7 @@ def get_status_on_project(project: dict, user_oid: ObjectId | str, db: Database)
     Returns composed message to be sent.
     """
 
-    bot_msg = f"Status of events for project '<b>{project['title']}<b>':"
+    bot_msg = f"Status of events for project '<b>{project['title']}</b>':"
 
     # Add PM username
     pm_username = get_worker_tg_username_by_tg_id(project['pm_tg_id'], db)
