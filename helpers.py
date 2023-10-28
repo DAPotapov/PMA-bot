@@ -407,10 +407,13 @@ def get_keyboard_and_msg(db, level: int, user_id: str, project: dict, branch: st
                                 for member in team:
                                     if user_id != member['tg_id']:
                                         keyboard.append([InlineKeyboardButton(f"{member['name']} (@{member['tg_username']})", callback_data=member['tg_id'])])       
+                            if not keyboard: 
+                                msg = f"You can't transfer control to other one, because you are only participant of this project.\n"
                             keyboard.extend([
                                 [InlineKeyboardButton("Back", callback_data='back')],        
                                 [InlineKeyboardButton("Finish settings", callback_data='finish')]
-                            ])                                
+                            ])             
+
 
             # Third menu level
             case 2:
