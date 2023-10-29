@@ -1966,7 +1966,7 @@ def main() -> None:
                         ],
             SECOND_LVL: [MessageHandler(filters.Document.ALL, file_recieved)]
         },
-        fallbacks=[MessageHandler(filters.TEXT & ~filters.COMMAND, start_ended)]
+        fallbacks=[MessageHandler(filters.TEXT & ~filters.COMMAND, start_ended)],
     )
     application.add_handler(start_conv)
 
@@ -2023,7 +2023,7 @@ def main() -> None:
                 MessageHandler(filters.TEXT & ~filters.COMMAND, project_delete_finish),
             ]
         },
-        fallbacks=[CallbackQueryHandler(finish_settings)]
+        fallbacks=[CallbackQueryHandler(finish_settings)],
     )
     application.add_handler(settings_conv)
 
