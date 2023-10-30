@@ -197,24 +197,20 @@ async def download(update: Update, context: CallbackContext):
         return ConversationHandler.END
 
 
-# TURNED OFF because conflicting with handlers which use input from user (naming project in /start, for example)
-async def echo(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+async def update_staff_on_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """
-    This function would be added to the application as a handler for messages coming from the Bot API
+    Function to update staff list with ids to be able contact users later.
     """
 
-    user = update.message.from_user
-    text = str(update.message.text)
-    logger.info(f'{user.id} ({user.username}): {text}')
-
-    if user:
-        result = add_user_info_to_db(user, DB)
-        if not result:
-            logger.warning(f"User id ({user.id}) of {user.username} was not added to DB (maybe already present).")
-
-    # reply only to personal messages
-    if update.message.chat_id == user.id:
-        await update.message.reply_text(text)
+    # Check if update caused by user and his info was not updated in database yet
+    if update.effective_user:
+        if 'known' not in context.user_data.keys():
+            context.user_data ['known'] = False
+        if context.user_data['known'] == False:
+            result = add_user_info_to_db(update.effective_user, DB)
+            if not result:
+                logger.debug(f"User id ({update.effective_user.id}) of {update.effective_user.username} was not added to DB (maybe already present).")
+            context.user_data['known'] = True
 
 
 async def feedback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
@@ -409,7 +405,7 @@ async def naming_project(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
     
     # Try to clean project title from unnecessary symbols and if not succeed give him another try.
     try: 
-        title = clean_project_title(str(update.message.text)) # to silence type error
+        title = clean_project_title(str(update.message.text.partition())) # to silence type error
     except ValueError as e:
         bot_msg = "Title is not very suitable for human reading. {e}"
         await update.message.reply_text(bot_msg)
@@ -1942,7 +1938,7 @@ def main() -> None:
         )
     )
 
-    # Register commands' handlers
+    # Register handler for /help command
     application.add_handler(CommandHandler(help_cmd.command, help)) 
 
     # Command to trigger project status check.
@@ -1951,10 +1947,10 @@ def main() -> None:
     # Command to allow user to save project file to local computer
     application.add_handler(CommandHandler(download_cmd.command, download))
 
-    # Echo any message that is text and not a command
-    # application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, echo))
+    # Run on any message in a group that is a text and not a command
+    application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND & filters.ChatType.GROUPS, update_staff_on_message))
 
-    # Try to catch which tasks accomplished
+    # Catch when PM pressed a button to mark task accomplished
     application.add_handler(CallbackQueryHandler(set_task_accomplished, pattern="^task"))
 
     # Conversation handler for /start
@@ -1966,7 +1962,7 @@ def main() -> None:
                         ],
             SECOND_LVL: [MessageHandler(filters.Document.ALL, file_recieved)]
         },
-        fallbacks=[MessageHandler(filters.TEXT & ~filters.COMMAND, start_ended)],
+        fallbacks=[MessageHandler(filters.TEXT & ~filters.COMMAND, start_ended)]
     )
     application.add_handler(start_conv)
 
@@ -2023,7 +2019,7 @@ def main() -> None:
                 MessageHandler(filters.TEXT & ~filters.COMMAND, project_delete_finish),
             ]
         },
-        fallbacks=[CallbackQueryHandler(finish_settings)],
+        fallbacks=[CallbackQueryHandler(finish_settings)]
     )
     application.add_handler(settings_conv)
 
