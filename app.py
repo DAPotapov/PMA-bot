@@ -91,9 +91,9 @@ settings_cmd = BotCommand("settings", "настройка параметров �
 feedback_cmd = BotCommand("feedback", "отправка сообщения разработчику")
 start_cmd = BotCommand("start", "запуск бота")
 stop_cmd = BotCommand("stop", "прекращение работы бота")
-upload_cmd = BotCommand("upload", "загрузка нового файла проекта для активного проекта \
-                        (например, если сдвинули сроки или заменили исполнителя в MS Project'е)\
-                        (работает только в личных сообщениях)")
+upload_cmd = BotCommand("upload", "загрузка нового файла проекта для активного проекта" +
+                        "(например, если сдвинули сроки или заменили исполнителя в MS Project'е)" +
+                        "(работает только в личных сообщениях)")
 download_cmd = BotCommand("download", "скачать файл проекта (пока в формате .json)")
 
 # States of settings menu:
@@ -187,7 +187,7 @@ async def download(update: Update, context: CallbackContext):
         else:
             if update.effective_user: # silence pylance
                 add_user_info_to_db(update.effective_user, DB)
-            bot_msg = f"Change in project can be made only after starting one: use /start command to start a project."
+            bot_msg = f"To download a project file you should /start a project first."
             await update.message.reply_text(bot_msg)
             return ConversationHandler.END
     else:
@@ -195,22 +195,6 @@ async def download(update: Update, context: CallbackContext):
         logger.error(f"Error occured while accessing database.")
         await context.bot.send_message(update.effective_user.id, bot_msg)
         return ConversationHandler.END
-
-
-async def update_staff_on_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    """
-    Function to update staff list with ids to be able contact users later.
-    """
-
-    # Check if update caused by user and his info was not updated in database yet
-    if update.effective_user:
-        if 'known' not in context.user_data.keys():
-            context.user_data ['known'] = False
-        if context.user_data['known'] == False:
-            result = add_user_info_to_db(update.effective_user, DB)
-            if not result:
-                logger.debug(f"User id ({update.effective_user.id}) of {update.effective_user.username} was not added to DB (maybe already present).")
-            context.user_data['known'] = True
 
 
 async def feedback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
@@ -846,6 +830,22 @@ async def stop_aborted(update: Update, context: ContextTypes.DEFAULT_TYPE) -> in
     bot_msg = "Stopping bot aborted."
     await context.bot.send_message(update.effective_user.id, bot_msg)  
     return ConversationHandler.END
+
+
+async def update_staff_on_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """
+    Function to update staff list with ids to be able contact users later.
+    """
+
+    # Check if update caused by user and his info was not updated in database yet
+    if update.effective_user:
+        if 'known' not in context.user_data.keys():
+            context.user_data ['known'] = False
+        if context.user_data['known'] == False:
+            result = add_user_info_to_db(update.effective_user, DB)
+            if not result:
+                logger.debug(f"User id ({update.effective_user.id}) of {update.effective_user.username} was not added to DB (maybe already present).")
+            context.user_data['known'] = True
 
 
 async def upload(update: Update, context: CallbackContext) -> int:
@@ -1945,7 +1945,7 @@ def main() -> None:
     application.add_handler(CommandHandler(status_cmd.command, status))
 
     # Command to allow user to save project file to local computer
-    application.add_handler(CommandHandler(download_cmd.command, download))
+    application.add_handler(CommandHandler(download_cmd.command, download, ~filters.ChatType.GROUPS))
 
     # Run on any message in a group that is a text and not a command
     application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND & filters.ChatType.GROUPS, update_staff_on_message))
@@ -1955,7 +1955,7 @@ def main() -> None:
 
     # Conversation handler for /start
     start_conv = ConversationHandler(
-        entry_points=[CommandHandler(start_cmd.command, start)],
+        entry_points=[CommandHandler(start_cmd.command, start, ~filters.ChatType.GROUPS)],
         states={
             FIRST_LVL: [MessageHandler(filters.TEXT & ~(filters.COMMAND | filters.Regex(re.compile('^cancel$', re.IGNORECASE))), naming_project),
                         MessageHandler(filters.Regex(re.compile('^cancel$', re.IGNORECASE)), start_ended)
@@ -1968,7 +1968,7 @@ def main() -> None:
 
     # Conversation handler for /feedback command
     feedback_conv = ConversationHandler(
-        entry_points=[CommandHandler(feedback_cmd.command, feedback)],
+        entry_points=[CommandHandler(feedback_cmd.command, feedback, ~filters.ChatType.GROUPS)],
         states={
             FIRST_LVL: [MessageHandler(filters.TEXT & ~filters.COMMAND, feedback_answer)]
         },
