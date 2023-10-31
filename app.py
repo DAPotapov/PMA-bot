@@ -220,6 +220,14 @@ async def feedback_answer(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
     return ConversationHandler.END
 
 
+async def feedback_aborted(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    """ Fallback function for feeadback command"""
+
+    bot_msg = "Feedback aborted."
+    await update.message.reply_text(bot_msg)
+    return ConversationHandler.END
+
+
 async def file_update(context: ContextTypes.DEFAULT_TYPE) -> None:
     '''
     This function is a reminder for team members that common files should be updated in the end of the week
@@ -389,7 +397,7 @@ async def naming_project(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
     
     # Try to clean project title from unnecessary symbols and if not succeed give him another try.
     try: 
-        title = clean_project_title(str(update.message.text.partition())) # to silence type error
+        title = clean_project_title(str(update.message.text)) # to silence type error
     except ValueError as e:
         bot_msg = "Title is not very suitable for human reading. {e}"
         await update.message.reply_text(bot_msg)
@@ -761,7 +769,7 @@ async def stop(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     if DB != None and is_db(DB): 
         docs_count = DB.projects.count_documents({"pm_tg_id": str(update.effective_user.id)})
         if docs_count > 0:
-            bot_msg = (f"🛑 Are you sure? This will <b>delete all of your projects<b> from bot.🛑\n" 
+            bot_msg = (f"🛑 Are you sure? This will <b>delete all of your projects</b> from bot.🛑\n" 
                         "You can disable reminders in /settings if they are bothering you"
                             " (but this will made bot pointless)")
             keyboard = [        
@@ -783,9 +791,9 @@ async def stop(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
                     # Collect names of projects with their PMs tg_username to contact
                     projects_with_PMs = get_projects_and_pms_for_user(user_oid, DB)
                     if projects_with_PMs:
-                        bot_msg = f"I'm afraid I can't stop informing you of events of other people projects: {projects_with_PMs}"
+                        bot_msg = f"I'm afraid I can't stop informing you of events of other people's projects: {projects_with_PMs}"
                     else:
-                        bot_msg = f"I'm afraid I can't stop informing you of events of other people projects."
+                        bot_msg = f"I'm afraid I can't stop informing you of events of other people's projects."
                         logger.warning(f"Couldn't gather information about projects and PMs where user {update.effective_user.id} participate")
 
             # If he don't participate in any project - be quiet
@@ -935,8 +943,11 @@ async def upload_ended(update: Update, context: CallbackContext) -> int:
     """Fallback function for /upload command conversation"""
     bot_msg = "Upload aborted"
     query = update.callback_query
-    await query.answer()
-    await query.edit_message_text(bot_msg)
+    if query:
+        await query.answer()
+        await query.edit_message_text(bot_msg)
+    elif update.message:
+        await update.message.reply_text(bot_msg)
     return ConversationHandler.END
 
 
@@ -1029,6 +1040,17 @@ async def finish_settings(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
     query = update.callback_query
     await query.answer()
     await query.edit_message_text(text="Settings done. You can do something else now.")
+    return ConversationHandler.END
+
+
+async def settings_aborted(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    '''
+    Fallback function of settings conversation
+    '''
+
+    bot_msg = "Settings function aborted."
+    logger.warning(f"User: {update.message.from_user.username} ({update.message.from_user.id}) wrote: {update.message.text} in settings function.")
+    await update.message.reply_text(bot_msg)
     return ConversationHandler.END
 
 
@@ -1957,14 +1979,18 @@ def main() -> None:
     start_conv = ConversationHandler(
         entry_points=[CommandHandler(start_cmd.command, start, ~filters.ChatType.GROUPS)],
         states={
-            FIRST_LVL: [MessageHandler(filters.TEXT & ~(filters.COMMAND | filters.Regex(re.compile('^cancel$', re.IGNORECASE))), naming_project),
-                        MessageHandler(filters.Regex(re.compile('^cancel$', re.IGNORECASE)), start_ended)
+            FIRST_LVL: [ # Оставить только ожидаемое, остальное должно упасть в fallback
+                MessageHandler(filters.TEXT & ~(filters.COMMAND | filters.Regex(re.compile('^cancel$', re.IGNORECASE))), naming_project),
+                # MessageHandler(filters.Regex(re.compile('^cancel$', re.IGNORECASE)), start_ended)
                         ],
             SECOND_LVL: [MessageHandler(filters.Document.ALL, file_recieved)]
         },
-        fallbacks=[MessageHandler(filters.TEXT & ~filters.COMMAND, start_ended)]
+        fallbacks=[
+            MessageHandler(filters.TEXT | filters.COMMAND, start_ended),
+            MessageHandler(filters.Regex(re.compile('^cancel$', re.IGNORECASE)), start_ended)
+            ],
     )
-    application.add_handler(start_conv)
+    application.add_handler(start_conv, group=1)
 
     # Conversation handler for /feedback command
     feedback_conv = ConversationHandler(
@@ -1972,9 +1998,9 @@ def main() -> None:
         states={
             FIRST_LVL: [MessageHandler(filters.TEXT & ~filters.COMMAND, feedback_answer)]
         },
-        fallbacks=[MessageHandler(filters.TEXT & ~filters.COMMAND, feedback_answer)]
+        fallbacks=[MessageHandler(filters.COMMAND, feedback_aborted)]
     )
-    application.add_handler(feedback_conv)
+    application.add_handler(feedback_conv, group=3)
 
     # PM should have the abibility to change bot behaviour, such as reminder interval and so on
     # Configure /settings conversation and add a handler
@@ -2013,15 +2039,18 @@ def main() -> None:
                 MessageHandler(filters.TEXT & ~filters.COMMAND, reminder_days_setter),
             ],
             SIXTH_LVL: [
-                MessageHandler(filters.TEXT & ~filters.COMMAND, project_rename_finish),
+                MessageHandler(filters.TEXT & ~filters.COMMAND & ~filters.Regex(re.compile('^cancel$', re.IGNORECASE)), project_rename_finish),
             ],
             SEVENTH_LVL: [
                 MessageHandler(filters.TEXT & ~filters.COMMAND, project_delete_finish),
             ]
         },
-        fallbacks=[CallbackQueryHandler(finish_settings)]
+        fallbacks=[
+            MessageHandler(filters.COMMAND, settings_aborted), 
+            MessageHandler(filters.Regex(re.compile('^cancel$', re.IGNORECASE)), settings_aborted)
+        ]
     )
-    application.add_handler(settings_conv)
+    application.add_handler(settings_conv, group=2)
 
     # Configure /stop conversation and add a handler
     stop_conv = ConversationHandler(
@@ -2032,9 +2061,9 @@ def main() -> None:
                 CallbackQueryHandler(stop_aborted, pattern="^" + str(TWO) + "$")
             ]
         },
-        fallbacks=[MessageHandler(filters.TEXT & ~filters.COMMAND, stop_aborted)]
+        fallbacks=[MessageHandler(filters.TEXT | filters.COMMAND, stop_aborted)]
     )
-    application.add_handler(stop_conv)
+    application.add_handler(stop_conv, group=5)
 
     # Configure /upload conversation and add a handler
     upload_conv = ConversationHandler(
@@ -2044,9 +2073,9 @@ def main() -> None:
                 MessageHandler(filters.Document.ALL, upload_file_recieved),
                 CallbackQueryHandler(upload_ended, pattern="^" + str(ONE) + "$")],
         },
-        fallbacks=[MessageHandler(filters.TEXT & ~filters.COMMAND, upload_ended)]
+        fallbacks=[MessageHandler(filters.COMMAND, upload_ended)]
     )
-    application.add_handler(upload_conv)
+    application.add_handler(upload_conv, group=4)
 
     # Start the Bot and run it until Ctrl+C pressed
     application.run_polling()

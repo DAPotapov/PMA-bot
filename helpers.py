@@ -541,13 +541,8 @@ def get_projects_and_pms_for_user(user_oid: ObjectId | str, db: Database) -> str
     
     projects_and_pms = ''
 
-    # Check type of user_oid
-    if type(user_oid) == str:
-        oid = ObjectId(user_oid)
-    elif type(user_oid) == ObjectId:
-        oid = user_oid
-    else:
-        return projects_and_pms
+    # Convert user_oid to string before search in db
+    oid = str(user_oid)
     
     try:
         projects = list(db.projects.find(
