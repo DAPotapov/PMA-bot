@@ -508,15 +508,12 @@ async def file_recieved(update: Update, context: ContextTypes.DEFAULT_TYPE) -> i
                         if result.acknowledged and result.modified_count == 0:
                             logger.error(f"Error making project inactive when user '{update.effective_user.id}' project '{context.user_data['project']['title']}'")
                             bot_msg = (bot_msg + f"Attempt to update database was unsuccessful. Records maybe corrupted. Contact developer or try later.")
-                            await update.message.reply_text(bot_msg)
-                            return ConversationHandler.END                                  
                             
             else:
                 bot_msg = (bot_msg + f"There is a problem with database connection. Contact developer or try later.")
                 logger.error(f"Error occured while accessing database.")
-                await update.message.reply_text(bot_msg)
-                return ConversationHandler.END        
   
+        # If provided file couldn't be processed let user try again
         else:
             logger.warning(f"User '{update.effective_user.id}' tried to upload unsupported file: '{update.message.document.file_name}'")
             bot_msg = (f"Couldn't process given file.\n"
@@ -525,8 +522,11 @@ async def file_recieved(update: Update, context: ContextTypes.DEFAULT_TYPE) -> i
                         f"If you would like to see other formats supported feel free to message bot developer via /feedback command.\n"
                         f"Try upload another one."
             )
+            await update.message.reply_text(bot_msg, parse_mode="HTML")
+            return SECOND_LVL
+
         await update.message.reply_text(bot_msg, parse_mode="HTML")
-        return SECOND_LVL
+        return ConversationHandler.END
 
 
 async def start_ended(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
