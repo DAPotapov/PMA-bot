@@ -9,7 +9,11 @@ import os
 from bson import ObjectId
 from datetime import date
 from dotenv import load_dotenv
-from pymongo.errors import ConnectionFailure, ServerSelectionTimeoutError, PyMongoError
+from pymongo.errors import (
+    ConnectionFailure,
+    ServerSelectionTimeoutError,
+    PyMongoError
+)
 from pymongo.database import Database
 from re import sub
 from telegram import InlineKeyboardMarkup, User, InlineKeyboardButton
@@ -45,7 +49,7 @@ def add_user_id_to_db(user: User, db: Database) -> ObjectId | None:
 
     if (
         record
-        and type(record) == dict
+        and type(record) is dict
         and "tg_id" in record.keys()
         and not record["tg_id"]
     ):
@@ -53,7 +57,7 @@ def add_user_id_to_db(user: User, db: Database) -> ObjectId | None:
         result = db.staff.update_one(
             {"tg_username": user.username}, {"$set": {"tg_id": str(user.id)}}
         )
-        if result.modified_count > 0 and type(record["_id"]) == ObjectId:
+        if result.modified_count > 0 and type(record["_id"]) is ObjectId:
             output = record["_id"]
 
     return output
@@ -73,7 +77,7 @@ def add_user_info_to_db(user: User, db: Database) -> ObjectId | None:
     # Check if field is empty and fill it with corresponding field from User
     if (
         db_user
-        and type(db_user) == dict
+        and type(db_user) is dict
         and "tg_id" in db_user.keys()
         and "name" in db_user.keys()
     ):
@@ -91,7 +95,7 @@ def add_user_info_to_db(user: User, db: Database) -> ObjectId | None:
             result = db.staff.update_one(
                 {"tg_username": user.username}, {"$set": dict2update}
             )
-            if result.modified_count > 0 and type(db_user["_id"]) == ObjectId:
+            if result.modified_count > 0 and type(db_user["_id"]) is ObjectId:
                 output = db_user["_id"]
     return output
 
@@ -124,7 +128,7 @@ def add_worker_info_to_staff(worker: dict, db: Database) -> str:
         worker_id = db.staff.insert_one(worker).inserted_id
     else:
         db_worker = db.staff.find_one({"_id": ObjectId(worker_id)})
-        if db_worker and type(db_worker) == dict:
+        if db_worker and type(db_worker) is dict:
             for key in worker.keys():
                 if not db_worker[key]:
                     db_worker[key] = worker[key]
@@ -150,7 +154,7 @@ def clean_project_title(user_input: str) -> str:
     max_title_len = 128
 
     # Replace whitespaces and their doubles with spaces, cut leading and ending spaces
-    title = sub("\s+", " ", user_input).strip()
+    title = sub("\s+", " ", user_input).strip()  # noqa: W605
     if not title:
         raise ValueError("Title absent")
 
@@ -204,12 +208,12 @@ def get_active_project(
         # Check if there is project of proper type to return
         if (
             project
-            and type(project) == dict
+            and type(project) is dict
             and "title" in project.keys()
             and project["title"]
         ):
             # Make other projects inactive
-            deactivated = db.projects.update_many(
+            deactivated = db.projects.update_many(  # noqa: F841
                 {"pm_tg_id": pm_tg_id, "active": True, "_id": {"$ne": project["_id"]}},
                 {"$set": {"active": False}},
             )
@@ -240,7 +244,7 @@ def get_assignees(task: dict, db: Database) -> tuple[str, list]:
         except PyMongoError as e:
             logger.error(f"Error using DB: {e}")
         else:
-            if team_member and type(team_member) == dict:
+            if team_member and type(team_member) is dict:
                 if "tg_id" in team_member.keys() and team_member["tg_id"]:
                     user_tg_ids.append(team_member["tg_id"])
                 if len(people) > 0:
@@ -378,27 +382,27 @@ def get_keyboard_and_msg(
                 keyboard = [
                     [
                         InlineKeyboardButton(
-                            f"Change notifications settings",
+                            "Change notifications settings",
                             callback_data="notifications",
                         )
                     ],
                     [
                         InlineKeyboardButton(
-                            f"Manage projects", callback_data="projects"
+                            "Manage projects", callback_data="projects"
                         )
                     ],
                     [
                         InlineKeyboardButton(
-                            f"Reminders settings", callback_data="reminders"
+                            "Reminders settings", callback_data="reminders"
                         )
                     ],
                     [
                         InlineKeyboardButton(
-                            f"Transfer control over active project to other user",
+                            "Transfer control over active project to other user",
                             callback_data="control",
                         )
                     ],
-                    [InlineKeyboardButton(f"Finish settings", callback_data="finish")],
+                    [InlineKeyboardButton("Finish settings", callback_data="finish")],
                 ]
 
             # Second level of menu
@@ -415,12 +419,12 @@ def get_keyboard_and_msg(
                             else:
                                 if (
                                     pm_settings
-                                    and type(pm_settings) == dict
+                                    and type(pm_settings) is dict
                                     and "settings" in pm_settings.keys()
                                     and "INFORM_OF_ALL_PROJECTS"
                                     in pm_settings["settings"].keys()
                                 ):
-                                    msg = f"Manage notification settings:"
+                                    msg = "Manage notification settings:"
                                     keyboard = [
                                         [
                                             InlineKeyboardButton(
@@ -455,7 +459,7 @@ def get_keyboard_and_msg(
 
                     case "projects":
                         if is_db(db):
-                            msg = f"You can manage these projects (active project could only be renamed): "
+                            msg = "You can manage these projects (active project could only be renamed): "
 
                             # Get list of projects for user
                             projects = list(
@@ -474,7 +478,7 @@ def get_keyboard_and_msg(
                                     ]
                                 )
 
-                                if project["active"] == False:
+                                if project["active"] is False:
                                     row = [
                                         InlineKeyboardButton(
                                             f"Activate '{project['title']}'",
@@ -502,7 +506,7 @@ def get_keyboard_and_msg(
                             )
 
                     case "reminders":
-                        msg = f"You can customize reminders here."
+                        msg = "You can customize reminders here."
                         keyboard = [
                             [
                                 InlineKeyboardButton(
@@ -533,7 +537,7 @@ def get_keyboard_and_msg(
                     case "control":
                         if is_db(db):
                             msg = (
-                                f"Choose a project team member to transfer control to."
+                                "Choose a project team member to transfer control to."
                             )
 
                             # Get team members names with telegram ids, except PM
@@ -552,7 +556,7 @@ def get_keyboard_and_msg(
                                             ]
                                         )
                             if not keyboard:
-                                msg = f"Can't do that. Ask other project team members (if any) to contact bot to this function to work.\n"
+                                msg = "Can't do that. Ask other project team members (if any) to contact bot to this function to work.\n"
                             keyboard.extend(
                                 [
                                     [
@@ -588,16 +592,16 @@ def get_keyboard_and_msg(
                 # Message contents depend on a branch of menu, return None if nonsense given
                 match branch:
                     case "morning_update":
-                        msg = f"Daily morning reminder has to be set here.\n"
+                        msg = "Daily morning reminder has to be set here.\n"
                         keyboard = reminders_kbd
                     case "day_before_update":
-                        msg = f"The day before reminder has to be set here. \n"
+                        msg = "The day before reminder has to be set here. \n"
                         keyboard = reminders_kbd
                     case "friday_update":
-                        msg = f"Reminder for file updates on friday has to be set here. \n"
+                        msg = "Reminder for file updates on friday has to be set here. \n"
                         keyboard = reminders_kbd
                     case "delete":
-                        msg = f"Are you sure?"
+                        msg = "Are you sure?"
                         keyboard = project_delete_kbd
 
     return keyboard, msg
@@ -621,7 +625,7 @@ def get_message_and_button_for_task(
         delta_end = date.today() - date.fromisoformat(task["enddate"])
 
         # Information about milestones and other tasks composed slightly different
-        if task["milestone"] == True:
+        if task["milestone"] is True:
             # Inform PM of future milestones
             if delta_end.days < 0:
                 msg = f"🎌Milestone '{task['name']}' is near ({task['enddate']})!🎌"
@@ -671,7 +675,7 @@ def get_project_by_title(db: Database, pm_tg_id: str, title: str) -> dict:
     # Check that returned all data needed
     if (
         project
-        and type(project) == dict
+        and type(project) is dict
         and "tasks" in project.keys()
         and "pm_tg_id" in project.keys()
         and project["tasks"]
@@ -716,7 +720,7 @@ def get_projects_and_pms_for_user(user_oid: ObjectId | str, db: Database) -> str
                     projects_and_pms += ", "
                 if (
                     project
-                    and type(project) == dict
+                    and type(project) is dict
                     and "title" in project.keys()
                     and "pm_tg_id" in project.keys()
                     and project["title"]
@@ -740,16 +744,16 @@ def get_project_team(prj_oid: ObjectId | str, db: Database) -> list[dict]:
     """
     team = []
 
-    if type(prj_oid) == str:
+    if type(prj_oid) is str:
         project = db.projects.find_one({"_id": ObjectId(prj_oid)})
-    elif type(prj_oid) == ObjectId:
+    elif type(prj_oid) is ObjectId:
         project = db.projects.find_one({"_id": prj_oid})
     else:
         project = {}
 
     if (
         project
-        and type(project) == dict
+        and type(project) is dict
         and "tasks" in project.keys()
         and project["tasks"]
     ):
@@ -770,7 +774,7 @@ def get_project_team(prj_oid: ObjectId | str, db: Database) -> list[dict]:
                         except PyMongoError as e:
                             logger.error(f"Error using DB: {e}")
                         else:
-                            if result and type(result) == dict:
+                            if result and type(result) is dict:
                                 # Convert ObjectId to string for further serialization to json
                                 result["_id"] = str(result["_id"])
                                 team.append(result)
@@ -872,7 +876,7 @@ def get_status_on_project(project: dict, user_oid: ObjectId | str, db: Database)
         logger.error(
             f"Something wrong: user has id: {user_oid} but no tg_username in DB"
         )
-        bot_msg = f"Error occured while processing your query"
+        bot_msg = "Error occured while processing your query"
     return bot_msg
 
 
@@ -891,10 +895,10 @@ def get_worker_oid_from_db_by_tg_username(tg_username: str, db: Database) -> str
     else:
         if (
             result
-            and type(result) == dict
+            and type(result) is dict
             and "_id" in result.keys()
             and result["_id"]
-            and type(result["_id"]) == ObjectId
+            and type(result["_id"]) is ObjectId
         ):  # Just to be certain about type to return
             worker_id = str(result["_id"])
 
@@ -916,10 +920,10 @@ def get_worker_oid_from_db_by_tg_id(tg_id: str, db: Database) -> str:
     else:
         if (
             result
-            and type(result) == dict
+            and type(result) is dict
             and "_id" in result.keys()
             and result["_id"]
-            and type(result["_id"]) == ObjectId
+            and type(result["_id"]) is ObjectId
         ):
             worker_id = str(result["_id"])
 
@@ -941,7 +945,7 @@ def get_worker_tg_id_from_db_by_tg_username(tg_username: str, db: Database) -> s
     else:
         if (
             result
-            and type(result) == dict
+            and type(result) is dict
             and "tg_id" in result.keys()
             and result["tg_id"]
         ):
@@ -956,9 +960,9 @@ def get_worker_tg_username_by_oid(user_oid: ObjectId | str, db: Database) -> str
     tg_un = ""
 
     try:
-        if type(user_oid) == str:
+        if type(user_oid) is str:
             result = db.staff.find_one({"_id": ObjectId(user_oid)})
-        elif type(user_oid) == ObjectId:
+        elif type(user_oid) is ObjectId:
             result = db.staff.find_one({"_id": user_oid})
         else:
             result = {}
@@ -966,7 +970,7 @@ def get_worker_tg_username_by_oid(user_oid: ObjectId | str, db: Database) -> str
     except PyMongoError as e:
         logger.error(f"Error using DB: {e}")
     else:
-        if result and type(result) == dict and "tg_username" in result.keys():
+        if result and type(result) is dict and "tg_username" in result.keys():
             tg_un = result["tg_username"]
     return str(tg_un)
 
@@ -983,7 +987,7 @@ def get_worker_tg_username_by_tg_id(tg_id: str, db: Database) -> str:
     except PyMongoError as e:
         logger.error(f"Error using DB: {e}")
     else:
-        if result and type(result) == dict and "tg_username" in result.keys():
+        if result and type(result) is dict and "tg_username" in result.keys():
             tg_un = result["tg_username"]
 
     return str(tg_un)
