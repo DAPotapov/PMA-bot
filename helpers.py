@@ -2,9 +2,7 @@
 Some helper functions to help main functions to manupulate with data
 """
 
-import json
 import logging
-import bson
 import pymongo
 import os
 
