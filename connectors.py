@@ -115,7 +115,7 @@ def load_gan(fp: Path, db: Database) -> list[dict]:
     # If no custom property for tg_username found then inform developer
     else:
         raise AttributeError(
-            f"Project file has invalid structure: no 'tg_username' field"
+            "Project file has invalid structure: no 'tg_username' field"
         )
 
     if "tasks" in obj.project and "task" in obj.project.tasks:
@@ -239,7 +239,7 @@ def compose_tasks_list(
                 )
             try:
                 depend_type = GAN_DEPEND_TYPES[int(str(follower["type"])) - 1]
-            except IndexError as e:
+            except IndexError:
                 raise ValueError(
                     f"Unknown dependency type ('{follower['type']}')of successor task: {follower['id']}"
                 )
@@ -321,11 +321,11 @@ def load_json(fp: Path, db: Database) -> list[dict]:
         # Check and get two lists: tasks and staff
         if (
             project
-            and type(project) == dict
+            and type(project) is dict
             and "tasks" in project.keys()
             and "staff" in project.keys()
-            and type(project["tasks"]) == list
-            and type(project["staff"]) == list
+            and type(project["tasks"]) is list
+            and type(project["staff"]) is list
             and project["tasks"]
             and project["staff"]
         ):
@@ -391,7 +391,7 @@ def load_json(fp: Path, db: Database) -> list[dict]:
 
                 # Complete have type integer
                 if (
-                    type(task["complete"]) != int
+                    type(task["complete"]) is not int
                     and task["complete"] >= 0
                     and task["complete"] < 101
                 ):
@@ -406,7 +406,7 @@ def load_json(fp: Path, db: Database) -> list[dict]:
                     )
 
                 # Regular task should have actioners and enddate later than startdate
-                if task["milestone"] == False and not task["include"]:
+                if task["milestone"] is False and not task["include"]:
                     if not task["actioners"]:
                         raise ValueError(
                             f"Taks #{task['id']} '{task['name']}' has no actioners."
@@ -703,7 +703,7 @@ def load_xml(fp: Path, db: Database) -> list[dict]:
                         record["include"].append(int(task.UID.cdata))
             record["successors"] = successors
     else:
-        raise AttributeError(f"There are no tasks in provided file. Nothing to do.")
+        raise AttributeError("There are no tasks in provided file. Nothing to do.")
     return tasks
 
 
@@ -713,7 +713,7 @@ def xml_date_conversion(input_date: str) -> str:
     """
 
     # Given date from XML, expect dateTime Project format
-    datestring = re.search("^\d{4}-\d{2}-\d{2}", input_date)
+    datestring = re.search("^\d{4}-\d{2}-\d{2}", input_date)  # noqa: W605
     if not datestring:
         raise ValueError(f"Error in start date found ({datestring})")
     else:
