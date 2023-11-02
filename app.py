@@ -18,6 +18,7 @@ import sys
 import tempfile
 
 from bson import ObjectId
+from connectors import load_gan, load_json, load_xml
 from dotenv import load_dotenv
 from datetime import datetime, date, time
 from helpers import (
@@ -37,16 +38,11 @@ from helpers import (
     get_worker_oid_from_db_by_tg_id,
     get_worker_oid_from_db_by_tg_username,
     is_db,
-    extract_tasks_from_file
 )
-
+from pathlib import Path
 from ptbcontrib.ptb_jobstores import PTBMongoDBJobStore
-from telegram import (
-    BotCommand,
-    Update,
-    InlineKeyboardMarkup,
-    InlineKeyboardButton
-)
+from pymongo.database import Database
+from telegram import BotCommand, Update, InlineKeyboardMarkup, InlineKeyboardButton
 from telegram.ext import (
     Application,
     CommandHandler,
@@ -116,6 +112,40 @@ FIRST_LVL, SECOND_LVL, THIRD_LVL, FOURTH_LVL, FIFTH_LVL, SIXTH_LVL, SEVENTH_LVL 
 # Callback data for settings menu
 ONE, TWO, THREE = range(3)
 
+
+def extract_tasks_from_file(fp: Path, db: Database) -> list[dict]:
+    """
+    Get file with project,
+    determine supported type,
+    call dedicated function to get list of tasks,
+    return it to caller.
+    Return empty list on error.
+    """
+
+    tasks = []
+
+    # If file is known format:
+    # call appropriate function with this file as argument
+    # and expect project dictionary on return
+    try:
+        match fp.suffix:
+            case ".gan":
+                tasks = load_gan(fp, db)
+
+            case ".json":
+                tasks = load_json(fp, db)
+
+            case ".xml":
+                tasks = load_xml(fp, db)
+
+            # else log what was tried to be loaded
+            case _:
+                logger.warning(f"Someone tried to load '{fp.suffix}' file.")
+    except (AttributeError, IndexError, ValueError, json.JSONDecodeError) as e:
+        logger.error(f"{e}")
+    finally:
+        return tasks
+    
 
 async def day_before_update(context: ContextTypes.DEFAULT_TYPE) -> None:
     """
@@ -643,16 +673,16 @@ def schedule_jobs(context: ContextTypes.DEFAULT_TYPE) -> dict:
     day_before_update_job = None
     file_update_job = None
 
-    # Construct additinal information to store in job.data 
+    # Construct additinal information to store in job.data
     # to be available when job runs
     data = {
         "project_title": context.user_data["project"]["title"],
         "pm_tg_id": str(context.user_data["PM"]["tg_id"]),
     }
 
-    """ To persistence to work job must have explicit ID 
+    """ To persistence to work job must have explicit ID
         and 'replace_existing' must be True
-        or a new copy of the job will be created 
+        or a new copy of the job will be created
         every time application restarts! """
     job_kwargs = {"replace_existing": True}
 
@@ -725,7 +755,7 @@ def schedule_jobs(context: ContextTypes.DEFAULT_TYPE) -> dict:
         return {}
 
 
-######### END OF START SECTION ###########
+""" ######### END OF START SECTION ########### """
 
 
 async def status(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -959,9 +989,11 @@ async def stopping(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
             for id in project["reminders"].values():
                 context.job_queue.scheduler.get_job(id).remove()
 
-        # Delete all projects for current user. 
+        # Delete all projects for current user.
         # I don't see necessity for checking result of operation for now.
-        result = DB.projects.delete_many({"pm_tg_id": str(update.effective_user.id)})  # noqa: F841
+        result = DB.projects.delete_many(
+            {"pm_tg_id": str(update.effective_user.id)}
+        )  # noqa: F841
 
         bot_msg = "Projects deleted. Reminders too. Bot stopped."
         await context.bot.send_message(update.effective_user.id, bot_msg)
@@ -1108,7 +1140,9 @@ async def upload_ended(update: Update, context: CallbackContext) -> int:
     return ConversationHandler.END
 
 
-### This part contains functions which make SETTINGS menu functionality #########################################################################
+""" ### This part contains functions which make SETTINGS menu functionality ### """
+
+
 async def settings(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     """
     This function handles /settings command, entry point for menu
@@ -1251,7 +1285,7 @@ async def second_lvl_menu(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
         return context.user_data["level"]
 
 
-### REMINDERS BRANCH
+""" REMINDERS BRANCH """
 
 
 async def allow_status_to_group(
@@ -1407,7 +1441,7 @@ async def notify_of_all_projects(
         return context.user_data["level"]
 
 
-### TRANSFER CONTROL BRANCH
+""" TRANSFER CONTROL BRANCH """
 
 
 async def transfer_control(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
@@ -1551,7 +1585,7 @@ async def transfer_control(update: Update, context: ContextTypes.DEFAULT_TYPE) -
             return context.user_data["level"]
 
 
-### PROJECTS CONTROL BRANCH
+""" PROJECTS CONTROL BRANCH """
 
 
 async def project_activate(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
@@ -1855,7 +1889,7 @@ async def project_rename_finish(
             return context.user_data["level"]
 
 
-### REMINDERS SETTINGS BRANCH
+""" REMINDERS SETTINGS BRANCH """
 
 
 async def reminders_settings_item(
@@ -2273,7 +2307,7 @@ async def reminder_days_setter(
     return context.user_data["level"]
 
 
-### END OF SETTINGS PART #################################
+""" ### END OF SETTINGS PART ### """
 
 
 async def post_init(application: Application) -> None:
