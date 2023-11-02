@@ -326,8 +326,10 @@ def compose_tasks_list(
 def load_json(fp: Path, db: Database) -> list[dict]:
     """
     Loads JSON data from file into dictionary.
-    This connector useful in case we downloaded JSON, manually made some changes,
-    and upload it again to bot
+    This connector useful in case we downloaded JSON,
+    manually made some changes, and upload it again to bot.
+    Returns list of tasks of the project.
+    Returns empty list if something wrong.
     """
 
     tasks = []
@@ -766,7 +768,8 @@ def load_xml(fp: Path, db: Database) -> list[dict]:
 
 def xml_date_conversion(input_date: str) -> str:
     """
-    Convert Project dateTime format (2023-05-15T08:00:00) to inner date format (2023-05-15)
+    Convert Project dateTime format (2023-05-15T08:00:00)
+    to inner date format (2023-05-15)
     """
 
     # Given date from XML, expect dateTime Project format
