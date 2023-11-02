@@ -22,7 +22,7 @@ ONE, TWO, THREE = range(3)
 
 # Configure logging
 logging.basicConfig(
-    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s", level=logging.INFO
+    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s", level=logging.DEBUG
 )
 # logging.basicConfig(filename=".data/log.log",
 #                     filemode='a',
@@ -135,7 +135,7 @@ def add_worker_info_to_staff(worker: dict, db: Database) -> str:
             result = db.staff.replace_one(
                 {"_id": ObjectId(worker_id)}, replacement=db_worker
             )
-            logger.info(
+            logger.debug(
                 f"Results of worker {db_worker['tg_username']} update:"
                 f" '{result.matched_count}' found, '{result.modified_count}' modified."
             )
@@ -671,7 +671,7 @@ def get_message_and_button_for_task(
                     f" {people}."
                 )
             else:
-                logger.info(f"Loop through future task '{task['id']}' '{task['name']}'")
+                logger.debug(f"Loop through future task '{task['id']}' '{task['name']}'")
                 pass
 
     # If task worth mention add a button to message

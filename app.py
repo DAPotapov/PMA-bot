@@ -57,7 +57,7 @@ from telegram.ext import (
 
 # Configure logging
 logging.basicConfig(
-    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s", level=logging.INFO
+    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s", level=logging.DEBUG
 )
 # TODO log to file in production stage
 # logging.basicConfig(filename=".data/log.log",
@@ -89,21 +89,21 @@ except AttributeError as e:
     sys.exit(f"{e}")
 
 # Set list of commands
-help_cmd = BotCommand("help", "выводит данное описание")
-status_cmd = BotCommand("status", "информация о текущем состоянии проекта")
+help_cmd = BotCommand("help", "show commands with their description")
+status_cmd = BotCommand("status", "information about current state of the project")
 settings_cmd = BotCommand(
-    "settings", "настройка параметров бота (работает только в личных сообщениях)"
+    "settings", "change bot parameters (works only in private chats)"
 )
-feedback_cmd = BotCommand("feedback", "отправка сообщения разработчику")
-start_cmd = BotCommand("start", "запуск бота")
-stop_cmd = BotCommand("stop", "прекращение работы бота")
+feedback_cmd = BotCommand("feedback", "send feedback to developer")
+start_cmd = BotCommand("start", "starts this bot or new project")
+stop_cmd = BotCommand("stop", "stops bot")
 upload_cmd = BotCommand(
     "upload",
-    "загрузка нового файла проекта для активного проекта"
-    + "(например, если сдвинули сроки или заменили исполнителя в MS Project'е)"
-    + "(работает только в личных сообщениях)",
+    "upload new schedule for active project"
+    + "(e.g., if some tasks were rescheduled or actioner was replaced)"
+    + "(works only in private chats)",
 )
-download_cmd = BotCommand("download", "скачать файл проекта (пока в формате .json)")
+download_cmd = BotCommand("download", "download actual project file (in .json format for now)")
 
 # States of settings menu:
 FIRST_LVL, SECOND_LVL, THIRD_LVL, FOURTH_LVL, FIFTH_LVL, SIXTH_LVL, SEVENTH_LVL = range(
@@ -2500,7 +2500,10 @@ async def reminder_days_setter(
 
 
 async def post_init(application: Application) -> None:
-    """Function to control list of commands in bot itself. Commands itself are global"""
+    """
+    Function to control list of commands and description in bot itself. 
+    Commands itself are global.
+    """
     await application.bot.set_my_commands(
         [
             download_cmd,
@@ -2513,6 +2516,21 @@ async def post_init(application: Application) -> None:
             upload_cmd,
         ]
     )
+    description = (
+        "The purpose of this bot to assist you as a Project Manager (PM) "
+        "to keep control over project. "
+        "It informs about current state of the provided project: which tasks started, "
+        "which are at deadline, about milestones, and tasks in overdue state. "
+        "It also informs assignees about their tasks. "
+        "You can change time and days when bot should send its reminders."
+    )
+    await application.bot.set_my_description(description)
+    short_description = (
+        "This Assisstant created to help Project Manager (PM) "
+        "and project team keep informed about project status.")
+    await application.bot.set_my_short_description(short_description)
+    bot_name = "Project Manager Assistant bot"
+    await application.bot.set_my_name(bot_name)
 
 
 def main() -> None:
