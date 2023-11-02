@@ -9,7 +9,6 @@
 # Post init
 # Main function
 
-import connectors
 import json
 import logging
 import os
@@ -38,8 +37,9 @@ from helpers import (
     get_worker_oid_from_db_by_tg_id,
     get_worker_oid_from_db_by_tg_username,
     is_db,
+    extract_tasks_from_file
 )
-from pathlib import Path
+
 from ptbcontrib.ptb_jobstores import PTBMongoDBJobStore
 from telegram import (
     BotCommand,
@@ -534,7 +534,7 @@ async def file_recieved(update: Update, context: ContextTypes.DEFAULT_TYPE) -> i
         fp = await gotfile.download_to_drive(os.path.join(tdp, update.message.document.file_name))  # type: ignore
 
         # Call function which converts given file to dictionary and add actioners to staff collection
-        tasks = file_to_dict(fp)
+        tasks = extract_tasks_from_file(fp, DB)
         if tasks:
             bot_msg = "File parsed successfully."
 
@@ -634,50 +634,26 @@ async def start_ended(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int
     return ConversationHandler.END
 
 
-### HELPERS:
-def file_to_dict(fp: Path):
-    """
-    Get file with project, determine supported type, call dedicated function to convert to dictionary, return it to caller
-    """
-
-    tasks = []
-
-    # If file is known format: call appropriate function with this file as argument and expect project dictionary on return
-    try:
-        match fp.suffix:
-            case ".gan":
-                tasks = connectors.load_gan(fp, DB)
-
-            case ".json":
-                tasks = connectors.load_json(fp, DB)
-
-            case ".xml":
-                tasks = connectors.load_xml(fp, DB)
-
-            # else log what was tried to be loaded
-            case _:
-                logger.warning(f"Someone tried to load '{fp.suffix}' file.")
-    except (AttributeError, IndexError, ValueError, json.JSONDecodeError) as e:
-        logger.error(f"{e}")
-    finally:
-        return tasks
-
-
 def schedule_jobs(context: ContextTypes.DEFAULT_TYPE) -> dict:
     """
     Schedule jobs for main reminders. Return false if not succeded
     """
 
-    morning_update_job, day_before_update_job, file_update_job = None, None, None
+    morning_update_job = None
+    day_before_update_job = None
+    file_update_job = None
 
-    # Construct additinal information to store in job.data to be available when job runs
+    # Construct additinal information to store in job.data 
+    # to be available when job runs
     data = {
         "project_title": context.user_data["project"]["title"],
         "pm_tg_id": str(context.user_data["PM"]["tg_id"]),
     }
 
-    """ To persistence to work job must have explicit ID and 'replace_existing' must be True
-        or a new copy of the job will be created every time application restarts! """
+    """ To persistence to work job must have explicit ID 
+        and 'replace_existing' must be True
+        or a new copy of the job will be created 
+        every time application restarts! """
     job_kwargs = {"replace_existing": True}
 
     # Use default values from constants for time
@@ -1068,7 +1044,7 @@ async def upload_file_recieved(update: Update, context: CallbackContext) -> int:
         fp = await gotfile.download_to_drive(os.path.join(tdp, update.message.document.file_name))  # type: ignore
 
         # Call function which converts given file to dictionary and add actioners to staff collection
-        tasks = file_to_dict(fp)
+        tasks = extract_tasks_from_file(fp, DB)
         if tasks:
             bot_msg = "File parsed successfully."
 

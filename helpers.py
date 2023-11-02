@@ -2,6 +2,8 @@
 Some helper functions to help main functions to manupulate with data
 """
 
+import connectors
+import json
 import logging
 import pymongo
 import os
@@ -9,6 +11,7 @@ import os
 from bson import ObjectId
 from datetime import date
 from dotenv import load_dotenv
+from pathlib import Path
 from pymongo.errors import (
     ConnectionFailure,
     ServerSelectionTimeoutError,
@@ -1006,3 +1009,37 @@ def is_db(db) -> bool:
         return False
     else:
         return True
+
+
+def extract_tasks_from_file(fp: Path, db: Database) -> list[dict]:
+    """
+    Get file with project, 
+    determine supported type, 
+    call dedicated function to get list of tasks, 
+    return it to caller.
+    Return empty list on error.
+    """
+
+    tasks = []
+
+    # If file is known format:
+    # call appropriate function with this file as argument
+    # and expect project dictionary on return
+    try:
+        match fp.suffix:
+            case ".gan":
+                tasks = connectors.load_gan(fp, db)
+
+            case ".json":
+                tasks = connectors.load_json(fp, db)
+
+            case ".xml":
+                tasks = connectors.load_xml(fp, db)
+
+            # else log what was tried to be loaded
+            case _:
+                logger.warning(f"Someone tried to load '{fp.suffix}' file.")
+    except (AttributeError, IndexError, ValueError, json.JSONDecodeError) as e:
+        logger.error(f"{e}")
+    finally:
+        return tasks
