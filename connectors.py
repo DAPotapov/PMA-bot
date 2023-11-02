@@ -11,13 +11,18 @@ from untangle import Element, parse
 # Because GanttProject and MS Project have different values for dependency type here is the adaptor
 # Will use MS Project values, because it's more popular program
 # MS Project type of link (depend_type): Values are 0=FF, 1=FS, 2=SF and 3=SS
-# (docs at https://learn.microsoft.com/en-us/office-project/xml-data-interchange/xml-schema-for-the-tasks-element?view=project-client-2016)
-# GanttProject type values: 0 = none, 1 = start-start SS, 2 = finish-start FS, 3 - finish-finish FF, 4 - start-finish SF (usually not used)
+# (docs at https://learn.microsoft.com/en-us/office-project/xml-data-interchange/xml-schema-for-the-tasks-element?view=project-client-2016)  # noqa: E501
+# GanttProject type values:
+# 0 = none, 1 = start-start SS, 2 = finish-start FS,
+# 3 - finish-finish FF, 4 - start-finish SF (usually not used)
 # Map GanttProject dependency types to MS Project
 GAN_DEPEND_TYPES = [3, 1, 0, 2]
 
 # Configure logging
-# logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s', level=logging.INFO)
+# logging.basicConfig(
+#   format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+#   level=logging.INFO
+# )
 logging.basicConfig(
     filename=".data/log.log",
     filemode="a",
@@ -36,7 +41,6 @@ def load_gan(fp: Path, db: Database) -> list[dict]:
     Returns list of tasks.
     """
 
-    # Using untangle on GAN - WORKS. This syntax cleaner and have some useful methods like 'children'
     # Declare dictionary to store data
     tasks = []
 
@@ -142,7 +146,8 @@ def get_tg_un_from_gan_resources(
     resource_id: str, resources: Element, property_id: str
 ) -> str:
     """
-    Find telegram username in dictionary of resources (from .gan file) which corresponds provided id.
+    Find telegram username in dictionary of resources (from .gan file)
+    which corresponds provided id.
     Return None if nothing found. Should be controlled on calling side.
     """
 
@@ -152,7 +157,8 @@ def get_tg_un_from_gan_resources(
         if "custom_property" in actioner and resource_id == actioner["id"]:
             for property in actioner.custom_property:
                 if property["definition-id"] == property_id:
-                    # If such property not filled then abort and tell user to do his job and make a proper file
+                    # If such property not filled then abort
+                    # and tell user to do his job and make a proper file
                     if property["value"]:
                         tg_username = str(property["value"])
                     else:
@@ -167,7 +173,8 @@ def get_tg_un_from_xml_resources(
     resource_id: str, resources: Element, property_id: str
 ) -> str:
     """
-    Find telegram username in dictionary of resources (from .xml file) which corresponds provided id.
+    Find telegram username in dictionary of resources (from .xml file)
+    which corresponds provided id.
     Return None if nothing found. Should be controlled on calling side.
     """
 
@@ -176,7 +183,8 @@ def get_tg_un_from_xml_resources(
         if resource_id == actioner.UID.cdata:
             for property in actioner.ExtendedAttribute:
                 if property.FieldID.cdata == property_id:
-                    # If such property not filled then abort and tell user to do his job and make a proper file
+                    # If such property not filled then abort and tell user to do his job
+                    # and make a proper file
                     if not property.Value.cdata:
                         raise ValueError(
                             f"'{actioner.Name.cdata}' have no tg_username value"
@@ -213,19 +221,26 @@ def compose_tasks_list(
                 if actioner_id:
                     actioners.append(
                         {
-                            "actioner_id": actioner_id,  # Now this field stores id of document in staff collection
-                            "nofeedback": False,  # Default. Will be changed to True if person didn't answer to bot
+                            "actioner_id": (
+                                actioner_id
+                            ),  # Now this field stores id of document in staff collection
+                            "nofeedback": (
+                                False
+                            ),  # Default. Will be changed to True if person didn't answer to bot
                         }
                     )
                 else:
                     raise AttributeError(
-                        f"Couldn't get ObjectId from DB for '{tg_username} while processing task-id='{task['id']}'"
-                        f"and resource-id='{allocation['resource-id']}' in resources section of provided file"
+                        f"Couldn't get ObjectId from DB for '{tg_username} while"
+                        f" processing task-id='{task['id']}'and"
+                        f" resource-id='{allocation['resource-id']}' in resources"
+                        " section of provided file"
                     )
             else:
                 raise AttributeError(
-                    f"Telegram username not found for task-id='{task['id']}'"
-                    f"and resource-id='{allocation['resource-id']}' in resources section of provided file"
+                    f"Telegram username not found for task-id='{task['id']}'and"
+                    f" resource-id='{allocation['resource-id']}' in resources section"
+                    " of provided file"
                 )
 
     # List of tasks which succeed from this one
@@ -235,13 +250,15 @@ def compose_tasks_list(
             # If dependency translation not possible better aware user than import with somehow
             if int(str(follower["type"])) == 0:
                 raise ValueError(
-                    f"Unknown dependency type ('{follower['type']}')of successor task: {follower['id']}"
+                    f"Unknown dependency type ('{follower['type']}')of successor task:"
+                    f" {follower['id']}"
                 )
             try:
                 depend_type = GAN_DEPEND_TYPES[int(str(follower["type"])) - 1]
             except IndexError:
                 raise ValueError(
-                    f"Unknown dependency type ('{follower['type']}')of successor task: {follower['id']}"
+                    f"Unknown dependency type ('{follower['type']}')of successor task:"
+                    f" {follower['id']}"
                 )
             else:
                 successors.append(
@@ -252,7 +269,8 @@ def compose_tasks_list(
                     }
                 )
 
-    # Dictionary of subtasks' id of this one. This way helpful to almost infinitely decompose tasks.
+    # Dictionary of subtasks' id of this one.
+    # This way helpful to almost infinitely decompose tasks.
     include = []
     if "task" in task:
         for subtask in task.task:
@@ -329,7 +347,8 @@ def load_json(fp: Path, db: Database) -> list[dict]:
             and project["tasks"]
             and project["staff"]
         ):
-            # Check staff members for consistency and add to database (if tg_id or tg_username not present already)
+            # Check staff members for consistency and add to database
+            # (if tg_id or tg_username not present already)
             # And store new oid to same dictionary for later use in actioners of tasks
             staff_keys = [
                 "_id",
@@ -350,7 +369,8 @@ def load_json(fp: Path, db: Database) -> list[dict]:
                         worker["new_oid"] = oid
                     else:
                         raise ValueError(
-                            f"Unable to add following staff member to database: '{worker}'"
+                            "Unable to add following staff member to database:"
+                            f" '{worker}'"
                         )
                 else:
                     raise AttributeError(
@@ -380,13 +400,15 @@ def load_json(fp: Path, db: Database) -> list[dict]:
                 # Check for keys
                 if not all(x in task.keys() for x in task_keys):
                     raise AttributeError(
-                        f"Task #{task['id']} doesn't have all necessary keys \n({task_keys})"
+                        f"Task #{task['id']} doesn't have all necessary keys"
+                        f" \n({task_keys})"
                     )
 
                 # Check that necessary parameters are filled
                 if not all(str(task[x]) for x in task_keys[:5]):
                     raise AttributeError(
-                        f"Not all necessary parameters ({task_keys[:5]}) of task {task['id']} are filled."
+                        f"Not all necessary parameters ({task_keys[:5]}) of task"
+                        f" {task['id']} are filled."
                     )
 
                 # Complete have type integer
@@ -396,13 +418,15 @@ def load_json(fp: Path, db: Database) -> list[dict]:
                     and task["complete"] < 101
                 ):
                     raise ValueError(
-                        "Completeness of task should be an integer from 0 to 100 percent."
+                        "Completeness of task should be an integer from 0 to 100"
+                        " percent."
                     )
 
                 # Dates have right order
                 if datetime64(task["startdate"]) > datetime64(task["enddate"]):
                     raise ValueError(
-                        f"Taks #{task['id']} '{task['name']}' starts later than finishes."
+                        f"Taks #{task['id']} '{task['name']}' starts later than"
+                        " finishes."
                     )
 
                 # Regular task should have actioners and enddate later than startdate
@@ -437,7 +461,8 @@ def load_json(fp: Path, db: Database) -> list[dict]:
 
         else:
             raise AttributeError(
-                "File malformed: project dictionary must contain 'tasks' and 'staff' lists, each contains corresponding dictionaries. See example."
+                "File malformed: project dictionary must contain 'tasks' and 'staff'"
+                " lists, each contains corresponding dictionaries. See example."
             )
 
     return tasks
@@ -518,9 +543,9 @@ def load_xml(fp: Path, db: Database) -> list[dict]:
             worker = {
                 "name": actioner.Name.cdata,
                 # Seems like XML not necessary contain email address field for resource
-                "email": actioner.EmailAddress.cdata
-                if "EmailAddress" in actioner
-                else "",
+                "email": (
+                    actioner.EmailAddress.cdata if "EmailAddress" in actioner else ""
+                ),
                 # Seems like MS Project does not know about phones :)
                 # Maybe I'll use ExtendedAttribute for this purpose later
                 "phone": "",
@@ -536,7 +561,8 @@ def load_xml(fp: Path, db: Database) -> list[dict]:
             try:
                 if not add_worker_info_to_staff(worker, db):
                     logger.warning(
-                        f"Something went wrong while adding worker {worker} to staff collection"
+                        f"Something went wrong while adding worker {worker} to staff"
+                        " collection"
                     )
             except ValueError as e:
                 logger.error(f"{e}")
@@ -561,7 +587,8 @@ def load_xml(fp: Path, db: Database) -> list[dict]:
             ):
                 # Calculate duration from start and end dates using only business days
                 # and considering that end date (aka deadline) should be included
-                # Calculating duration from presented duration in XML (in hours) may provide not right results:
+                # Calculating duration from presented duration in XML (in hours)
+                # may provide not right results:
                 # actually its effort - assume work only need 1 hour but sometime during the week
                 # And milestones have zero duration
                 if task.Milestone.cdata == "0":
@@ -581,7 +608,8 @@ def load_xml(fp: Path, db: Database) -> list[dict]:
                             and "ResourceUID" in allocation
                             and task.UID.cdata == allocation.TaskUID.cdata
                         ):
-                            # MS Project store value '-65535' in case no resource assigned. I'll leave this list empty
+                            # MS Project store value '-65535' in case no resource assigned.
+                            # I'll leave this list empty
                             if int(allocation.ResourceUID.cdata) > 0:
                                 tg_username = get_tg_un_from_xml_resources(
                                     allocation.ResourceUID.cdata, resources, property_id
@@ -593,23 +621,36 @@ def load_xml(fp: Path, db: Database) -> list[dict]:
                                     if actioner_id:
                                         actioners.append(
                                             {
-                                                # Memo: GanntProject starts numeration of resources from 0, MS Project - from 1
+                                                # Memo: GanntProject starts numeration
+                                                # of resources from 0,
+                                                # MS Project - from 1
                                                 "actioner_id": actioner_id,
-                                                "nofeedback": False,  # Default. Will be changed to True if person didn't answer to bot
+                                                # For future development.
+                                                # This setting will be changed to True
+                                                # if person didn't answer to bot
+                                                "nofeedback": (
+                                                    False
+                                                ),
                                             }
                                         )
                                     else:
                                         raise AttributeError(
-                                            f"Couldn't get ObjectId from DB for '{tg_username} while processing task-id='{task.UID.cdata}'"
-                                            f"and resource-id='{allocation.ResourceUID.cdata}' in resources section of provided file"
+                                            "Couldn't get ObjectId from DB for"
+                                            f" '{tg_username} while processing"
+                                            f" task-id='{task.UID.cdata}'and"
+                                            f" resource-id='{allocation.ResourceUID.cdata}'"
+                                            " in resources section of provided file"
                                         )
                                 else:
                                     raise AttributeError(
-                                        f"Telegram username not found for task-id='{task.UID.cdata}'"
-                                        f"and resource-id='{allocation.ResourceUID.cdata}' in resources section of provided file"
+                                        "Telegram username not found for"
+                                        f" task-id='{task.UID.cdata}'and"
+                                        f" resource-id='{allocation.ResourceUID.cdata}'"
+                                        " in resources section of provided file"
                                     )
 
-                # Besides successors will store predecessors for backward compatibility with MS Project
+                # Besides successors will store predecessors
+                # for backward compatibility with MS Project
                 predecessors = []
                 if "PredecessorLink" in task:
                     for predecessor in task.PredecessorLink:
@@ -623,12 +664,16 @@ def load_xml(fp: Path, db: Database) -> list[dict]:
                             )
                         predecessors.append(
                             {
-                                "id": int(predecessor.PredecessorUID.cdata)
-                                if "PredecessorUID" in predecessor
-                                else None,
-                                "depend_type": int(predecessor.Type.cdata)
-                                if "Type" in predecessor
-                                else None,
+                                "id": (
+                                    int(predecessor.PredecessorUID.cdata)
+                                    if "PredecessorUID" in predecessor
+                                    else None
+                                ),
+                                "depend_type": (
+                                    int(predecessor.Type.cdata)
+                                    if "Type" in predecessor
+                                    else None
+                                ),
                                 "depend_offset": depend_offset,
                             }
                         )
@@ -636,23 +681,31 @@ def load_xml(fp: Path, db: Database) -> list[dict]:
                 tasks.append(
                     {
                         "id": int(task.UID.cdata),
-                        "WBS": task.WBS.cdata,  # this field is useful for determining inclusion of tasks
+                        "WBS": (
+                            task.WBS.cdata
+                        ),  # this field is useful for determining inclusion of tasks
                         "name": task.Name.cdata,
                         "startdate": xml_date_conversion(task.Start.cdata),
                         "enddate": xml_date_conversion(task.Finish.cdata),
                         "duration": duration,
                         "predecessors": predecessors,
-                        "successors": [],  # will be calculated below from PredecessorLink
+                        "successors": (
+                            []
+                        ),  # will be calculated below from PredecessorLink
                         "milestone": True if task.Milestone.cdata == "1" else False,
                         "complete": int(task.PercentComplete.cdata),
-                        "curator": "",  # not using for now, but it may become usefull later
+                        "curator": (
+                            ""
+                        ),  # not using for now, but it may become usefull later
                         "basicplan_startdate": xml_date_conversion(
                             task.Start.cdata
                         ),  # equal to start date on a start of the project
                         "basicplan_enddate": xml_date_conversion(
                             task.Finish.cdata
                         ),  # equal to end date on a start of the project
-                        "include": [],  # will be calculated later from WBS and OutlineLevel
+                        "include": (
+                            []
+                        ),  # will be calculated later from WBS and OutlineLevel
                         "actioners": actioners,
                     }
                 )
@@ -669,19 +722,22 @@ def load_xml(fp: Path, db: Database) -> list[dict]:
                             and "Type" in predecessor
                             and record["id"] == int(predecessor.PredecessorUID.cdata)
                         ):
-                            # Recalculate offset from LinkLag, which expressed in tenth of minutes (sic!), so 4800 is 8 hours
+                            # Recalculate offset from LinkLag,
+                            # which expressed in tenth of minutes (sic!), so 4800 is 8 hours
                             if int(predecessor.LinkLag.cdata) == 0:
                                 offset = 0
                             else:
-                                # For project management purposes it's better to be aware of smth earlier than later
+                                # For project management purposes it's better
+                                # to be aware of smth earlier than later
                                 offset = int(
                                     floor(int(predecessor.LinkLag.cdata) / 4800)
                                 )
                             successors.append(
                                 {
                                     "id": int(task.UID.cdata),
-                                    # Type of link (depend_type): Values are 0=FF, 1=FS, 2=SF and 3=SS
-                                    # (docs at https://learn.microsoft.com/en-us/office-project/xml-data-interchange/xml-schema-for-the-tasks-element?view=project-client-2016)
+                                    # Type of link (depend_type):
+                                    # Values are 0=FF, 1=FS, 2=SF and 3=SS
+                                    # (docs at https://learn.microsoft.com/en-us/office-project/xml-data-interchange/xml-schema-for-the-tasks-element?view=project-client-2016)   # noqa: E501
                                     "depend_type": int(predecessor.Type.cdata),
                                     "depend_offset": offset,
                                 }
@@ -698,7 +754,8 @@ def load_xml(fp: Path, db: Database) -> list[dict]:
                     # Take part of WBS of task before last dot - this is WBS of Parent task
                     parentWBS = task.WBS.cdata[: task.WBS.cdata.rindex(".")]
 
-                    # Find in gathered tasks list task with such WBS and add UID of task to 'include' sublist
+                    # Find in gathered tasks list task with such WBS
+                    # and add UID of task to 'include' sublist
                     if record["WBS"] == parentWBS:
                         record["include"].append(int(task.UID.cdata))
             record["successors"] = successors
