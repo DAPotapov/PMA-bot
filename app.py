@@ -182,9 +182,17 @@ async def day_before_update(context: ContextTypes.DEFAULT_TYPE) -> None:
                     and not task["milestone"]
                 ):
                     if delta_start.days == -1:
-                        bot_msg = f"🚥🛣Task №{task['id']} '<i>{task['name']}</i>' of '<b>{project['title']}</b>' (PM: @{project['tg_username']}) starts <u>tomorrow</u>."
+                        bot_msg = (
+                            f"🚥🛣Task №{task['id']} '<i>{task['name']}</i>' of "
+                            f"'<b>{project['title']}</b>' (PM: @{project['tg_username']}) "
+                            f"starts <u>tomorrow</u>."
+                        )
                     elif delta_end.days == -1:
-                        bot_msg = f"⏰⌛<u>Tomorrow</u> is deadline  for task {task['id']} '<i>{task['name']}</i>' of '<b>{project['title']}</b>' (PM: @{project['tg_username']})!"
+                        bot_msg = (
+                            f"⏰⌛<u>Tomorrow</u> is deadline for task {task['id']} "
+                            f"'<i>{task['name']}</i>' of '<b>{project['title']}</b>' "
+                            f"(PM: @{project['tg_username']})!"
+                        )
 
                 # Inform about tomorrow milestone according to project's setting
                 if (
@@ -192,7 +200,11 @@ async def day_before_update(context: ContextTypes.DEFAULT_TYPE) -> None:
                     and task["milestone"]
                     and delta_end.days == -1
                 ):
-                    bot_msg = f"🎌<u>Tomorrow</u> is the date of milestone  {task['id']} '<i>{task['name']}</i>' of '<b>{project['title']}</b>' (PM: @{project['tg_username']})!"
+                    bot_msg = (
+                        f"🎌<u>Tomorrow</u> is the date of milestone {task['id']} "
+                        f"'<i>{task['name']}</i>' of '<b>{project['title']}</b>' "
+                        f"(PM: @{project['tg_username']})!"
+                    )
 
                 # If task worth talking, and tg_id could be found in staff and actioner not PM
                 # (will be informed separately) then send message to actioner
@@ -238,7 +250,8 @@ async def download(update: Update, context: CallbackContext):
             # Get project team for this project
             staff = get_project_team(project["_id"], DB)
 
-            # This approach will be useful in future development when this function become conversation with multiple choice
+            # This approach will be useful in future development 
+            # when this function become conversation with multiple choice
             # Store project with staff in it in user_data in context
             context.user_data["project"] = project
             if staff:
@@ -274,7 +287,10 @@ async def feedback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     """
     Initiation of feedback dialog with user
     """
-    bot_msg = "What would you like inform developer about? Bugs, comments and suggestions highly appreciated."
+    bot_msg = (
+        "What would you like inform developer about? "
+        "Bugs, comments and suggestions highly appreciated."
+    )
     await update.message.reply_text(bot_msg)
     return FIRST_LVL
 
@@ -282,7 +298,10 @@ async def feedback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
 async def feedback_answer(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     """Gather information user provided and answer user"""
 
-    msg = f"FEEDBACK from {update.message.from_user.username} ({update.message.from_user.id}): {update.message.text}"
+    msg = (
+        f"FEEDBACK from {update.message.from_user.username} ({update.message.from_user.id}): "
+        f"{update.message.text}"
+    )
     logger.warning(msg)
     bot_msg = "Feedback sent to developer."
     await update.message.reply_text(bot_msg)
@@ -303,18 +322,24 @@ async def feedback_aborted(update: Update, context: ContextTypes.DEFAULT_TYPE) -
 
 async def file_update(context: ContextTypes.DEFAULT_TYPE) -> None:
     """
-    This function is a reminder for team members that common files should be updated in the end of the week
+    This function is a reminder for team members 
+    that common files should be updated in the end of the week
     """
 
     if DB is not None and is_db(DB):
-        project = get_project_by_title(DB, str(context.job.data["pm_tg_id"]), context.job.data["project_title"])  # type: ignore
+        project = get_project_by_title(
+            DB,
+            str(context.job.data["pm_tg_id"]),  # type: ignore
+            context.job.data["project_title"]  # type: ignore
+            )
         if project:
             team = get_project_team(project["_id"], DB)
             if team:
                 for member in team:
                     if member["tg_id"]:
                         bot_msg = (
-                            f"💾💻{member['name']}, remember to update common files for project '<b>{project['title']}</b>'!\n"
+                            f"💾💻{member['name']}, remember to update common files "
+                            f"for project '<b>{project['title']}</b>'!\n"
                             f"Other team members should have actual information!"
                         )
                         await context.bot.send_message(
@@ -371,12 +396,23 @@ async def morning_update(context: ContextTypes.DEFAULT_TYPE) -> None:
 
             # If no team inform only PM about such situation
             else:
-                bot_msg = "Project has no team or something is wrong with database - contact developer."
-                await context.bot.send_message(str(context.job.data["pm_tg_id"]), bot_msg)  # type: ignore
+                bot_msg = (
+                    "Project has no team or something is wrong with database - "
+                    "contact developer."
+                )
+                await context.bot.send_message(
+                    str(context.job.data["pm_tg_id"]),  # type: ignore
+                    bot_msg
+                    )
 
             # Make status update with buttons for PM
-            bot_msg = f"Morning status update for project '<b>{context.job.data['project_title']}</b>':"  # type: ignore
-            await context.bot.send_message(str(context.job.data["pm_tg_id"]), bot_msg, parse_mode="HTML")  # type: ignore
+            bot_msg = (
+                f"Morning status update for project "
+                f"'<b>{context.job.data['project_title']}</b>':")  # type: ignore
+            await context.bot.send_message(
+                str(context.job.data["pm_tg_id"]),  # type: ignore
+                bot_msg, parse_mode="HTML"
+                )
             task_counter = 0
             for task in project["tasks"]:
                 task_counter += 1
@@ -384,10 +420,18 @@ async def morning_update(context: ContextTypes.DEFAULT_TYPE) -> None:
                     task, project["_id"], DB
                 )
                 if bot_msg and reply_markup:
-                    await context.bot.send_message(str(context.job.data["pm_tg_id"]), bot_msg, reply_markup=reply_markup, parse_mode="HTML")  # type: ignore
+                    await context.bot.send_message(
+                        str(context.job.data["pm_tg_id"]),   # type: ignore
+                        bot_msg, 
+                        reply_markup=reply_markup,  # type: ignore
+                        parse_mode="HTML"
+                        )
             if task_counter == 0:
                 bot_msg = "Seems like there are no events to inform about at this time."
-                await context.bot.send_message(str(context.job.data["pm_tg_id"]), bot_msg)  # type: ignore
+                await context.bot.send_message(
+                    str(context.job.data["pm_tg_id"]),  # type: ignore
+                    bot_msg
+                    )
 
     else:
         bot_msg = "Error occured while accessing database. Try again later or contact developer."
@@ -432,7 +476,11 @@ async def set_task_accomplished(update: Update, context: CallbackContext):
                 and "complete" in project["tasks"][0].keys()
                 and project["tasks"][0]["complete"] == 100
             ):
-                bot_msg = f"Task №{project['tasks'][0]['id']} '<i>{project['tasks'][0]['name']}</i>' marked completed🏁. Congratulations! 🎉🍾"
+                bot_msg = (
+                    f"Task №{project['tasks'][0]['id']} "
+                    f"'<i>{project['tasks'][0]['name']}</i>' marked completed🏁. "
+                    "Congratulations! 🎉🍾"
+                    )
 
         # Send message
         await query.edit_message_text(bot_msg, parse_mode="HTML")
@@ -497,7 +545,8 @@ async def naming_project(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
             "title": title,
             "active": True,
             "pm_tg_id": str(context.user_data["PM"]["tg_id"]),
-            "tg_chat_id": "",  # group chat where project members discuss project will be stored here
+            # group chat where project members discuss project will be stored here
+            "tg_chat_id": "",
             "settings": {
                 "ALLOW_POST_STATUS_TO_GROUP": False,
                 "INFORM_ACTIONERS_OF_MILESTONES": False,
@@ -521,7 +570,10 @@ async def naming_project(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
                 await update.message.reply_text(bot_msg)
                 return ConversationHandler.END
             if not pm_oid:
-                bot_msg = "There is a problem with database connection. Contact developer or try later."
+                bot_msg = (
+                    "There is a problem with database connection. "                    
+                    "Contact developer or try later."
+                    )
                 await update.message.reply_text(bot_msg)
                 return ConversationHandler.END
             else:
@@ -538,19 +590,27 @@ async def naming_project(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
                     and "_id" in prj_id.keys()
                     and prj_id["id"]
                 ):
-                    bot_msg = f"You've already started project with name <b>{project['title']}</b>. Try another one."
+                    bot_msg = (
+                        f"You've already started project with name <b>{project['title']}</b>. "
+                        "Try another one."
+                        )
                     await update.message.reply_text(bot_msg, parse_mode="HTML")
                     return FIRST_LVL
                 else:
                     bot_msg = (
-                        f"Title was refurbushed to: '<b>{title}</b>'.\nYou can change it later in /settings.\n"
-                        f"Now you can upload your project file. Supported formats are: <u>.gan</u> (GanttProject), <u>.json</u>, <u>.xml</u> (MS Project)"
+                        f"Title was refurbushed to: '<b>{title}</b>'.\n"
+                        "You can change it later in /settings.\n"
+                        f"Now you can upload your project file. Supported formats are: "
+                        "<u>.gan</u> (GanttProject), <u>.json</u>, <u>.xml</u> (MS Project)"
                     )
                     await update.message.reply_text(bot_msg, parse_mode="HTML")
                     return SECOND_LVL
         else:
             logger.error("Error occured while accessing database.")
-            bot_msg = "Error occured while accessing database. Try again later or contact developer."
+            bot_msg = (
+                "Error occured while accessing database. "
+                "Try again later or contact developer."
+                )
             await context.bot.send_message(context.job.data["pm_tg_id"], bot_msg)  # type: ignore
             return ConversationHandler.END
 
@@ -561,9 +621,12 @@ async def file_recieved(update: Update, context: ContextTypes.DEFAULT_TYPE) -> i
     # Get file and save it as temp
     with tempfile.TemporaryDirectory() as tdp:
         gotfile = await context.bot.get_file(update.message.document)  # type: ignore
-        fp = await gotfile.download_to_drive(os.path.join(tdp, update.message.document.file_name))  # type: ignore
+        fp = await gotfile.download_to_drive(
+            os.path.join(tdp, update.message.document.file_name)  # type: ignore
+            )
 
-        # Call function which converts given file to dictionary and add actioners to staff collection
+        # Call function which converts given file to dictionary 
+        # and add actioners to staff collection
         tasks = extract_tasks_from_file(fp, DB)
         if tasks:
             bot_msg = "File parsed successfully."
@@ -582,9 +645,10 @@ async def file_recieved(update: Update, context: ContextTypes.DEFAULT_TYPE) -> i
                 bot_msg = (
                     bot_msg
                     + f"\nReminders were created: on the day before event (<i>{ONTHEEVE}</i>),"
-                    f" in the morning of event (<i>{MORNING}</i>) and reminder for friday file update (<i>{FRIDAY}</i>). "
-                    f"You can change them or turn off in /settings."
-                    f"\nAlso you can update the schedule by uploading new file via /upload command."
+                    f" in the morning of event (<i>{MORNING}</i>) and "
+                    f"reminder for friday file update (<i>{FRIDAY}</i>). "
+                    f"You can change them or turn off in /settings.\n"
+                    f"Also you can update the schedule by uploading new file via /upload command."
                     f"\nRemember that you can /start a new project anytime."
                 )
 
@@ -809,7 +873,8 @@ async def status(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
                         if bot_msg and reply_markup:
                             task_counter += 1
 
-                            # Check current setting and chat where update came from to decide where to send answer
+                            # Check current setting and chat where update came from to decide
+                            # where to send answer
                             if (
                                 project["settings"]["ALLOW_POST_STATUS_TO_GROUP"]
                                 and update.message.chat_id != update.effective_user.id
@@ -827,7 +892,8 @@ async def status(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
                                 )
                     if task_counter == 0:
                         bot_msg = "Seems like there are no events to inform about at this time."
-                        # Check current setting and chat where update came from to decide where to send answer
+                        # Check current setting and chat where update came from to decide
+                        # where to send answer
                         if (
                             project["settings"]["ALLOW_POST_STATUS_TO_GROUP"]
                             and update.message.chat_id != update.effective_user.id
@@ -857,7 +923,8 @@ async def status(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
                     if update.effective_user:  # silence pylance
                         add_user_id_to_db(update.effective_user, DB)
 
-                    # Get all documents where user mentioned, cast cursor object to list to check if smth returned
+                    # Get all documents where user mentioned,
+                    # cast cursor object to list to check if smth returned
                     projects = list(
                         DB.projects.find(
                             {
@@ -868,7 +935,8 @@ async def status(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
                         )
                     )
 
-                    # If documents was found where user mentioned then loop them and collect status update for user
+                    # If documents was found where user mentioned then loop them
+                    # and collect status update for user
                     if projects:
                         for project in projects:
                             # Compose message from tasks of the project and send to user
@@ -1148,7 +1216,8 @@ async def settings(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     This function handles /settings command, entry point for menu
     """
 
-    # Check if current user is acknowledged PM then proceed otherwise suggest to start a new project
+    # Check if current user is acknowledged PM
+    # then proceed otherwise suggest to start a new project
     if DB is not None and is_db(DB):
         # Let's control which level of settings we are at any given moment
         context.user_data["level"] = FIRST_LVL
@@ -1157,7 +1226,10 @@ async def settings(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
             # If user is not PM at least add his id in DB (if his telegram username is there)
             if update.effective_user:
                 add_user_info_to_db(update.effective_user, DB)
-            bot_msg = "Settings available after starting a project: use /start command for a new one."
+            bot_msg = (
+                "Settings available after starting a project: "
+                "use /start command for a new one."
+            )
             await update.message.reply_text(bot_msg)
             return ConversationHandler.END
         else:
@@ -1211,7 +1283,8 @@ async def settings_back(update: Update, context: ContextTypes.DEFAULT_TYPE) -> i
             context.user_data["project"],
         )
 
-    # Call function which create keyboard and generate message to send to user. End conversation if that was unsuccessful.
+    # Call function which create keyboard and generate message to send to user.
+    # End conversation if that was unsuccessful.
     if not keyboard and not bot_msg:
         bot_msg = "Some error happened. Unable to show a menu."
         await update.message.reply_text(bot_msg)
@@ -1239,7 +1312,8 @@ async def settings_aborted(update: Update, context: ContextTypes.DEFAULT_TYPE) -
 
     bot_msg = "Settings function aborted."
     logger.warning(
-        f"User: {update.message.from_user.username} ({update.message.from_user.id}) wrote: {update.message.text} in settings function."
+        f"User: {update.message.from_user.username} ({update.message.from_user.id}) wrote: "
+        f"{update.message.text} in settings function."
     )
     await update.message.reply_text(bot_msg)
     return ConversationHandler.END
