@@ -2,7 +2,6 @@
 Some helper functions to help main functions to manupulate with data
 """
 
-import json
 import logging
 import pymongo
 import os
@@ -1007,6 +1006,3 @@ def is_db(db) -> bool:
         return False
     else:
         return True
-
-
-

@@ -145,7 +145,7 @@ def extract_tasks_from_file(fp: Path, db: Database) -> list[dict]:
         logger.error(f"{e}")
     finally:
         return tasks
-    
+
 
 async def day_before_update(context: ContextTypes.DEFAULT_TYPE) -> None:
     """
@@ -991,9 +991,9 @@ async def stopping(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
 
         # Delete all projects for current user.
         # I don't see necessity for checking result of operation for now.
-        result = DB.projects.delete_many(
+        result = DB.projects.delete_many(  # noqa: F841
             {"pm_tg_id": str(update.effective_user.id)}
-        )  # noqa: F841
+        )
 
         bot_msg = "Projects deleted. Reminders too. Bot stopped."
         await context.bot.send_message(update.effective_user.id, bot_msg)
