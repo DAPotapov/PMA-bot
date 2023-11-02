@@ -9,11 +9,7 @@ import os
 from bson import ObjectId
 from datetime import date
 from dotenv import load_dotenv
-from pymongo.errors import (
-    ConnectionFailure,
-    ServerSelectionTimeoutError,
-    PyMongoError
-)
+from pymongo.errors import ConnectionFailure, ServerSelectionTimeoutError, PyMongoError
 from pymongo.database import Database
 from re import sub
 from telegram import InlineKeyboardMarkup, User, InlineKeyboardButton
@@ -38,7 +34,8 @@ logger = logging.getLogger(__name__)
 def add_user_id_to_db(user: User, db: Database) -> ObjectId | None:
     """
     Helper function to add telegram id of username provided to DB.
-    Returns None if telegram username not found in staff collection, did't updated or something went wrong.
+    Returns None if telegram username not found in staff collection,
+    did't updated or something went wrong.
     Returns ObjectId if record updated
     """
     output = None
@@ -66,7 +63,8 @@ def add_user_id_to_db(user: User, db: Database) -> ObjectId | None:
 def add_user_info_to_db(user: User, db: Database) -> ObjectId | None:
     """
     Adds missing user info (telegram id and name) to DB
-    Returns None if telegram username not found in staff collection, did't updated or something went wrong.
+    Returns None if telegram username not found in staff collection,
+    did't updated or something went wrong.
     Returns ObjectId if record updated
     """
     output = None
@@ -104,7 +102,8 @@ def add_worker_info_to_staff(worker: dict, db: Database) -> str:
     """
     Calls functions to check whether such worker exist in staff collection.
     Adds given worker to staff collection if not exist already.
-    Fill empty fields in case worker already present in staff (for ex. PM is actioner in other project)
+    Fill empty fields in case worker already present in staff
+    (for ex. PM is actioner in other project)
     Returns empty string if worker telegram id not found in staff collection.
     Return ObjectId as a string otherwise.
     """
@@ -120,7 +119,8 @@ def add_worker_info_to_staff(worker: dict, db: Database) -> str:
         worker_id = get_worker_oid_from_db_by_tg_username(worker["tg_username"], db)
     else:
         raise ValueError(
-            f"Not enough information about worker provided: neither tg_id nor tg_username. Provided dict:\n{worker}"
+            "Not enough information about worker provided: neither tg_id nor"
+            f" tg_username. Provided dict:\n{worker}"
         )
 
     # If worker not found in staff collection add him, if exist then fill empty fields
@@ -136,7 +136,8 @@ def add_worker_info_to_staff(worker: dict, db: Database) -> str:
                 {"_id": ObjectId(worker_id)}, replacement=db_worker
             )
             logger.info(
-                f"Results of worker {db_worker['tg_username']} update: '{result.matched_count}' found, '{result.modified_count}' modified."
+                f"Results of worker {db_worker['tg_username']} update:"
+                f" '{result.matched_count}' found, '{result.modified_count}' modified."
             )
 
     return worker_id
@@ -150,7 +151,8 @@ def clean_project_title(user_input: str) -> str:
     If something went wrong raise value error to be managed on calling side.
     """
 
-    # To prevent user from using War and Peace as a title let's limit its length to this number of symbols
+    # To prevent user from using War and Peace as a title
+    # let's limit its length to this number of symbols
     max_title_len = 128
 
     # Replace whitespaces and their doubles with spaces, cut leading and ending spaces
@@ -266,7 +268,8 @@ def get_assignees(task: dict, db: Database) -> tuple[str, list]:
 
 def get_db() -> Database:
     """
-    Creates connection to mongo server and returns database instance. Raises exception if not succeed.
+    Creates connection to mongo server and returns database instance.
+    Raises exception if not succeed.
     """
     load_dotenv()
     BOT_NAME = os.environ.get("BOT_NAME")
@@ -386,11 +389,7 @@ def get_keyboard_and_msg(
                             callback_data="notifications",
                         )
                     ],
-                    [
-                        InlineKeyboardButton(
-                            "Manage projects", callback_data="projects"
-                        )
-                    ],
+                    [InlineKeyboardButton("Manage projects", callback_data="projects")],
                     [
                         InlineKeyboardButton(
                             "Reminders settings", callback_data="reminders"
@@ -428,19 +427,22 @@ def get_keyboard_and_msg(
                                     keyboard = [
                                         [
                                             InlineKeyboardButton(
-                                                f"Allow status update in group chat: {'On' if project['settings']['ALLOW_POST_STATUS_TO_GROUP'] == True else 'Off'}",
+                                                "Allow status update in group chat:"
+                                                f" {'On' if project['settings']['ALLOW_POST_STATUS_TO_GROUP'] == True else 'Off'}",  # noqa: E501
                                                 callback_data=str(ONE),
                                             )
                                         ],
                                         [
                                             InlineKeyboardButton(
-                                                f"Users get anounces about milestones: {'On' if project['settings']['INFORM_ACTIONERS_OF_MILESTONES'] == True else 'Off'}",
+                                                "Users get anounces about milestones:"
+                                                f" {'On' if project['settings']['INFORM_ACTIONERS_OF_MILESTONES'] == True else 'Off'}",  # noqa: E501
                                                 callback_data=str(TWO),
                                             )
                                         ],
                                         [
                                             InlineKeyboardButton(
-                                                f"/status notify PM of all projects: {'On' if pm_settings['settings']['INFORM_OF_ALL_PROJECTS'] == True else 'Off'}",
+                                                "/status notify PM of all projects:"
+                                                f" {'On' if pm_settings['settings']['INFORM_OF_ALL_PROJECTS'] == True else 'Off'}",  # noqa: E501
                                                 callback_data=str(THREE),
                                             )
                                         ],
@@ -459,14 +461,18 @@ def get_keyboard_and_msg(
 
                     case "projects":
                         if is_db(db):
-                            msg = "You can manage these projects (active project could only be renamed): "
+                            msg = (
+                                "You can manage these projects (active project could"
+                                " only be renamed): "
+                            )
 
                             # Get list of projects for user
                             projects = list(
                                 db.projects.find({"pm_tg_id": str(user_id)})
                             )
 
-                            # For each project make buttons: active(if not active), rename, delete with oid as a string
+                            # For each project make buttons: active(if not active),
+                            # rename, delete with oid as a string
                             keyboard = []
                             for project in projects:
                                 keyboard.append(
@@ -536,9 +542,7 @@ def get_keyboard_and_msg(
 
                     case "control":
                         if is_db(db):
-                            msg = (
-                                "Choose a project team member to transfer control to."
-                            )
+                            msg = "Choose a project team member to transfer control to."
 
                             # Get team members names with telegram ids, except PM
                             # Construct keyboard from that list
@@ -556,7 +560,10 @@ def get_keyboard_and_msg(
                                             ]
                                         )
                             if not keyboard:
-                                msg = "Can't do that. Ask other project team members (if any) to contact bot to this function to work.\n"
+                                msg = (
+                                    "Can't do that. Ask other project team members (if"
+                                    " any) to contact bot to this function to work.\n"
+                                )
                             keyboard.extend(
                                 [
                                     [
@@ -598,7 +605,9 @@ def get_keyboard_and_msg(
                         msg = "The day before reminder has to be set here. \n"
                         keyboard = reminders_kbd
                     case "friday_update":
-                        msg = "Reminder for file updates on friday has to be set here. \n"
+                        msg = (
+                            "Reminder for file updates on friday has to be set here. \n"
+                        )
                         keyboard = reminders_kbd
                     case "delete":
                         msg = "Are you sure?"
@@ -611,7 +620,8 @@ def get_message_and_button_for_task(
     task: dict, project_id: ObjectId, db: Database
 ) -> tuple[str, InlineKeyboardMarkup | None]:
     """
-    Helper function to provide status update on task with a button (InlineKeyboardReplyMarkup to be sent) to mark such task as complete.
+    Helper function to provide status update on task with a button
+    (InlineKeyboardReplyMarkup to be sent) to mark such task as complete.
     Returns empty tuple of empty string and Nonetype object if task not worth mention.
     """
     msg = ""
@@ -640,13 +650,26 @@ def get_message_and_button_for_task(
 
             # Check dates and compose message including information about human resources
             if delta_start.days == 0:
-                msg = f"🚥🛣Task №{task['id']} '<i>{task['name']}</i>' started today. Assigned to: {people}."
+                msg = (
+                    f"🚥🛣Task №{task['id']} '<i>{task['name']}</i>' started today."
+                    f" Assigned to: {people}."
+                )
             elif delta_start.days > 0 and delta_end.days < 0:
-                msg = f"⏳🛠Task №{task['id']} '<i>{task['name']}</i>' is intermidiate. Due date is <u>{task['enddate']}</u>. Assigned to: {people}."
+                msg = (
+                    f"⏳🛠Task №{task['id']} '<i>{task['name']}</i>' is intermidiate."
+                    f" Due date is <u>{task['enddate']}</u>. Assigned to: {people}."
+                )
             elif delta_end.days == 0:
-                msg = f"⌛⏰Task №{task['id']} '<i>{task['name']}</i>' must be completed today! Assigned to: {people}."
+                msg = (
+                    f"⌛⏰Task №{task['id']} '<i>{task['name']}</i>' must be completed"
+                    f" today! Assigned to: {people}."
+                )
             elif delta_start.days > 0 and delta_end.days > 0:
-                msg = f"🚽🔥Task №{task['id']} '<i>{task['name']}</i>' is overdue! (had to be completed on <u>{task['enddate']}</u>). Assigned to: {people}."
+                msg = (
+                    f"🚽🔥Task №{task['id']} '<i>{task['name']}</i>' is overdue! (had"
+                    f" to be completed on <u>{task['enddate']}</u>). Assigned to:"
+                    f" {people}."
+                )
             else:
                 logger.info(f"Loop through future task '{task['id']}' '{task['name']}'")
                 pass
@@ -781,7 +804,8 @@ def get_project_team(prj_oid: ObjectId | str, db: Database) -> list[dict]:
 
         if not team:
             logger.error(
-                f"Maybe DB is corrupted: project '{project['title']}' (id: {project['_id']}) has no project team!"
+                f"Maybe DB is corrupted: project '{project['title']}' (id:"
+                f" {project['_id']}) has no project team!"
             )
 
     return team
@@ -789,7 +813,8 @@ def get_project_team(prj_oid: ObjectId | str, db: Database) -> list[dict]:
 
 def get_status_on_project(project: dict, user_oid: ObjectId | str, db: Database) -> str:
     """
-    Function composes message which contains status update on given project for given ObjectId of actioner.
+    Function composes message which contains status update
+    on given project for given ObjectId of actioner.
     Returns composed message to be sent.
     """
 
@@ -811,7 +836,8 @@ def get_status_on_project(project: dict, user_oid: ObjectId | str, db: Database)
     # Get user telegram username to add to message
     actioner_username = get_worker_tg_username_by_oid(user_oid, db)
     if actioner_username:
-        # Find task to inform about: not completed yet, not a milestone, not common task (doesn't consist of subtasks), and this user assigned to it
+        # Find task to inform about: not completed yet, not a milestone,
+        # not common task (doesn't consist of subtasks), and this user assigned to it
         msg = ""
         for task in project["tasks"]:
             if (
@@ -834,22 +860,27 @@ def get_status_on_project(project: dict, user_oid: ObjectId | str, db: Database)
                 if delta_start.days == 0:
                     msg = (
                         msg
-                        + f"\n🚥🛣Task №{task['id']} '<i>{task['name']}</i>' started <u>today</u> 🚥🛣"
+                        + f"\n🚥🛣Task №{task['id']} '<i>{task['name']}</i>' started"
+                        " <u>today</u> 🚥🛣"
                     )
                 elif delta_start.days > 0 and delta_end.days < 0:
                     msg = (
                         msg
-                        + f"\n⏳🛠Task №{task['id']} '<i>{task['name']}</i>' is intermidiate.  Due date is <u>{task['enddate']}</u>⏳🛠."
+                        + f"\n⏳🛠Task №{task['id']} '<i>{task['name']}</i>' is"
+                        f" intermidiate.  Due date is <u>{task['enddate']}</u>⏳🛠."
                     )
                 elif delta_end.days == 0:
                     msg = (
                         msg
-                        + f"\n⌛⏰Task №{task['id']}  '<i>{task['name']}</i>' must be completed <u>today</u>! ⌛⏰"
+                        + f"\n⌛⏰Task №{task['id']}  '<i>{task['name']}</i>' must be"
+                        " completed <u>today</u>! ⌛⏰"
                     )
                 elif delta_start.days > 0 and delta_end.days > 0:
                     msg = (
                         msg
-                        + f"\n🚽🔥Task №{task['id']} '<i>{task['name']}</i>' is overdue!  (had to be completed on <u>{task['enddate']}</u>)"
+                        + f"\n🚽🔥Task №{task['id']} '<i>{task['name']}</i>' is"
+                        " overdue!  (had to be completed on"
+                        f" <u>{task['enddate']}</u>)"
                     )
                 else:
                     # Future tasks goes here
@@ -863,7 +894,8 @@ def get_status_on_project(project: dict, user_oid: ObjectId | str, db: Database)
             ):
                 msg = (
                     msg
-                    + f"\n🎌Today is the day of planned milestone: '<i>{task['name']}</i>'🎌."
+                    + "\n🎌Today is the day of planned milestone:"
+                    f" '<i>{task['name']}</i>'🎌."
                 )
 
         if msg:
