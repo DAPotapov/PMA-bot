@@ -245,7 +245,7 @@ async def download(update: Update, context: CallbackContext):
 
     # Check if user is PM and remember what project to update
     if DB is not None and is_db(DB):
-        # Get whole active project for user
+        # Get whole active project for user as PM
         project = get_active_project(
             str(update.effective_user.id), DB, include_tasks=True
         )
@@ -272,7 +272,8 @@ async def download(update: Update, context: CallbackContext):
                     document=fp.name, caption="Here is your project file:"
                 )
 
-        # If user is not PM at least add his id in DB (if his telegram username is there)
+        # If user is not PM at least add his id in DB
+        # (if his telegram username is there)
         else:
             if update.effective_user:  # silence pylance
                 add_user_info_to_db(update.effective_user, DB)
@@ -2501,7 +2502,7 @@ async def reminder_days_setter(
 
 async def post_init(application: Application) -> None:
     """
-    Function to control list of commands and description in bot itself. 
+    Function to control list of commands and description in bot itself.
     Commands itself are global.
     """
     await application.bot.set_my_commands(
