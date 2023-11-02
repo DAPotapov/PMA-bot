@@ -376,8 +376,7 @@ async def help(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     # Build message about commands not repeating /help command
     bot_msg = ""
     for command in bot_commands:
-        if command.command != "help":
-            bot_msg = f"/{command.command} - {command.description}\n" + bot_msg
+        bot_msg = f"/{command.command} - {command.description}\n" + bot_msg
 
     await update.message.reply_text(bot_msg)
 
