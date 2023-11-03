@@ -10,7 +10,8 @@ Overview of data structure used for schedule is [here](#data-structure)
 
 Bot can inform user about purpose of each command.  
 Bot can recieve file from user. And inform user of file formats supported.  
-Bot currently accept .gan (GanttProject) format and MS Project XML and translate them to json format for inner use.  
+Bot currently accept .gan (GanttProject) format, MS Project XML and translate them to json format for inner use.
+Bot can save project and its actioners to json file (and load it as well)  
 Bot can inform PM about current status of schedule. Also it send notification to actioner assigned to that task.
 Every day bot looks at schedule and sends notification to actioners about tasks that should start or have deadline tomorrow.  
 Every day at the morning bot looks at schedule and sends notification to actioners about current status of schedule.  

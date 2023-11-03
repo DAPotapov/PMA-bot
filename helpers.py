@@ -448,7 +448,7 @@ def get_keyboard_and_msg(
                                         ],
                                         [
                                             InlineKeyboardButton(
-                                                "Back", callback_data="back"
+                                                "« Back", callback_data="back"
                                             )
                                         ],
                                         [
@@ -500,7 +500,7 @@ def get_keyboard_and_msg(
                                 [
                                     [
                                         InlineKeyboardButton(
-                                            "Back", callback_data="back"
+                                            "« Back", callback_data="back"
                                         )
                                     ],
                                     [
@@ -532,7 +532,7 @@ def get_keyboard_and_msg(
                                     callback_data="friday_update",
                                 )
                             ],
-                            [InlineKeyboardButton("Back", callback_data="back")],
+                            [InlineKeyboardButton("« Back", callback_data="back")],
                             [
                                 InlineKeyboardButton(
                                     "Finish settings", callback_data="finish"
@@ -568,7 +568,7 @@ def get_keyboard_and_msg(
                                 [
                                     [
                                         InlineKeyboardButton(
-                                            "Back", callback_data="back"
+                                            "« Back", callback_data="back"
                                         )
                                     ],
                                     [
@@ -589,7 +589,7 @@ def get_keyboard_and_msg(
                             "Set days of week", callback_data=str(THREE)
                         )
                     ],
-                    [InlineKeyboardButton("Back", callback_data="back")],
+                    [InlineKeyboardButton("« Back", callback_data="back")],
                     [InlineKeyboardButton("Finish settings", callback_data="finish")],
                 ]
                 project_delete_kbd = [
