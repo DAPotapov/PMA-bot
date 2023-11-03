@@ -2504,19 +2504,22 @@ async def post_init(application: Application) -> None:
     Function to control list of commands and description in bot itself.
     Commands itself are global.
     """
-    await application.bot.set_my_commands(
-        [
-            download_cmd,
-            feedback_cmd,
-            help_cmd,
-            settings_cmd,
-            start_cmd,
-            status_cmd,
-            stop_cmd,
-            upload_cmd,
-        ]
+    commands = await application.bot.get_my_commands()
+    new_commands = (
+        download_cmd,
+        feedback_cmd,
+        help_cmd,
+        settings_cmd,
+        start_cmd,
+        status_cmd,
+        stop_cmd,
+        upload_cmd,
     )
-    description = (
+    if commands != new_commands:
+        await application.bot.set_my_commands(new_commands)
+
+    description = await application.bot.get_my_description()
+    new_description = (
         "The purpose of this bot to assist you as a Project Manager (PM) "
         "to keep control over project. "
         "It informs about current state of the provided project: which tasks started, "
@@ -2524,13 +2527,20 @@ async def post_init(application: Application) -> None:
         "It also informs assignees about their tasks. "
         "You can change time and days when bot should send its reminders."
     )
-    await application.bot.set_my_description(description)
-    short_description = (
+    if description.description != new_description:
+        await application.bot.set_my_description(new_description)
+
+    short_description = await application.bot.get_my_short_description()
+    new_short_description = (
         "This Assisstant created to help Project Manager (PM) "
         "and project team keep informed about project status.")
-    await application.bot.set_my_short_description(short_description)
-    bot_name = "Project Manager Assistant bot"
-    await application.bot.set_my_name(bot_name)
+    if short_description.short_description != new_short_description:
+        await application.bot.set_my_short_description(new_short_description)
+
+    bot_name = await application.bot.get_my_name()
+    new_bot_name = "Project Manager Assistant bot"
+    if bot_name.name != new_bot_name:
+        await application.bot.set_my_name(bot_name)
 
 
 def main() -> None:
