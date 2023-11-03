@@ -311,7 +311,6 @@ def compose_tasks_list(
         "successors": successors,
         "milestone": milestone,
         "complete": int(str(task["complete"])),
-        "curator": "",  # not using for now, but it may become usefull later
         "basicplan_startdate": task[
             "start"
         ],  # equal to start date on a start of the project
@@ -380,7 +379,7 @@ def load_json(fp: Path, db: Database) -> list[dict]:
                     )
 
             # Check each task for presence of keys and values
-            # Order of this list matter! See check below.
+            # Order of this list matter! See remarks and check below.
             task_keys = [
                 "name",
                 "startdate",
@@ -388,8 +387,9 @@ def load_json(fp: Path, db: Database) -> list[dict]:
                 "complete",
                 # Can be False that will spoil check below
                 "milestone",
-                # Duration will be recalculated; id=0 becomes False in check below
+                # Duration will be recalculated
                 "duration",
+                # id=0 becomes False in check below
                 "id",
                 # These could be empty and will fail check below as well
                 "predecessors",
@@ -696,9 +696,6 @@ def load_xml(fp: Path, db: Database) -> list[dict]:
                         ),  # will be calculated below from PredecessorLink
                         "milestone": True if task.Milestone.cdata == "1" else False,
                         "complete": int(task.PercentComplete.cdata),
-                        "curator": (
-                            ""
-                        ),  # not using for now, but it may become usefull later
                         "basicplan_startdate": xml_date_conversion(
                             task.Start.cdata
                         ),  # equal to start date on a start of the project

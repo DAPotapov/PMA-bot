@@ -1,8 +1,6 @@
-# PMA-bot
+# Project manager assistant telegram bot
 
-Project manager assistant telegram bot
-
-## Description
+#### Description:
 
 The purpose of this bot is assist Project Manager to control schedule (via reminders) and completion of tasks.  
 It should make PM free from sitting behind dashboard and looking who delaying which task, and which tasks should be done by now.  
@@ -19,67 +17,52 @@ Every day at the morning bot looks at schedule and sends notification to actione
 Every friday bot reminds team members about necessity of updating shared project files (Customer requirement)  
 PM can change settings of notifications: time to send reminders to actioners, turn them off and on, change days of week on which reminders should be sent.
 
-## Known issues
 
-Reminder will not run if settings menu opened.  
-
-## TODO
-
-[ ] make bot persistent https://github.com/python-telegram-bot/python-telegram-bot/wiki/Making-your-bot-persistent  
-    [x] use MongoDB to store projects and other data
-    [x] use MongoDB to store jobs  
-[ ] fully implement connector to json format  
-[ ] ask if PM wants to rewrite project file if new uploaded
-[ ] Error handling: https://docs.python-telegram-bot.org/en/stable/telegram.ext.application.html#telegram.ext.Application.error_handlers
-[x] make /cancel command to work in conversation handler if user don't want to enter time or days of week
-[x] make status command working for team members too  
-[x] make reminders can be turned off and on
-[x] make reminders' time customizable in /settings
-[x] fixbug: last of children tasks rewrites its parent task (in load_gan)  
-[x] add example of json structure for project files and requirments for project files to README.  
-[x] make export to json format with readable formatting  
-[x] implement /help command  
-[x] implement /status command  
-[x] Make "hello world" type bot - learn how to connect app to telegram  
 
 ## Data structure
 
-First of all: the project file sent to bot should contain field 'tg_username' containing telegram username for members of a project team. Resources obviously should be present in file and assigned to tasks for bot to work :)
+First of all: the project file sent to bot should contain custom field 'tg_username' containing telegram username for members of a project team. Resources obviously should be present in file and assigned to tasks for bot to work :)
+
 
 ```json
 "projects": [                           
     {
-        "title": '',                                    # Title of the project
-        "active": True,                                 # Is this an active project? Controlled via settings and used in /status command
-        "pm_tg_id": '',                                 # Telegram id of PM  
-        "tg_chat_id": '',                               # store here group chat where project members discuss project
-        "reminders": {                                  # Dict to store ids of apcheduler jobs for 
-            "morning_update": id,                       # reminders
+        "title": '',                    # Title of the project
+        "active": True,                 # Flag that it's active project, can be only one for PM
+        "pm_tg_id": '',                 # Telegram id of PM  
+        "tg_chat_id": '',               # Group chat where project members discuss project will be stored here
+        "reminders": {                  # Dict to store ids of apcheduler jobs for reminders
+            "morning_update": id,                       
             "day_before_update": id,
             "friday_update": id,
         }
         "settings": {
-            'ALLOW_POST_STATUS_TO_GROUP': False,        # This option controls whether /status command from group chat 
-                                                        # will send message  to group chat or directly to user
-            'INFORM_ACTIONERS_OF_MILESTONES': False,    # This option controls whether participants will be informed 
+            'ALLOW_POST_STATUS_TO_GROUP': False,        # This option controls 
+                                                        # whether /status command from group chat 
+                                                        # will send message to group chat or directly to user
+            'INFORM_ACTIONERS_OF_MILESTONES': False,    # This option controls 
+                                                        # whether participants will be informed 
                                                         # not only about tasks but about milestones too
         },
         "tasks": [
             {
                 "id": 0,
-                "WBS": "1",                             # Filled when project imported from MS Project, otherwise it's empty; bot not using it for now.
+                "WBS": "1",                             # Filled when project imported from MS Project,
+                                                        # otherwise it's empty.
                 "name": "Common task",
                 "startdate": "2023-05-15",
                 "enddate": "2023-05-18",
                 "duration": 3,                          # Business days
-            "predecessor": [],                          # Filled when project imported from MS Project, otherwise it's empty; bot not using it for now.
-                "successors": [], 
-            "milestone": false,                         # True if task is a milestone
-                "complete": 0,                          # should 0-100 indicate percentage of completion
-                "curator": "",                          # for future purposes - if overseer role will be needed
-                "basicplan_startdate": "2023-05-15",
-                "basicplan_enddate": "2023-05-18",
-                "include": [                            # For common task in this list goes ids of included subtasks. 
+                "predecessor": [],                      # Contains tasks prior to the current one 
+                                                        # (filled when project imported from MS Project, 
+                                                        # otherwise it's empty); 
+                                                        # bot is not using it for now.
+                "successors": [],                       # Tasks which follow after current
+                "milestone": false,                     # True if task is a milestone
+                "complete": 0,                          # Indicate percentage of completion (0-100)
+                "basicplan_startdate": "2023-05-15",    # For future purpose: when postpone function
+                "basicplan_enddate": "2023-05-18",      # will be developed
+                "include": [                            # If task consist of subtasks, their ids go here
                     1,
                     4,
                     2
@@ -101,15 +84,23 @@ First of all: the project file sent to bot should contain field 'tg_username' co
                 "basicplan_startdate": "2023-05-08",
                 "basicplan_enddate": "2023-05-15",
                 "include": [],
-                "actioners": [                          # Actioner (doer) of this task
+                "actioners": [                          # List of actioners (doers) of this task:
+                                                        # It is known that the best approach is 
+                                                        # to decompose project to small tasks
+                                                        # which can be assigned to only one person,
+                                                        # but some tasks (e.g. to move furniture)
+                                                        # need two or more people to be envolved
                     {
-                        "actioner_id": ObjectId(""),    # This is id of person in staff collection below
-                        "nofeedback": false             # This flag will store if person didn't respond on last reminder
-                    },                                  # And will be used to inform PM that this task may lack of attention 
+                        "actioner_id": "",              # This is id of person in staff collection below 
+                                                        # (ObjectId stored as string)
+                        "nofeedback": false             # For future purpose: this flag will store
+                                                        # if person didn't respond on last reminder
+                    },                                  # And will be used to inform PM that 
+                                                        # this task may lack of attention 
                     {
-                        "actioner_id": ObjectId(""),    # It is better to decompose project to small task  
-                        "nofeedback": false             # which can be assigned to one doer, but some tasks (like moving furniture)
-                }                                       # need two or more people envolved
+                        "actioner_id": "",
+                        "nofeedback": false
+                }                                       
                 ]
             },
             {
@@ -169,14 +160,16 @@ First of all: the project file sent to bot should contain field 'tg_username' co
                 "include": [],
                 "actioners": [
                     {
-                        "actioner_id": ObjectId(""),
+                        "actioner_id": "",
                         "nofeedback": false
                     }
                 ]
             },        
         ],
-    "staff": [                                      # Actioners are stored separately 
-        {                                           # If they were stored in tasks, then it will be a problem to write tg_id in each task
+    },
+    "staff": [                      # Actioners are stored separately 
+        {                           # If they were stored in tasks, 
+                                    # then it will be a problem to write tg_id in each task
             "_id": ObjectId(),
             "name": "John",
             "email": "",
@@ -197,16 +190,13 @@ First of all: the project file sent to bot should contain field 'tg_username' co
             "phone": "",
             "tg_username": "some_user666",
             "tg_id": '000000',
-            "account_type": 'free',                 # For future comercial use
+            "account_type": 'free',
             "settings": {
-                'INFORM_OF_ALL_PROJECTS': False,    #  If set to True /status command will inform PM 
-                                                    # about all his projects, otherwise   
-            },                                      # only about active project  
+                'INFORM_OF_ALL_PROJECTS': False,
+            },
         },
     ]
-        
-    }
-    ]
+]
 
 ```
 
