@@ -2600,7 +2600,6 @@ def main() -> None:
                     ),
                     naming_project,
                 ),
-                # MessageHandler(filters.Regex(re.compile('^cancel$', re.IGNORECASE)), start_ended)
             ],
             SECOND_LVL: [MessageHandler(filters.Document.ALL, file_recieved)],
         },
