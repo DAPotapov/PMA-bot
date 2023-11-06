@@ -146,8 +146,7 @@ def add_worker_info_to_staff(worker: dict, db: Database) -> str:
 def clean_project_title(user_input: str) -> str:
     """
     Clean title typed by user from unnecessary spaces and so on.
-    Imagine someone copy-pasted project title here,
-    Should return string.
+    Return string of refurbished title.
     If something went wrong raise value error to be managed on calling side.
     """
 
@@ -167,11 +166,11 @@ def get_active_project(
     pm_tg_id: str, db: Database, include_tasks: bool = False
 ) -> dict:
     """
-    Gets active project (without tasks by default) by given PM telegram id.
+    Gets active project (without tasks by default to save some memory) by given PM telegram id.
     And fixes if something not right:
     - makes one project active if there were not,
     - if more than one active: leave only one active.
-    Returns empty dictionary if no projects found for user
+    Returns empty dictionary if no projects found for user.
     """
 
     project = {}
@@ -234,7 +233,7 @@ def get_assignees(task: dict, db: Database) -> tuple[str, list]:
     Helper function for getting names and telegram usernames
     of person assigned to given task to insert in a bot message
     Returns string of the form: '@johntherevelator (John) and @judasofkerioth (Judas)'
-    Also returns list of their telegram ids for bot to be able to send direct messages
+    Also returns list of their telegram ids for bot to be able to send direct messages.
     """
 
     people = ""
@@ -319,7 +318,7 @@ def get_job_preset(job_id: str, context: ContextTypes.DEFAULT_TYPE) -> str:
 
 def get_job_preset_dict(job_id: str, context: ContextTypes.DEFAULT_TYPE) -> dict:
     """
-    Helper function that returns dictionary of current reminder preset for given job id
+    Helper function that returns dictionary of current reminder preset for given job id.
     Returns empty dict if nothing is found or error occured.
     """
 
@@ -364,7 +363,8 @@ def get_keyboard_and_msg(
     db, level: int, user_id: str, project: dict, branch: str = ""
 ) -> Tuple[list, str]:
     """
-    Helper function to provide specific keyboard on different levels of settings menu
+    Helper function to provide specific keyboard on
+    different levels and branches of settings menu.
     """
 
     keyboard = []
@@ -622,7 +622,7 @@ def get_message_and_button_for_task(
     """
     Helper function to provide status update on task with a button
     (InlineKeyboardReplyMarkup to be sent) to mark such task as complete.
-    Returns empty tuple of empty string and Nonetype object if task not worth mention.
+    Returns tuple of empty string and Nonetype object if task not worth mention.
     """
     msg = ""
     keyboard = []
@@ -718,7 +718,8 @@ def get_project_by_title(db: Database, pm_tg_id: str, title: str) -> dict:
 
 def get_projects_and_pms_for_user(user_oid: ObjectId | str, db: Database) -> str:
     """
-    Function to get string of projects (and their PMs) where user participate as an actioner
+    Function to get string of projects (and their PMs)
+    where user participate as an actioner.
     Return empty string if nothing was found.
     """
 
@@ -762,7 +763,7 @@ def get_projects_and_pms_for_user(user_oid: ObjectId | str, db: Database) -> str
 
 def get_project_team(prj_oid: ObjectId | str, db: Database) -> list[dict]:
     """
-    Construct list of project team members.
+    Construct list of project team members by given id of project.
     Returns empty list if it is not possible to achieve or something went wrong.
     """
     team = []
@@ -914,8 +915,9 @@ def get_status_on_project(project: dict, user_oid: ObjectId | str, db: Database)
 
 def get_worker_oid_from_db_by_tg_username(tg_username: str, db: Database) -> str:
     """
-    Search staff collection in DB for given telegram username and return DB-oid as string.
-    If something went wrong return empty string (should be checked on calling side)
+    Search staff collection in DB for given telegram username and
+    returns ObjectId of found worker (as string).
+    If something went wrong return empty string (should be checked on calling side).
     """
 
     worker_id = ""
@@ -939,8 +941,9 @@ def get_worker_oid_from_db_by_tg_username(tg_username: str, db: Database) -> str
 
 def get_worker_oid_from_db_by_tg_id(tg_id: str, db: Database) -> str:
     """
-    Search staff collection in DB for given telegram id and return DB-oid as string.
-    If something went wrong return empty string (should be checked on calling side)
+    Search staff collection in DB for given telegram id and
+    return ObjectId of found worker as a string.
+    If something went wrong return empty string (should be checked on calling side).
     """
 
     worker_id = ""
@@ -964,8 +967,9 @@ def get_worker_oid_from_db_by_tg_id(tg_id: str, db: Database) -> str:
 
 def get_worker_tg_id_from_db_by_tg_username(tg_username: str, db: Database) -> str:
     """
-    Search staff collection in DB for given telegram username and return telegram-id.
-    If something went wrong return empty string (should be checked on calling side)
+    Search staff collection in DB for given telegram username and
+    return telegram-id of found worker.
+    If something went wrong return empty string (should be checked on calling side).
     """
 
     tg_id = ""
@@ -986,8 +990,11 @@ def get_worker_tg_id_from_db_by_tg_username(tg_username: str, db: Database) -> s
 
 
 def get_worker_tg_username_by_oid(user_oid: ObjectId | str, db: Database) -> str:
-    """Search staff collection in DB for given ObjectId and return telegram username.
-    If something went wrong return empty string (should be checked on calling side)"""
+    """
+    Search staff collection in DB for given ObjectId and
+    return telegram username.
+    If something went wrong return empty string (should be checked on calling side)
+    """
 
     tg_un = ""
 
@@ -1009,7 +1016,7 @@ def get_worker_tg_username_by_oid(user_oid: ObjectId | str, db: Database) -> str
 
 def get_worker_tg_username_by_tg_id(tg_id: str, db: Database) -> str:
     """
-    Search staff collection in DB for given telegram id and return telegram username.
+    Searches staff collection in DB for given telegram id and returns telegram username.
     If something went wrong return empty string (should be checked on calling side)
     """
     tg_un = ""
