@@ -149,8 +149,10 @@ def extract_tasks_from_file(fp: Path, db: Database) -> list[dict]:
 
 async def day_before_update(context: ContextTypes.DEFAULT_TYPE) -> None:
     """
-    This reminder must be send to all team members on the day before of the important dates:
-    start of task, deadline, optionally milestones (according to setting)
+    This reminder must be sent to all team members on
+    the day before of the important dates:
+    start of task, deadline, optionally milestones (according to setting).
+    It executes form a job from a job_queue.
     """
     if (
         DB is not None
@@ -239,7 +241,7 @@ async def day_before_update(context: ContextTypes.DEFAULT_TYPE) -> None:
 
 async def download(update: Update, context: CallbackContext):
     """
-    Let user download (updated) project.
+    Let user download (updated) active project.
     First of all: in json format.
     """
 
@@ -292,7 +294,7 @@ async def download(update: Update, context: CallbackContext):
 
 async def feedback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     """
-    Initiation of feedback dialog with user
+    First step of feedback dialog with user
     """
     bot_msg = (
         "What would you like inform developer about? "
@@ -303,7 +305,10 @@ async def feedback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
 
 
 async def feedback_answer(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
-    """Gather information user provided and answer user"""
+    """
+    Get feedback provided by user, log it,
+    send to depeloper and answer to user
+    """
 
     msg = (
         "FEEDBACK from"
@@ -321,7 +326,7 @@ async def feedback_answer(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
 
 
 async def feedback_aborted(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
-    """Fallback function for feeadback command"""
+    """Fallback function for feedback command"""
 
     bot_msg = "Feedback aborted."
     await update.message.reply_text(bot_msg)
@@ -331,7 +336,8 @@ async def feedback_aborted(update: Update, context: ContextTypes.DEFAULT_TYPE) -
 async def file_update(context: ContextTypes.DEFAULT_TYPE) -> None:
     """
     This function is a reminder for team members
-    that common files should be updated in the end of the week
+    that common files should be updated in the end of the week.
+    It executes form a job from a job_queue.
     """
 
     if DB is not None and is_db(DB):
@@ -364,7 +370,8 @@ async def file_update(context: ContextTypes.DEFAULT_TYPE) -> None:
 
 async def help(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """
-    This function handles /help command
+    This function handles /help command.
+    Shows description and available commands to user.
     """
     # Get description and send to user
     bot_description = await context.bot.getMyDescription()
@@ -383,7 +390,8 @@ async def help(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
 
 async def morning_update(context: ContextTypes.DEFAULT_TYPE) -> None:
     """
-    This routine will be executed on daily basis to control project(s) schedule
+    This reminder will be executed on daily basis to control project(s) schedule.
+    It executes form a job from a job_queue.
     """
 
     if DB is not None and is_db(DB):
@@ -453,7 +461,10 @@ async def morning_update(context: ContextTypes.DEFAULT_TYPE) -> None:
 
 
 async def set_task_accomplished(update: Update, context: CallbackContext):
-    """Function to proceed pressed button of setting task accomplished"""
+    """
+    Function to mark task accomplished when corresponding
+    button pressed during output of /status command
+    """
     bot_msg = "Unsuccessful"
     query = update.callback_query
     await query.answer()
@@ -506,7 +517,7 @@ async def set_task_accomplished(update: Update, context: CallbackContext):
 
 async def start(update: Update, context: CallbackContext) -> int:
     """
-    Function to handle start of the bot
+    Function to handle /start command - first step
     """
 
     # Collect information about PM
@@ -544,7 +555,10 @@ async def start(update: Update, context: CallbackContext) -> int:
 
 
 async def naming_project(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
-    """Function for recognizing name of the project"""
+    """
+    Function for recognizing name of the project
+    Second step of /start command
+    """
 
     # Try to clean project title from unnecessary symbols and if not succeed give him another try.
     try:
@@ -629,7 +643,10 @@ async def naming_project(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
 
 
 async def file_recieved(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
-    """Function to proceed uploaded file and saving to DB"""
+    """
+    Function to proceed uploaded file and saving to DB
+    Third step of /start command
+    """
 
     # Get file and save it as temp
     with tempfile.TemporaryDirectory() as tdp:
@@ -742,7 +759,7 @@ async def file_recieved(update: Update, context: ContextTypes.DEFAULT_TYPE) -> i
 
 
 async def start_ended(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
-    """Fallback function of start routine"""
+    """Fallback function of /start command"""
 
     bot_msg = "Procedure of starting new project aborted."
     logger.warning(
@@ -755,7 +772,8 @@ async def start_ended(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int
 
 def schedule_jobs(context: ContextTypes.DEFAULT_TYPE) -> dict:
     """
-    Schedule jobs for main reminders. Return false if not succeded
+    Schedule jobs for main reminders.
+    Return empty dictionary if not succeded.
     """
 
     morning_update_job = None
@@ -769,7 +787,7 @@ def schedule_jobs(context: ContextTypes.DEFAULT_TYPE) -> dict:
         "pm_tg_id": str(context.user_data["PM"]["tg_id"]),
     }
 
-    """ To persistence to work job must have explicit ID
+    """ From docs: To persistence to work job must have explicit ID
         and 'replace_existing' must be True
         or a new copy of the job will be created
         every time application restarts! """
@@ -849,7 +867,8 @@ def schedule_jobs(context: ContextTypes.DEFAULT_TYPE) -> dict:
 
 async def status(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """
-    This function handles /status command
+    This function handles /status command.
+    And informs user about important dates.
     """
     # Dummy message
     bot_msg = "Should print status to user"
@@ -1128,7 +1147,7 @@ async def update_staff_on_message(
     update: Update, context: ContextTypes.DEFAULT_TYPE
 ) -> None:
     """
-    Function to update staff list with ids to be able contact users later.
+    Function to update staff collection with ids to be able contact users later.
     """
 
     # Check if update caused by user and his info was not updated in database yet
@@ -1148,7 +1167,7 @@ async def update_staff_on_message(
 
 async def upload(update: Update, context: CallbackContext) -> int:
     """
-    Starting point of conversation of uploading new project file
+    Entry point of conversation of uploading new project file
     """
 
     # Check if user is PM and remember what project to update
@@ -1189,7 +1208,11 @@ async def upload(update: Update, context: CallbackContext) -> int:
 
 
 async def upload_file_recieved(update: Update, context: CallbackContext) -> int:
-    """Function to proceed uploaded new project file and updating corresponding record in DB"""
+    """
+    Function to proceed uploaded new project file 
+    and update corresponding record in DB.
+    Second and final step of /upload command.
+    """
 
     with tempfile.TemporaryDirectory() as tdp:
         gotfile = await context.bot.get_file(update.message.document)
@@ -1322,7 +1345,7 @@ async def settings(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
 
 
 async def settings_back(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
-    """Menu option 'Back'. Handles returning to previous menu level"""
+    """Menu option 'Back'. Handles return to previous menu level"""
 
     query = update.callback_query
     await query.answer()
@@ -1364,7 +1387,8 @@ async def settings_back(update: Update, context: ContextTypes.DEFAULT_TYPE) -> i
 
 async def finish_settings(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     """
-    Endpoint of settings conversation
+    Function to handle 'finish' button.
+    Endpoint of /settings conversation.
     """
     query = update.callback_query
     await query.answer()
@@ -1374,7 +1398,7 @@ async def finish_settings(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
 
 async def settings_aborted(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     """
-    Fallback function of settings conversation
+    Fallback function of /settings conversation
     """
 
     bot_msg = "Settings function aborted."
@@ -1387,7 +1411,10 @@ async def settings_aborted(update: Update, context: ContextTypes.DEFAULT_TYPE) -
 
 
 async def second_lvl_menu(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
-    """Function to control second level menu"""
+    """
+    Function to control second level menu.
+    Shows second level menu according to button pressed on 1st level.
+    """
 
     query = update.callback_query
     await query.answer()
@@ -1752,7 +1779,11 @@ async def transfer_control(update: Update, context: ContextTypes.DEFAULT_TYPE) -
 
 
 async def project_activate(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
-    """Menu option to activate choosen project. Work as switch and return keyboard with projects"""
+    """
+    Menu option to activate choosen project and deactivate current project.
+    Replaces current project in context.
+    Work as switch and return keyboard with projects.
+    """
     query = update.callback_query
     await query.answer()
     msg = ""
@@ -1888,7 +1919,10 @@ async def project_delete_start(
 async def project_delete_finish(
     update: Update, context: ContextTypes.DEFAULT_TYPE
 ) -> int:
-    """Deletes selected project with reminders from database and returns to projects menu"""
+    """
+    Deletes selected project with reminders 
+    from database and returns to projects menu.
+    """
     query = update.callback_query
     await query.answer()
     msg = ""
@@ -1938,7 +1972,10 @@ async def project_delete_finish(
 async def project_rename_start(
     update: Update, context: ContextTypes.DEFAULT_TYPE
 ) -> int:
-    """Start point of conversation for project rename: asks user for new name"""
+    """
+    Start point of conversation for project rename:
+    asks user for new name
+    """
 
     query = update.callback_query
     await query.answer()
@@ -2084,7 +2121,7 @@ async def project_rename_finish(
 async def reminders_settings_item(
     update: Update, context: ContextTypes.DEFAULT_TYPE
 ) -> int:
-    """Controls settings menu branch with reminders"""
+    """Function to show reminders control menu branch"""
     query = update.callback_query
     await query.answer()
 
@@ -2172,7 +2209,7 @@ async def reminder_switcher(update: Update, context: ContextTypes.DEFAULT_TYPE) 
 async def reminder_time_pressed(
     update: Update, context: ContextTypes.DEFAULT_TYPE
 ) -> int:
-    """Menu option 'Set time' (for reminders)"""
+    """Menu option 'Set time' (for for choosen reminder)"""
 
     query = update.callback_query
     await query.answer()
@@ -2221,7 +2258,7 @@ async def reminder_time_pressed(
 async def reminder_days_pressed(
     update: Update, context: ContextTypes.DEFAULT_TYPE
 ) -> int:
-    """Menu option 'Set days of week'"""
+    """Menu option 'Set days of week' for choosen reminder"""
 
     query = update.callback_query
     await query.answer()
@@ -2275,7 +2312,10 @@ async def reminder_days_pressed(
 async def reminder_time_setter(
     update: Update, context: ContextTypes.DEFAULT_TYPE
 ) -> int:
-    """Handles new time provided by user"""
+    """
+    Handles new time provided by user.
+    Reschedules corresponding job.
+    """
 
     bot_msg = "Unable to reschedule the reminder"
 
@@ -2359,7 +2399,10 @@ async def reminder_time_setter(
 async def reminder_days_setter(
     update: Update, context: ContextTypes.DEFAULT_TYPE
 ) -> int:
-    """Handles new days of week provided by user for reminder"""
+    """
+    Handles new days of week provided by user for reminder.
+    Reschedules corresponding job.
+    """
 
     bot_msg = "Unable to reschedule the reminder"
     new_days = []
@@ -2505,7 +2548,7 @@ async def reminder_days_setter(
 async def post_init(application: Application) -> None:
     """
     Function to control list of commands and description in bot itself.
-    Commands itself are global.
+    Commands itself are global because they used in main() too.
     """
     commands = await application.bot.get_my_commands()
     new_commands = (
