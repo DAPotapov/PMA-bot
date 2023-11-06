@@ -1826,7 +1826,10 @@ async def project_activate(update: Update, context: ContextTypes.DEFAULT_TYPE) -
 async def project_delete_start(
     update: Update, context: ContextTypes.DEFAULT_TYPE
 ) -> int:
-    # Should ask for confirmation
+    """
+    Function handles press of button 'Delete {project title}'.
+    Asks for confirmation.
+    """
     query = update.callback_query
     await query.answer()
 
@@ -1835,7 +1838,7 @@ async def project_delete_start(
         context.user_data["title_to_delete"] = ""
         context.user_data["level"] += 1
         context.user_data["branch"].append(query.data.split("_", 1)[0])
-
+        # Get title of the project to delete to show to the user
         if is_db(DB):
             title = DB.projects.find_one(
                 {"_id": context.user_data["oid_to_delete"]}, {"title": 1, "_id": 0}
@@ -2591,7 +2594,7 @@ def main() -> None:
             CommandHandler(start_cmd.command, start, ~filters.ChatType.GROUPS)
         ],
         states={
-            FIRST_LVL: [  # Оставить только ожидаемое, остальное должно упасть в fallback
+            FIRST_LVL: [
                 MessageHandler(
                     filters.TEXT
                     & ~(
@@ -2675,6 +2678,8 @@ def main() -> None:
                 CallbackQueryHandler(settings_back, pattern="^back$"),
                 CallbackQueryHandler(finish_settings, pattern="^finish$"),
             ],
+            # Don't need 'cancel' in two states below: they process all input and
+            # exit from settings can be done via 'finish' button when menu appears
             FOURTH_LVL: [
                 MessageHandler(filters.TEXT & ~filters.COMMAND, reminder_time_setter),
             ],
@@ -2688,9 +2693,6 @@ def main() -> None:
                     & ~filters.Regex(re.compile("^cancel$", re.IGNORECASE)),
                     project_rename_finish,
                 ),
-            ],
-            SEVENTH_LVL: [
-                MessageHandler(filters.TEXT & ~filters.COMMAND, project_delete_finish),
             ],
         },
         fallbacks=[
