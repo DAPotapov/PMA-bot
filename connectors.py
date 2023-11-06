@@ -35,10 +35,12 @@ logger = logging.getLogger(__name__)
 def load_gan(fp: Path, db: Database) -> list[dict]:
     """
     This is a connector from GanttProject format (.gan) to inner format.
-    Get file pointer on input
-    Validates and converts data to inner dict-list-dict.. format
-    Saves actioners to staff collection in DB
+    Gets file pointer on input. Reads data from file.
+    Validates and converts data to inner dict-list-dict.. format.
+    Saves actioners to staff collection in DB.
     Returns list of tasks.
+    Raises AttributeError and ValueError errors
+    if project structure in a file is not correct.
     """
 
     # Declare dictionary to store data
@@ -201,7 +203,12 @@ def compose_tasks_list(
     property_id: str,
     db: Database,
 ) -> dict:
-    """Function to append to list of tasks information of one task or subtask"""
+    """
+    Creates task dictionary (to append to tasks list) of inner format
+    from a task element of .gan file,
+    resources and allocations collections (elements of .gan file too).
+    Raises AttributeError and ValueError errors if structure is not correct.
+    """
 
     output_task = {}
 
@@ -328,7 +335,8 @@ def load_json(fp: Path, db: Database) -> list[dict]:
     This connector useful in case we downloaded JSON,
     manually made some changes, and upload it again to bot.
     Returns list of tasks of the project.
-    Returns empty list if something wrong.
+    Raises AttributeError and ValueError errors
+    if project structure in a file is not correct.
     """
 
     tasks = []
@@ -476,7 +484,9 @@ def load_xml(fp: Path, db: Database) -> list[dict]:
     Get file pointer and database instance on input.
     Validates and converts data to inner dict-list-dict.. format
     Saves actioners to staff collection in DB.
-    Returns list of tasks. And empty list if no tasks in file.
+    Returns list of tasks.
+    Raises AttributeError and ValueError errors
+    if project structure in a file is not correct.
     """
 
     tasks = []
