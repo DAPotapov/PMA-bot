@@ -129,12 +129,12 @@ def load_gan(fp: Path, db: Database) -> list[dict]:
         for task in obj.project.tasks.task:
             # Add relevant data to list containing task information
             tasks.append(
-                compose_tasks_list(task, allocations, resources, property_id, db)
+                compose_task_dict(task, allocations, resources, property_id, db)
             )
             if "task" in task:
                 for subtask in task.task:
                     tasks.append(
-                        compose_tasks_list(
+                        compose_task_dict(
                             subtask, allocations, resources, property_id, db
                         )
                     )
@@ -196,7 +196,7 @@ def get_tg_un_from_xml_resources(
     return tg_username
 
 
-def compose_tasks_list(
+def compose_task_dict(
     task: Element,
     allocations: Element,
     resources: Element,
@@ -277,7 +277,7 @@ def compose_tasks_list(
                 )
 
     # Dictionary of subtasks' id of this one.
-    # This way helpful to almost infinitely decompose tasks.
+    # This way is helpful to almost infinitely decompose tasks.
     include = []
     if "task" in task:
         for subtask in task.task:

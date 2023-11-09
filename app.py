@@ -5,7 +5,7 @@
 # Constants
 # Sincronuous functions
 # Async functions
-# Settings part (functions for settings functionality)
+# Settings part (functions for settings menu functionality)
 # Post init
 # Main function
 
@@ -1209,7 +1209,7 @@ async def upload(update: Update, context: CallbackContext) -> int:
 
 async def upload_file_recieved(update: Update, context: CallbackContext) -> int:
     """
-    Function to proceed uploaded new project file 
+    Function to proceed uploaded new project file
     and update corresponding record in DB.
     Second and final step of /upload command.
     """
@@ -1920,7 +1920,7 @@ async def project_delete_finish(
     update: Update, context: ContextTypes.DEFAULT_TYPE
 ) -> int:
     """
-    Deletes selected project with reminders 
+    Deletes selected project with reminders
     from database and returns to projects menu.
     """
     query = update.callback_query

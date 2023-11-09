@@ -166,7 +166,8 @@ def get_active_project(
     pm_tg_id: str, db: Database, include_tasks: bool = False
 ) -> dict:
     """
-    Gets active project (without tasks by default to save some memory) by given PM telegram id.
+    Gets active project (without tasks by default to save some memory) 
+    by given PM telegram id.
     And fixes if something not right:
     - makes one project active if there were not,
     - if more than one active: leave only one active.
@@ -275,7 +276,6 @@ def get_db() -> Database:
     BOT_PASS = os.environ.get("BOT_PASS")
 
     # link to database
-    # DB_URI = f"mongodb://{BOT_NAME}:{BOT_PASS}@localhost:27017/admin?retryWrites=true&w=majority"
     DB_NAME = os.environ.get("DB_NAME", "database")
     host = "127.0.0.1:27017"
     if not BOT_NAME or not BOT_PASS:
