@@ -127,18 +127,8 @@ def load_gan(fp: Path, db: Database) -> list[dict]:
     if "tasks" in obj.project and "task" in obj.project.tasks:
         # Loop through tasks
         for task in obj.project.tasks.task:
-            # Add relevant data to list containing task information
-            tasks.append(
-                compose_task_dict(task, allocations, resources, property_id, db)
-            )
-            if "task" in task:
-                for subtask in task.task:
-                    tasks.append(
-                        compose_task_dict(
-                            subtask, allocations, resources, property_id, db
-                        )
-                    )
-
+            # Build tasks list using recursion
+            tasks.extend(compose_tasks_list(task, allocations, resources, property_id, db))
     else:
         raise AttributeError("There are no tasks in provided file. Nothing to do.")
     return tasks
@@ -196,21 +186,21 @@ def get_tg_un_from_xml_resources(
     return tg_username
 
 
-def compose_task_dict(
+def compose_tasks_list(
     task: Element,
     allocations: Element,
     resources: Element,
     property_id: str,
     db: Database,
-) -> dict:
+) -> list:
     """
-    Creates task dictionary (to append to tasks list) of inner format
-    from a task element of .gan file,
+    Creates tasks list from a task element of .gan file
+    and its nested subtasks (if any),
     resources and allocations collections (elements of .gan file too).
-    Raises AttributeError and ValueError errors if structure is not correct.
+    Raises AttributeError or ValueError errors if structure is not correct.
     """
 
-    output_task = {}
+    output_tasks = []
 
     # Dictionary of id of actioners and their last reaction
     # Completeness of task assignments will be controlled in /status function
@@ -276,8 +266,7 @@ def compose_task_dict(
                     }
                 )
 
-    # Dictionary of subtasks' id of this one.
-    # This way is helpful to almost infinitely decompose tasks.
+    # Dictionary of subtasks' ids of this one.
     include = []
     if "task" in task:
         for subtask in task.task:
@@ -306,27 +295,34 @@ def compose_task_dict(
             )
         )
 
-    # tasks.append(
-    output_task = {
-        "id": int(str(task["id"])),
-        "WBS": "",  # For compatibility with MS Project
-        "name": task["name"],
-        "startdate": task["start"],
-        "enddate": enddate,
-        "duration": int(str(task["duration"])),
-        "predecessors": [],  # For compatibility with MS Project
-        "successors": successors,
-        "milestone": milestone,
-        "complete": int(str(task["complete"])),
-        "basicplan_startdate": task[
-            "start"
-        ],  # equal to start date on a start of the project
-        "basicplan_enddate": enddate,  # equal to end date on a start of the project
-        "include": include,
-        "actioners": actioners,
-    }
-    # )
-    return output_task
+    output_tasks.append(
+        {
+            "id": int(str(task["id"])),
+            "WBS": "",  # For compatibility with MS Project
+            "name": task["name"],
+            "startdate": task["start"],
+            "enddate": enddate,
+            "duration": int(str(task["duration"])),
+            "predecessors": [],  # For compatibility with MS Project
+            "successors": successors,
+            "milestone": milestone,
+            "complete": int(str(task["complete"])),
+            "basicplan_startdate": task[
+                "start"
+            ],  # equal to start date on a start of the project
+            "basicplan_enddate": enddate,  # equal to end date on a start of the project
+            "include": include,
+            "actioners": actioners,
+        }
+    )
+
+    # Go deeper in subtasks to build tasks list
+    if "task" in task:
+        for subtask in task.task:
+            subtasks = compose_tasks_list(subtask, allocations, resources, property_id, db)
+            output_tasks.extend(subtasks)
+
+    return output_tasks
 
 
 def load_json(fp: Path, db: Database) -> list[dict]:

@@ -166,7 +166,7 @@ def get_active_project(
     pm_tg_id: str, db: Database, include_tasks: bool = False
 ) -> dict:
     """
-    Gets active project (without tasks by default to save some memory) 
+    Gets active project (without tasks by default to save some memory)
     by given PM telegram id.
     And fixes if something not right:
     - makes one project active if there were not,
