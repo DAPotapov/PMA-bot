@@ -642,7 +642,7 @@ async def naming_project(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
             return ConversationHandler.END
 
 
-async def file_recieved(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+async def file_received(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     """
     Function to proceed uploaded file and saving to DB
     Third step of /start command
@@ -2647,7 +2647,7 @@ def main() -> None:
                     naming_project,
                 ),
             ],
-            SECOND_LVL: [MessageHandler(filters.Document.ALL, file_recieved)],
+            SECOND_LVL: [MessageHandler(filters.Document.ALL, file_received)],
         },
         fallbacks=[
             MessageHandler(filters.TEXT | filters.COMMAND, start_ended),
