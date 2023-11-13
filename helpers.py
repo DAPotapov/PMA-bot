@@ -397,7 +397,7 @@ def get_keyboard_and_msg(
                     ],
                     [
                         InlineKeyboardButton(
-                            "Transfer control over active project to other user",
+                            "Transfer control over the active project to another user",
                             callback_data="control",
                         )
                     ],
