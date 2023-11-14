@@ -23,12 +23,12 @@ GAN_DEPEND_TYPES = [3, 1, 0, 2]
 #   format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
 #   level=logging.INFO
 # )
-logging.basicConfig(
-    filename=".data/log.log",
-    filemode="a",
-    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
-    level=logging.DEBUG,
-)
+# logging.basicConfig(
+#     filename=".data/log.log",
+#     filemode="a",
+#     format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+#     level=logging.INFO,
+# )
 logger = logging.getLogger(__name__)
 
 

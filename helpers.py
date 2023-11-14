@@ -21,9 +21,9 @@ from urllib.parse import quote_plus
 ONE, TWO, THREE = range(3)
 
 # Configure logging
-logging.basicConfig(
-    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s", level=logging.DEBUG
-)
+# logging.basicConfig(
+#     format="%(asctime)s - %(name)s - %(levelname)s - %(message)s", level=logging.DEBUG
+# )
 # logging.basicConfig(filename=".data/log.log",
 #                     filemode='a',
 #                     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
@@ -125,12 +125,16 @@ def add_worker_info_to_staff(worker: dict, db: Database) -> str:
 
     # If worker not found in staff collection add him, if exist then fill empty fields
     if not worker_id:
+
+        # Convert old id (if present) to ObjectId
+        if '_id' in worker.keys():
+            worker['_id'] = ObjectId(worker['_id'])
         worker_id = db.staff.insert_one(worker).inserted_id
     else:
         db_worker = db.staff.find_one({"_id": ObjectId(worker_id)})
         if db_worker and type(db_worker) is dict:
             for key in worker.keys():
-                if not db_worker[key]:
+                if not db_worker[key] and worker[key]:
                     db_worker[key] = worker[key]
             result = db.staff.replace_one(
                 {"_id": ObjectId(worker_id)}, replacement=db_worker
@@ -140,7 +144,7 @@ def add_worker_info_to_staff(worker: dict, db: Database) -> str:
                 f" '{result.matched_count}' found, '{result.modified_count}' modified."
             )
 
-    return worker_id
+    return str(worker_id)
 
 
 def clean_project_title(user_input: str) -> str:

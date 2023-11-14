@@ -59,7 +59,7 @@ from telegram.ext import (
 logging.basicConfig(
     format="%(asctime)s - %(name)s - %(levelname)s - %(message)s", level=logging.DEBUG
 )
-# TODO log to file in production stage
+# Log to file in production stage
 # logging.basicConfig(filename=".data/log.log",
 #                     filemode='a',
 #                     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
@@ -746,7 +746,7 @@ async def file_received(update: Update, context: ContextTypes.DEFAULT_TYPE) -> i
             bot_msg = (
                 "Couldn't process given file.\nSupported formats are: <u>.gan</u>"
                 " (GanttProject), <u>.json</u>, <u>.xml</u> (MS Project)\nMake sure"
-                " these files contain custom field named '<i>tg_username</i>, which"
+                " these files contain custom field named '<i>tg_username</i>', which"
                 " store usernames of project team members.\nIf you would like to see"
                 " other formats supported feel free to message bot developer via"
                 " /feedback command.\nTry upload another one."
@@ -1272,14 +1272,14 @@ async def upload_file_recieved(update: Update, context: CallbackContext) -> int:
 
         else:
             bot_msg = (
-                "Couldn't process given file.\nSupported formats are: .gan"
-                " (GanttProject), .json, .xml (MS Project)\nMake sure these files"
-                " contain custom field named 'tg_username', which store usernames of"
+                "Couldn't process given file.\nSupported formats are: <u>.gan</u>"
+                " (GanttProject), <u>.json</u>, <u>.xml</u> (MS Project)\nMake sure these files"
+                " contain custom field named '<i>tg_username</i>', which store usernames of"
                 " project team members.\nIf you would like to see other formats"
                 " supported feel free to message bot developer via /feedback"
                 " command.\nTry upload another one."
             )
-            await update.message.reply_text(bot_msg)
+            await update.message.reply_text(bot_msg, parse_mode="HTML")
             return FIRST_LVL
 
 
