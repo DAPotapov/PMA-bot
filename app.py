@@ -99,8 +99,8 @@ start_cmd = BotCommand("start", "starts this bot or new project")
 stop_cmd = BotCommand("stop", "stops bot")
 upload_cmd = BotCommand(
     "upload",
-    "upload new schedule for active project"
-    + "(e.g., if some tasks were rescheduled or actioner was replaced)"
+    "upload new schedule for active project "
+    + "(e.g., if some tasks were rescheduled or actioner was replaced) "
     + "(works only in private chats)",
 )
 download_cmd = BotCommand("download", "download actual project file (in .json format for now)")
@@ -406,8 +406,10 @@ async def morning_update(context: ContextTypes.DEFAULT_TYPE) -> None:
             if team:
                 # For each member (except PM) compose status update on project and send
                 for member in team:
-                    if (member["tg_id"] and 
-                        member["tg_id"] != str(context.job.data["pm_tg_id"])):  # type: ignore
+                    if (
+                        member["tg_id"] and
+                        member["tg_id"] != str(context.job.data["pm_tg_id"])  # type: ignore
+                    ):
                         bot_msg = get_status_on_project(project, member["_id"], DB)
                         await context.bot.send_message(
                             member["tg_id"], bot_msg, parse_mode="HTML"
