@@ -21,13 +21,6 @@ from urllib.parse import quote_plus
 ONE, TWO, THREE = range(3)
 
 # Configure logging
-# logging.basicConfig(
-#     format="%(asctime)s - %(name)s - %(levelname)s - %(message)s", level=logging.DEBUG
-# )
-# logging.basicConfig(filename=".data/log.log",
-#                     filemode='a',
-#                     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-#                     level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 

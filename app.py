@@ -56,14 +56,14 @@ from telegram.ext import (
 
 
 # Configure logging
-logging.basicConfig(
-    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s", level=logging.DEBUG
-)
+# logging.basicConfig(
+#     format="%(asctime)s - %(name)s - %(levelname)s - %(message)s", level=logging.DEBUG
+# )
 # Log to file in production stage
-# logging.basicConfig(filename=".data/log.log",
-#                     filemode='a',
-#                     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-#                     level=logging.INFO)
+logging.basicConfig(filename=".data/log.log",
+                    filemode='a',
+                    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+                    level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 # Default values for daily reminders
@@ -406,7 +406,8 @@ async def morning_update(context: ContextTypes.DEFAULT_TYPE) -> None:
             if team:
                 # For each member (except PM) compose status update on project and send
                 for member in team:
-                    if member["tg_id"] != str(context.job.data["pm_tg_id"]):  # type: ignore
+                    if (member["tg_id"] and 
+                        member["tg_id"] != str(context.job.data["pm_tg_id"])):  # type: ignore
                         bot_msg = get_status_on_project(project, member["_id"], DB)
                         await context.bot.send_message(
                             member["tg_id"], bot_msg, parse_mode="HTML"
@@ -615,7 +616,7 @@ async def naming_project(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
                     prj_id
                     and type(prj_id) is dict
                     and "_id" in prj_id.keys()
-                    and prj_id["id"]
+                    and prj_id["_id"]
                 ):
                     bot_msg = (
                         "You've already started project with name"
