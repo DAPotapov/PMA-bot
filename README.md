@@ -1,7 +1,7 @@
 # Project manager assistant telegram bot ([@PMA_sp_bot](https://t.me/PMA_sp_bot))
 
 - [Project manager assistant telegram bot (@PMA\_sp\_bot)](#project-manager-assistant-telegram-bot-pma_sp_bot)
-  - [Video Demo:](#video-demo)
+  - [Video Demo: https://youtu.be/youGpWycIl8](#video-demo-httpsyoutubeyougpwycil8)
   - [Description](#description)
     - [What problem is the bot trying to solve?](#what-problem-is-the-bot-trying-to-solve)
     - [Constraints](#constraints)
@@ -49,7 +49,7 @@
     - [Data structure](#data-structure)
   - [Installation and usage](#installation-and-usage)
 
-## Video Demo:  
+## Video Demo: https://youtu.be/youGpWycIl8
 
 ## Description
 
