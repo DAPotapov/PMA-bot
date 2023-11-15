@@ -1,0 +1,405 @@
+{
+    "_id": "65547379961e755b79d497a1",
+    "title": "example",
+    "active": true,
+    "pm_tg_id": "35390725",
+    "tg_chat_id": "",
+    "settings": {
+        "ALLOW_POST_STATUS_TO_GROUP": false,
+        "INFORM_ACTIONERS_OF_MILESTONES": false
+    },
+    "reminders": {
+        "morning_update": "c444d61f24354b3f806f86568db86f77",
+        "day_before_update": "af1393804222412fbb0ed2395cf98e95",
+        "friday_update": "93bb11dbdf714ff680027d7b80d07699"
+    },
+    "tasks": [
+        {
+            "id": 0,
+            "WBS": "",
+            "name": "Preparation",
+            "startdate": "2023-11-06",
+            "enddate": "2023-11-10",
+            "duration": 5,
+            "predecessors": [],
+            "successors": [],
+            "milestone": false,
+            "complete": 30,
+            "basicplan_startdate": "2023-11-06",
+            "basicplan_enddate": "2023-11-10",
+            "include": [
+                11,
+                4,
+                2,
+                12
+            ],
+            "actioners": []
+        },
+        {
+            "id": 11,
+            "WBS": "",
+            "name": "Develop list of requirements",
+            "startdate": "2023-11-06",
+            "enddate": "2023-11-08",
+            "duration": 3,
+            "predecessors": [],
+            "successors": [
+                {
+                    "id": 4,
+                    "depend_type": 1,
+                    "depend_offset": 0
+                }
+            ],
+            "milestone": false,
+            "complete": 50,
+            "basicplan_startdate": "2023-11-06",
+            "basicplan_enddate": "2023-11-08",
+            "include": [],
+            "actioners": [
+                {
+                    "actioner_id": "6553742d42b783db6fec837e",
+                    "nofeedback": false
+                }
+            ]
+        },
+        {
+            "id": 4,
+            "WBS": "",
+            "name": "List of requirements created",
+            "startdate": "2023-11-09",
+            "enddate": "2023-11-09",
+            "duration": 0,
+            "predecessors": [],
+            "successors": [
+                {
+                    "id": 2,
+                    "depend_type": 1,
+                    "depend_offset": 0
+                }
+            ],
+            "milestone": true,
+            "complete": 0,
+            "basicplan_startdate": "2023-11-09",
+            "basicplan_enddate": "2023-11-09",
+            "include": [],
+            "actioners": []
+        },
+        {
+            "id": 2,
+            "WBS": "",
+            "name": "Develop architecture of the app",
+            "startdate": "2023-11-09",
+            "enddate": "2023-11-10",
+            "duration": 2,
+            "predecessors": [],
+            "successors": [
+                {
+                    "id": 12,
+                    "depend_type": 1,
+                    "depend_offset": 0
+                }
+            ],
+            "milestone": false,
+            "complete": 0,
+            "basicplan_startdate": "2023-11-09",
+            "basicplan_enddate": "2023-11-10",
+            "include": [],
+            "actioners": [
+                {
+                    "actioner_id": "6553742d42b783db6fec837e",
+                    "nofeedback": false
+                }
+            ]
+        },
+        {
+            "id": 12,
+            "WBS": "",
+            "name": "Project architecture created",
+            "startdate": "2023-11-13",
+            "enddate": "2023-11-13",
+            "duration": 0,
+            "predecessors": [],
+            "successors": [
+                {
+                    "id": 5,
+                    "depend_type": 1,
+                    "depend_offset": 0
+                }
+            ],
+            "milestone": true,
+            "complete": 0,
+            "basicplan_startdate": "2023-11-13",
+            "basicplan_enddate": "2023-11-13",
+            "include": [],
+            "actioners": []
+        },
+        {
+            "id": 3,
+            "WBS": "",
+            "name": "Coding",
+            "startdate": "2023-11-13",
+            "enddate": "2023-11-17",
+            "duration": 5,
+            "predecessors": [],
+            "successors": [],
+            "milestone": false,
+            "complete": 0,
+            "basicplan_startdate": "2023-11-13",
+            "basicplan_enddate": "2023-11-17",
+            "include": [
+                5,
+                6,
+                9,
+                7,
+                8,
+                15
+            ],
+            "actioners": []
+        },
+        {
+            "id": 5,
+            "WBS": "",
+            "name": "Implementing feature A",
+            "startdate": "2023-11-13",
+            "enddate": "2023-11-14",
+            "duration": 2,
+            "predecessors": [],
+            "successors": [
+                {
+                    "id": 6,
+                    "depend_type": 1,
+                    "depend_offset": 0
+                }
+            ],
+            "milestone": false,
+            "complete": 0,
+            "basicplan_startdate": "2023-11-13",
+            "basicplan_enddate": "2023-11-14",
+            "include": [],
+            "actioners": [
+                {
+                    "actioner_id": "6553742d42b783db6fec837e",
+                    "nofeedback": false
+                }
+            ]
+        },
+        {
+            "id": 6,
+            "WBS": "",
+            "name": "Testing feature A",
+            "startdate": "2023-11-15",
+            "enddate": "2023-11-15",
+            "duration": 1,
+            "predecessors": [],
+            "successors": [
+                {
+                    "id": 7,
+                    "depend_type": 1,
+                    "depend_offset": 0
+                },
+                {
+                    "id": 9,
+                    "depend_type": 1,
+                    "depend_offset": 0
+                }
+            ],
+            "milestone": false,
+            "complete": 0,
+            "basicplan_startdate": "2023-11-15",
+            "basicplan_enddate": "2023-11-15",
+            "include": [],
+            "actioners": [
+                {
+                    "actioner_id": "65422f0eaeb8250d3e963ce2",
+                    "nofeedback": false
+                }
+            ]
+        },
+        {
+            "id": 9,
+            "WBS": "",
+            "name": "Feature A work",
+            "startdate": "2023-11-16",
+            "enddate": "2023-11-16",
+            "duration": 0,
+            "predecessors": [],
+            "successors": [
+                {
+                    "id": 14,
+                    "depend_type": 1,
+                    "depend_offset": 0
+                }
+            ],
+            "milestone": true,
+            "complete": 0,
+            "basicplan_startdate": "2023-11-16",
+            "basicplan_enddate": "2023-11-16",
+            "include": [],
+            "actioners": []
+        },
+        {
+            "id": 7,
+            "WBS": "",
+            "name": "Implementing feature B",
+            "startdate": "2023-11-16",
+            "enddate": "2023-11-16",
+            "duration": 1,
+            "predecessors": [],
+            "successors": [
+                {
+                    "id": 8,
+                    "depend_type": 1,
+                    "depend_offset": 0
+                }
+            ],
+            "milestone": false,
+            "complete": 0,
+            "basicplan_startdate": "2023-11-16",
+            "basicplan_enddate": "2023-11-16",
+            "include": [],
+            "actioners": [
+                {
+                    "actioner_id": "6553742d42b783db6fec837e",
+                    "nofeedback": false
+                }
+            ]
+        },
+        {
+            "id": 8,
+            "WBS": "",
+            "name": "Testing feature B",
+            "startdate": "2023-11-17",
+            "enddate": "2023-11-17",
+            "duration": 1,
+            "predecessors": [],
+            "successors": [
+                {
+                    "id": 15,
+                    "depend_type": 1,
+                    "depend_offset": 0
+                }
+            ],
+            "milestone": false,
+            "complete": 0,
+            "basicplan_startdate": "2023-11-17",
+            "basicplan_enddate": "2023-11-17",
+            "include": [],
+            "actioners": [
+                {
+                    "actioner_id": "65422f0eaeb8250d3e963ce2",
+                    "nofeedback": false
+                }
+            ]
+        },
+        {
+            "id": 15,
+            "WBS": "",
+            "name": "Feature B work",
+            "startdate": "2023-11-20",
+            "enddate": "2023-11-20",
+            "duration": 0,
+            "predecessors": [],
+            "successors": [
+                {
+                    "id": 14,
+                    "depend_type": 1,
+                    "depend_offset": 0
+                }
+            ],
+            "milestone": true,
+            "complete": 0,
+            "basicplan_startdate": "2023-11-20",
+            "basicplan_enddate": "2023-11-20",
+            "include": [],
+            "actioners": []
+        },
+        {
+            "id": 13,
+            "WBS": "",
+            "name": "Integrational testing",
+            "startdate": "2023-11-20",
+            "enddate": "2023-11-21",
+            "duration": 2,
+            "predecessors": [],
+            "successors": [],
+            "milestone": false,
+            "complete": 0,
+            "basicplan_startdate": "2023-11-20",
+            "basicplan_enddate": "2023-11-21",
+            "include": [
+                14,
+                16
+            ],
+            "actioners": []
+        },
+        {
+            "id": 14,
+            "WBS": "",
+            "name": "Integrational testing of MVP",
+            "startdate": "2023-11-20",
+            "enddate": "2023-11-21",
+            "duration": 2,
+            "predecessors": [],
+            "successors": [
+                {
+                    "id": 16,
+                    "depend_type": 1,
+                    "depend_offset": 0
+                }
+            ],
+            "milestone": false,
+            "complete": 0,
+            "basicplan_startdate": "2023-11-20",
+            "basicplan_enddate": "2023-11-21",
+            "include": [],
+            "actioners": [
+                {
+                    "actioner_id": "65422f0eaeb8250d3e963ce2",
+                    "nofeedback": false
+                }
+            ]
+        },
+        {
+            "id": 16,
+            "WBS": "",
+            "name": "MVP tested and ready to launch",
+            "startdate": "2023-11-22",
+            "enddate": "2023-11-22",
+            "duration": 0,
+            "predecessors": [],
+            "successors": [],
+            "milestone": true,
+            "complete": 0,
+            "basicplan_startdate": "2023-11-22",
+            "basicplan_enddate": "2023-11-22",
+            "include": [],
+            "actioners": []
+        }
+    ],
+    "staff": [
+        {
+            "_id": "6553742d42b783db6fec837e",
+            "name": "Alice",
+            "email": "",
+            "phone": "",
+            "tg_username": "PLACE YOUR TELEGRAM USERNAME HERE",
+            "tg_id": "",
+            "account_type": "free",
+            "settings": {
+                "INFORM_OF_ALL_PROJECTS": false
+            }
+        },
+        {
+            "_id": "65422f0eaeb8250d3e963ce2",
+            "name": "Bob",
+            "email": "",
+            "phone": "",
+            "tg_username": "PLACE YOUR TELEGRAM USERNAME HERE",
+            "tg_id": "",
+            "account_type": "free",
+            "settings": {
+                "INFORM_OF_ALL_PROJECTS": false
+            }
+        }
+    ]
+}
